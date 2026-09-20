@@ -67,15 +67,25 @@ bash scripts/zip_backup.sh
 
 Verified **after a full backup→restore round-trip** — the dumps are genuinely restorable.
 
-## Pushing to GitHub (first time)
+## GitHub
+
+**Repo:** https://github.com/Ninja-Emp/ninja-emp — **private**, default branch `main`.
+
+Day-to-day sync (commits + pushes in one step):
 
 ```bash
-# Create an empty repo on github.com first (no README), then:
-git remote add origin https://github.com/<you>/<repo>.git
-bash scripts/push.sh "chore: initial commit"
+bash scripts/push.sh "feat: what you changed"
 ```
 
-For token auth use `https://<token>@github.com/<you>/<repo>.git` as the remote URL.
+### Cloning to your local machine
+
+```bash
+git clone https://github.com/Ninja-Emp/ninja-emp.git
+cd ninja-emp
+```
+
+If prompted for credentials, use a **Personal Access Token** as the password (GitHub no longer
+accepts account passwords over HTTPS), or install the GitHub CLI and run `gh auth login`.
 
 ## Documentation map
 

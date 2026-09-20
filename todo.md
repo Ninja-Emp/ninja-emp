@@ -14,15 +14,17 @@ Goal: make the work durable and reproducible. GitHub = source of truth; sandbox 
 - [x] Run backup; verify restore round-trip (19/20/5/12 green after restore)
 
 ## C. GitHub push (user has no repo yet)
-- [ ] Provide exact steps + a `scripts/push.sh` helper; ask user for repo URL / token OR use gh if available
-- [ ] Document remote setup in README
+- [x] Provide exact steps + a `scripts/push.sh` helper; gh installed but NOT authenticated
+- [x] Document remote setup in README
+- [x] gh authenticated (benanamen, device flow); created PRIVATE repo Ninja-Emp/ninja-emp; pushed 48 files to main
 
 ## D. Local dev (Laragon + PostgreSQL 18)
-- [ ] `docs/LOCAL_DEV.md`: install PG 18 alongside Laragon, create DBs, run provision.sh, connect Navicat
-- [ ] Note: Laragon ships MySQL, not PG — explicit steps to add PG 18
+- [x] `docs/LOCAL_DEV.md`: install PG 18 alongside Laragon, create DBs, run provision.sh, connect Navicat
+- [x] Note: Laragon ships MySQL, not PG — explicit steps to add PG 18
 
 ## E. Next steps roadmap
-- [ ] `docs/ROADMAP.md`: Part 5 (POS/Sales/Payments) onward, with sequencing
+- [x] `docs/ROADMAP.md`: Part 5 (POS/Sales/Payments) onward, with sequencing
 
 ## F. Validate + deliver
-- [ ] Verify backup/restore round-trips; zip exists; commit all; attach + complete
+- [x] Verify backup/restore round-trips (19/20/5/12 green after restore); zip exists; commit all
+- [ ] Attach + complete
