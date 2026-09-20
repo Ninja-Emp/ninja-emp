@@ -33,9 +33,17 @@ SELECT _apply_tenant_rls(t) FROM unnest(ARRAY[
   'party_contact_mechanism','postal_address','party_identifier',
   'account','posting_map','fiscal_period','audit_log',
   'open_item','payment_application',
+  -- Vendor Mall (Part 3)
+  'location','floor','space','space_attribute','waitlist',
+  'lease','lease_space','rent_component','lease_deposit','delinquency',
+  -- Consignment (Part 4)
   'consignor_agreement','commission_rule','consignment_item','item_price_change',
   'consignment_sale','consignment_sale_line','consignor_settlement',
-  'settlement_line','consignor_payout'
+  'settlement_line','consignor_payout',
+  -- POS & Payments (Part 5)
+  'tender_type','tax_jurisdiction','tax_rate','register','shift',
+  'sale','sale_line','sale_line_tax','payment','payment_tender',
+  'merchant_settlement'
 ]) AS t;
 
 -- Subtype tables (person/organization) have no tenant_id; isolate via their party.

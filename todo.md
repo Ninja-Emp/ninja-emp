@@ -1,30 +1,37 @@
-# Ninja EMP — Round 5: Durability (Git + backups + local dev)
+# Ninja EMP — Round 6: Part 5 (POS & Payments) + Realtime Vendor Portal
 
-Goal: make the work durable and reproducible. GitHub = source of truth; sandbox = throwaway build env; local = fast dev. Add schema+data backups committed to the repo, and a downloadable zip.
+Decisions locked: **accrual at sale** (consignor/vendor liability recognized at the moment of
+sale, not at settlement) → enables **realtime vendor portal numbers**.
 
-## A. Git repo + hygiene
-- [x] `git init`, set identity, create `.gitignore` (exclude .browser_data, .psiphon_data, outputs, *.zip, backups/*.dump)
-- [x] Add `.gitattributes` (normalize line endings; mark *.png binary)
-- [ ] Initial commit of all source (db/, docs/, HANDOFF.md, scripts)
+## A. Decisions
+- [ ] ADR-0028: accrual at sale confirmed; vendor portal reads realtime from the ledger (no batch)
+- [ ] ADR-0029: tender model — split tenders, clearing accounts, over/short
 
-## B. Backup system (schema + data → repo folder)
-- [x] `scripts/backup.sh`: pg_dump schema-only + data-only + full custom-format for both DBs into `backups/<timestamp>/`
-- [x] `scripts/restore.sh`: restore from a backup dir (schema then data)
-- [x] `scripts/zip_backup.sh`: produce `dist/ninja-emp-backup-<timestamp>.zip` of latest backup + source
-- [x] Run backup; verify restore round-trip (19/20/5/12 green after restore)
+## B. Chart of accounts additions
+- [ ] db/38_coa_pos.sql: undeposited funds/card clearing, sales tax payable, merchant fees,
+      store credit liability, gift certificate liability, cash over/short, inventory/COGS(owned)
+      + posting_map roles
 
-## C. GitHub push (user has no repo yet)
-- [x] Provide exact steps + a `scripts/push.sh` helper; gh installed but NOT authenticated
-- [x] Document remote setup in README
-- [x] gh authenticated (benanamen, device flow); created PRIVATE repo Ninja-Emp/ninja-emp; pushed 48 files to main
+## C. POS schema (DB-first)
+- [ ] db/70_pos.sql: tender_type, tax_jurisdiction, tax_rate, register, shift (drawer),
+      sale, sale_line, sale_line_tax, payment, payment_tender, store_credit, gift_certificate,
+      return/refund linkage
+- [ ] Enforce: sale totals = Σ lines; tenders = sale total; line ownership (consignment vs owned)
 
-## D. Local dev (Laragon + PostgreSQL 18)
-- [x] `docs/LOCAL_DEV.md`: install PG 18 alongside Laragon, create DBs, run provision.sh, connect Navicat
-- [x] Note: Laragon ships MySQL, not PG — explicit steps to add PG 18
+## D. Posting functions
+- [ ] db/75_pos_posting.sql: post_sale (accrual at sale), post_refund (reversal-not-edit),
+      post_shift_close (over/short), post_merchant_settlement — idempotent, posting_map-driven
 
-## E. Next steps roadmap
-- [x] `docs/ROADMAP.md`: Part 5 (POS/Sales/Payments) onward, with sequencing
+## E. Realtime vendor portal
+- [ ] db/80_vendor_portal.sql: v_vendor_balance_realtime, v_vendor_sales_today,
+      v_vendor_statement, v_vendor_payout_available — read straight from the ledger
 
-## F. Validate + deliver
-- [x] Verify backup/restore round-trips (19/20/5/12 green after restore); zip exists; commit all
-- [ ] Attach + complete
+## F. Wire-up + tests
+- [ ] Add new tables to 90_rls.sql; update provision.sh
+- [ ] db/tests/pos.sql: assertions (totals, tenders, tax, accrual-at-sale, refund, over/short,
+      vendor realtime balance ties to control, trial balance = 0, idempotency)
+- [ ] Re-provision clean; run ALL suites green
+
+## G. Sync + deliver
+- [ ] Update SRS Part 5, DECISIONS, ERD + render, README
+- [ ] Backup + zip + commit + push; attach; complete

@@ -265,11 +265,57 @@ Status legend: **ACCEPTED** (locked), **PROPOSED** (needs your call), **PUSHBACK
 
 ---
 
+## ADR-0028 — Consignor/vendor liability accrues **at the moment of sale** (not at settlement)
+**Status:** ACCEPTED (confirmed by the product owner)
+**Context:** For consignment and vendor-mall sales, the amount owed to the consignor/vendor can be
+recognized either (a) **at sale**, or (b) deferred until a periodic **settlement** run. This choice
+determines whether a vendor portal can show *realtime* numbers.
+**Decision:** Recognize the liability **at the moment of sale**. `post_sale` immediately credits the
+`consignor_payable_control` / `vendor_payable_control` account, tagged to the consignor/vendor party,
+and opens an AP open item. Settlement does **not** create the liability — it only *groups* already-
+accrued amounts for payout.
+**Consequences:**
+- **Vendors see realtime balances**, because the portal reads the live ledger, not a batch table.
+- The liability is faithfully represented at period end with no accrual adjustment needed.
+- Settlement becomes a pure payout/grouping step (lower risk, fully reversible).
+- Requires per-line consignor attribution at POS (`sale_line.consignor_party_id`).
+**Pushback:** Deferring to settlement is simpler to implement but is **wrong under accrual accounting**
+(the obligation exists the instant the goods sell) and makes a realtime portal impossible without a
+parallel shadow calculation that inevitably drifts from the ledger. Accrual-at-sale keeps **one source
+of truth**. This confirms and extends ADR-0022.
+
+---
+
+## ADR-0029 — Tender model: split tenders, clearing accounts, drawer over/short
+**Status:** ACCEPTED
+**Context:** A POS sale may be paid with multiple tenders (cash + card + store credit). Card money does
+not arrive as cash on the sale date — it settles later, net of merchant fees. Cash drawers miscount.
+**Decision:**
+1. **Split tenders** are first-class: `payment_tender` is a child of `payment`; the sum of tenders must
+   equal the payment total (DB-enforced).
+2. **Clearing accounts**: card/other electronic tenders debit a **card clearing** asset, not `cash`.
+   A later `post_merchant_settlement` moves clearing → bank and books **merchant fee expense** for the
+   spread. This keeps the bank reconciliation honest.
+3. **Liability tenders** (store credit, gift certificate) **debit the corresponding liability control**
+   rather than an asset — redeeming a gift certificate extinguishes an obligation, it is not revenue.
+4. **Over/short**: `post_shift_close` compares counted cash to expected cash and books the difference to
+   `cash_over_short` (income/expense), never silently adjusting revenue.
+**Consequences:** Cash, card, and liability tenders each post correctly; merchant fees are visible as
+expense rather than netted into revenue; drawer discrepancies are auditable.
+**Pushback:** Treating card sales as immediate `cash` is the common shortcut and it corrupts bank rec
+and hides merchant fees. Netting fees against revenue understates both revenue and expense — a
+reporting and tax defect. Clearing accounts are the world-class default.
+
+---
+
 ## Open decisions for you
 1. ~~**ADR-0006:** switch `journal_line.id` to `bigint`?~~ **DONE.**
 2. ~~**ADR-0007:** keep RLS on the hot `journal_line` path?~~ **DONE** — measured ~3× cost; RLS disabled on journal tables, kept elsewhere; `ninja_migrator` BYPASSRLS added.
 3. ~~**ADR-0008:** split the control plane into its own database?~~ **DONE** — `ninja_control` + `ninja_emp`.
-4. **ADR-0012:** drop literal 100% coverage in favor of an MSI gate? (I recommend yes — still open.)
-5. **ADR-0011 (DBAL):** decimal lib (`bcmath` vs library), savepoints (forbid vs support), native prepares (default emulated)? See `docs/DBAL.md` §11.
-6. **ADR-0019:** partition-enablement threshold (proposal: 20M `journal_line` rows/tenant). Your call.
-7. **ADR-0018:** PII key management — session GUC from a secret store vs. `pgcrypto` with a KMS-wrapped key. Your call.
+4. ~~**ADR-0012:** drop literal 100% coverage in favor of an MSI gate?~~ **DONE** — resolved by **ADR-0024** (MSI ≥ 80%).
+5. ~~**ADR-0011 (DBAL):** decimal lib, savepoints, native prepares?~~ **DONE** — resolved by **ADR-0025** (bcmath strings, savepoints supported, emulated prepares).
+6. ~~**ADR-0019:** partition-enablement threshold?~~ **DONE** — resolved by **ADR-0026** (20M `journal_line` rows/tenant).
+7. ~~**ADR-0018:** PII key management?~~ **DONE** — resolved by **ADR-0027** (envelope encryption, KMS-wrapped per-tenant data key).
+8. ~~**Accrual at sale vs at settlement?**~~ **DONE** — resolved by **ADR-0028** (accrual at sale; realtime vendor portal).
+
+**No open decisions remain.** New questions will be raised as ADRs when Part 5+ work surfaces them.

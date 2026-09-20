@@ -328,7 +328,16 @@ INSERT INTO kernel.posting_role (code, name, description) VALUES
   ('owner_equity',               'Owner Equity',                'Owner equity / draw.'),
   ('consignor_payable_control',  'Consignor Payable Control',   'Net proceeds owed to consignors (control).'),
   ('commission_revenue',         'Commission Revenue',          'Commission earned on consignment sales.'),
-  ('consignment_cogs',           'Consignment COGS',            'Cost of consigned goods sold (amount due to consignor).')
+  ('consignment_cogs',           'Consignment COGS',            'Cost of consigned goods sold (amount due to consignor).'),
+  -- POS & Payments (Part 5, ADR-0029)
+  ('undeposited_funds',          'Undeposited Funds',           'Cash/checks received but not yet deposited.'),
+  ('card_clearing',              'Card Clearing',               'Card receipts awaiting processor settlement (not cash).'),
+  ('bank',                       'Bank',                        'Operating bank account.'),
+  ('tips_payable',               'Tips Payable',                'Tips collected on behalf of staff.'),
+  ('sales_tax_payable',          'Sales Tax Payable',           'Sales tax collected and owed to jurisdictions.'),
+  ('cash_over_short',            'Cash Over/Short',             'Drawer count differences (never netted into revenue).'),
+  ('merchant_fees',              'Merchant Fees',               'Card processor fees expensed at settlement.'),
+  ('sales_discounts',            'Sales Discounts',             'Contra-revenue discounts granted at POS.')
 ON CONFLICT (code) DO NOTHING;
 
 -- Seed the classification registry for the columns we know are sensitive.
