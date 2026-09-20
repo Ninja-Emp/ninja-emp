@@ -13,37 +13,29 @@ stable.
 | 2 | **The Ledger** — CoA, journal, invariants, posting API, `posting_map` | ✅ |
 | 3 | **Vendor Mall** — location→floor→space, lease, rent, deposit, delinquency | ✅ |
 | 4 | **Consignment** — agreements, commission rules, items, sales, settlements, payouts | ✅ |
+| 5 | **POS & Payments** — tenders, tax, registers/shifts, sales, refunds, merchant settlement | ✅ |
+| — | **Realtime vendor portal** — ledger-sourced views, ties to GL control | ✅ |
 | — | Open-item AR/AP (aging + cash-basis conversion) | ✅ |
 | — | Durability: git, backups, restore, zip bundles | ✅ |
 
-**Proven:** 56 assertions across 4 suites, all idempotent, verified after a backup→restore round-trip.
+**Proven:** 83 assertions across 5 suites, all idempotent, verified after a backup→restore round-trip.
 
-## Next — Part 5: POS & Payments (DB-first)
+## Next — Part 6: Application Layer
 
-The point-of-sale and money-movement layer. Build order:
+With the domain schema stable through Part 5, the next build is the PHP application layer.
 
-1. **Tender types** — cash, card, check, **customer store credit**, **vendor payable draw**,
-   gift certificate. Lookup table + posting roles.
-2. **Sale / sale_line** — central checkout and vendor-run checkout; per-line tax, discount,
-   commission routing (consignment lines → consignor payable; owned lines → inventory/COGS).
-3. **Payment / payment_tender** — split tenders, change, over/short; ties to open-item AR.
-4. **Sales tax** — tax jurisdictions, rates, tax collected payable; exemption certificates.
-5. **Merchant fees** — processor fee expense, net settlement deposit, fee reconciliation.
-6. **Cash drawer / shift** — opening float, counts, over/short posting.
-7. **Returns / refunds** — reversal-not-edit; restock; store-credit issuance.
-8. **1099-NEC** — vendor/consignor reportable payments, threshold tracking, year-end export.
-9. **Posting functions** — `post_sale`, `post_payment`, `post_refund`, `post_drawer_count`,
-   all idempotent and `posting_map`-driven.
-10. **Assertion suite** — `db/tests/pos.sql`.
+1. **DBAL** per ADR-0025 — bcmath + string money, savepoints, emulated prepares (PgBouncer).
+2. **Feature modules + service contracts** (PHP 8.5, no frameworks, PSR-3/4/7/11/12/15).
+3. **Routing + middleware**; auth (sessions, RBAC via party roles).
+4. **Vendor portal UI** — the realtime views from Part 5 are already built and proven.
+5. **API-first**: OpenAPI 3.1 spec generated from the contracts.
+6. **Server-rendered PHP templates** + a map island for the mall floor plan.
+7. **Quality gate**: PHP-CS-Fixer, PHPStan L10, PHPMD, Deptrac, mutation testing (MSI ≥ 80%).
 
-## Then — Part 6: Application Layer
+## Remaining Part 5 follow-ons (deferred, not blocking)
 
-- Feature modules + service contracts (PHP 8.5, no frameworks, PSR-3/4/7/11/12/15).
-- Routing + middleware; auth (sessions, RBAC via party roles).
-- API-first: OpenAPI 3.1 spec generated from contracts.
-- Server-rendered PHP templates + a map island for the mall floor plan.
-- DBAL per ADR-0025 (bcmath + string money, savepoints, emulated prepares for PgBouncer).
-- Quality gate: PHP-CS-Fixer, PHPStan L10, PHPMD, Deptrac, mutation testing (MSI ≥ 80%, ADR-0024).
+Square/processor API integration · 1099-NEC generation and threshold tracking · vendor payable
+draw as a tender · gift-certificate issuance flow · inventory decrement for owned goods.
 
 ## Then — Part 7: Integrations & Reporting
 
@@ -61,5 +53,6 @@ The point-of-sale and money-movement layer. Build order:
 
 ## Immediate next action
 
-**Part 5, step 1: tender types + sale/sale_line schema.** Say the word and I'll build it DB-first
-the same way — schema, posting functions, and an assertion suite proven on live PostgreSQL.
+**Part 6, step 1: the DBAL** (ADR-0025) — the foundation every service will sit on. Alternatively,
+if you'd rather keep going DB-first, the Part 5 follow-ons above (1099-NEC, gift certificates,
+inventory) are the natural next schema work.

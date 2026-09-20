@@ -3,8 +3,8 @@
 A greenfield **vendor mall + consignment store SaaS** with world-class double-entry accounting.
 **DB-first**: the PostgreSQL schema is the contract; application code follows.
 
-> **Status:** DB foundation complete through **Part 4 (Consignment)**. All invariants proven on
-> live PostgreSQL 18.6. Application layer (Part 6) not yet built.
+> **Status:** DB foundation complete through **Part 5 (POS & Payments)**, including a **realtime
+> vendor portal**. All invariants proven on live PostgreSQL 18.6. Application layer (Part 6) not yet built.
 
 ---
 
@@ -45,6 +45,7 @@ sudo -u postgres psql -d ninja_emp -v ON_ERROR_STOP=1 -f db/tests/invariants.sql
 sudo -u postgres psql -d ninja_emp -v ON_ERROR_STOP=1 -f db/tests/vendormall.sql
 sudo -u postgres psql -d ninja_emp -v ON_ERROR_STOP=1 -f db/tests/partition.sql
 sudo -u postgres psql -d ninja_emp -v ON_ERROR_STOP=1 -f db/tests/consignment.sql
+sudo -u postgres psql -d ninja_emp -v ON_ERROR_STOP=1 -f db/tests/pos.sql
 
 # 3) Back up (schema + data) into backups/<timestamp>/
 bash scripts/backup.sh
@@ -64,6 +65,7 @@ bash scripts/zip_backup.sh
 | `vendormall.sql` | 20 | **20/20 PASS** |
 | `partition.sql` | 5 | **5/5 PASS** |
 | `consignment.sql` | 12 | **12/12 PASS** |
+| `pos.sql` | 27 | **27/27 PASS** |
 
 Verified **after a full backup→restore round-trip** — the dumps are genuinely restorable.
 
@@ -106,5 +108,11 @@ accepts account passwords over HTTPS), or install the GitHub CLI and run `gh aut
 - **Money** = `NUMERIC(19,4)` + `CHAR(3)` currency; never float, never PG `money`.
 - **Accrual** is the book of record; **cash basis** is a derived report (ADR-0022).
 - **Open-item AR/AP** drives aging + cash-basis conversion (ADR-0023).
+- **Accrual at sale** (ADR-0028): consignor/vendor liability is recognized the instant goods sell,
+  which is what makes the **realtime vendor portal** possible — it reads the live ledger, so it
+  cannot drift from the books.
+- **Tenders** (ADR-0029): split tenders are first-class; card receipts hit a **clearing** account
+  (not cash) until the processor settles; merchant fees are **expensed**, never netted into revenue;
+  drawer differences go to **cash over/short**.
 - **Account determination** via `posting_map` — domain code never hard-codes account codes (ADR-0020).
 - **RLS** defense-in-depth; disabled on hot journal tables (measured ~3× cost, ADR-0007).

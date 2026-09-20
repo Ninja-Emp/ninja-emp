@@ -191,8 +191,37 @@ Markdown/discount engine, returns, layaway, gift certificates, vendor statements
 
 ---
 
-## Part 5 — POS & Payments (outline)
-Central + vendor-run checkout; cash drawer; card/check; Square integration; merchant fees; sales tax; 1099-NEC; tender types incl. **customer store credit** and **vendor payable draw**. **Not built.**
+## Part 5 — POS & Payments — **BUILT**
+
+### 5.1 Purpose
+Point of sale for both central checkout and vendor-run registers, the money-movement layer behind it, and the **realtime vendor portal** those numbers feed.
+
+### 5.2 Accounting basis (ADR-0028, ADR-0029)
+Liability to a consignor/vendor accrues **at the moment of sale**, not at settlement. This is both the correct accrual treatment (the obligation exists the instant the goods sell) and the enabling condition for a **realtime vendor portal**: the portal reads the live ledger, so it cannot drift from the books. Settlement is reduced to a pure grouping-and-payout step.
+
+Tender handling follows ADR-0029. Card receipts debit a **card clearing** asset rather than cash, because the money has not arrived yet; a later merchant settlement moves clearing to bank and books the processor fee as **expense** rather than netting it into revenue. Liability tenders (store credit, gift certificate) **debit the liability control** — redeeming a certificate extinguishes an obligation and is not revenue. Drawer differences are booked to **cash over/short**, never absorbed silently into sales.
+
+### 5.3 Entities
+`tender_type` (settlement kind: cash / clearing / liability), `tax_jurisdiction`, `tax_rate` (effective-dated, non-overlapping), `register`, `shift` (drawer session, one open per register), `sale`, `sale_line` (consignment vs owned; consignment lines carry the commission split), `sale_line_tax` (multi-jurisdiction), `payment`, `payment_tender` (split tenders), `merchant_settlement`.
+
+### 5.4 Posting to the ledger (ADR-0020) — **BUILT**
+`post_sale` debits each tender to its resolved account, credits sales revenue and sales tax payable, and — for consignment lines — debits consignment COGS and credits consignor payable per consignor while opening an AP open item. `post_refund` is a separate document that mirrors the sale, reverses the consignor accrual, **and relieves the matching open items**. `post_shift_close` compares counted to expected cash and books over/short. `post_merchant_settlement` moves clearing to bank and expenses the fee. All are idempotent and `posting_map`-driven.
+
+### 5.5 Realtime vendor portal
+`v_vendor_balance_realtime`, `v_vendor_sales_realtime`, `v_vendor_sales_today`, `v_vendor_payout_available`, and `v_vendor_statement` are **views over the ledger and open-item layer** — no batch tables, no nightly rollups, nothing that can drift. `vendor_portal_check()` asserts the portal total equals the GL control balance and is exercised by the test suite.
+
+### 5.6 Requirements
+R1. A sale's header totals must equal the sum of its lines (DB-enforced, deferred).
+R2. Captured tenders must sum to the payment amount (DB-enforced, deferred).
+R3. Consignment lines must split exactly: commission + net = extended price.
+R4. Card tenders must never debit cash; they debit clearing until settled.
+R5. Liability tenders must be subledger-tagged to the party whose balance falls.
+R6. Refunds must be new documents; the original entry is never mutated.
+R7. A refund must relieve both the GL control account and the open items.
+R8. The realtime portal balance must equal the GL control balance at all times.
+
+### 5.7 Not yet built (future Parts)
+Square/processor API integration, 1099-NEC generation and threshold tracking, vendor payable draw as a tender, gift-certificate issuance flow, and inventory decrement for owned goods.
 
 ## Part 6 — Application Layer (outline)
 Feature modules, service contracts, routing, middleware, auth, API surface (OpenAPI 3.1), server-rendered UI + map island. **Not built.**
@@ -202,4 +231,4 @@ QB/Xero export mapping; reporting depth; dashboards. **Not built.**
 
 ## Part 8 — Invariants & Test Strategy
 The invariants in §2.4 are the contract. Test pyramid: unit → functional (real PG) → contract (OpenAPI) → E2E → smoke. Mutation testing is the primary gate (ADR-0012).
-**Harnesses built:** `db/tests/invariants.sql` (19/19 PASS), `db/tests/vendormall.sql` (20/20 PASS), `db/tests/consignment.sql` (12/12 PASS), `db/tests/partition.sql` (5/5 PASS), `db/tests/rls_benchmark.sql`. All assertion suites are idempotent (safe to re-run against a live tenant).
+**Harnesses built:** `db/tests/invariants.sql` (19/19 PASS), `db/tests/vendormall.sql` (20/20 PASS), `db/tests/consignment.sql` (12/12 PASS), `db/tests/pos.sql` (27/27 PASS), `db/tests/partition.sql` (5/5 PASS), `db/tests/rls_benchmark.sql`. **83 assertions total.** All assertion suites are idempotent (safe to re-run against a live tenant) and are verified after a full backup→restore round-trip.

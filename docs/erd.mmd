@@ -319,6 +319,102 @@ erDiagram
         text method
         uuid journal_entry_id FK
     }
+    TENDER_TYPE {
+        text code PK
+        text name
+        text settlement_kind
+        text debit_role_code FK
+        text subledger_type_code FK
+    }
+    TAX_JURISDICTION {
+        uuid id PK
+        text code
+        text name
+    }
+    TAX_RATE {
+        uuid id PK
+        uuid jurisdiction_id FK
+        numeric rate
+        date effective_from
+        date effective_thru
+    }
+    REGISTER {
+        uuid id PK
+        text code
+        text name
+        uuid location_id FK
+    }
+    SHIFT {
+        uuid id PK
+        bigint shift_no
+        uuid register_id FK
+        numeric opening_float
+        numeric counted_cash
+        numeric expected_cash
+        numeric over_short
+        text status
+        uuid journal_entry_id FK
+    }
+    SALE {
+        uuid id PK
+        bigint sale_no
+        uuid register_id FK
+        uuid shift_id FK
+        uuid customer_party_id FK
+        date sale_date
+        numeric subtotal
+        numeric discount_total
+        numeric tax_total
+        numeric total
+        text status
+        boolean is_refund
+        uuid refunds_sale_id FK
+        uuid journal_entry_id FK
+    }
+    SALE_LINE {
+        uuid id PK
+        uuid sale_id FK
+        integer line_no
+        text line_kind
+        uuid consignment_item_id FK
+        uuid consignor_party_id FK
+        uuid vendor_party_id FK
+        numeric extended_price
+        numeric commission_amount
+        numeric net_to_consignor
+        numeric tax_amount
+    }
+    SALE_LINE_TAX {
+        uuid id PK
+        uuid sale_line_id FK
+        uuid jurisdiction_id FK
+        numeric rate
+        numeric tax_amount
+    }
+    PAYMENT {
+        uuid id PK
+        bigint payment_no
+        uuid sale_id FK
+        numeric amount
+        text status
+        uuid journal_entry_id FK
+    }
+    PAYMENT_TENDER {
+        uuid id PK
+        uuid payment_id FK
+        text tender_type_code FK
+        numeric amount
+        uuid party_id FK
+        char4 card_last4
+    }
+    MERCHANT_SETTLEMENT {
+        uuid id PK
+        bigint settlement_no
+        numeric gross_amount
+        numeric fee_amount
+        numeric net_amount
+        uuid journal_entry_id FK
+    }
     CURRENCY ||--o{ TENANT_CONFIG : "functional"
     CURRENCY ||--o{ EXCHANGE_RATE : "from_to"
     ACCOUNT_TYPE ||--o{ ACCOUNT : "types"
@@ -374,3 +470,27 @@ erDiagram
     JOURNAL_ENTRY ||--o| CONSIGNOR_SETTLEMENT : "records"
     CONSIGNOR_SETTLEMENT ||--o{ CONSIGNOR_PAYOUT : "paid_by"
     JOURNAL_ENTRY ||--o| CONSIGNOR_PAYOUT : "records"
+    POSTING_ROLE ||--o{ TENDER_TYPE : "debit_role"
+    SUBLEDGER_TYPE ||--o{ TENDER_TYPE : "liability_tag"
+    TAX_JURISDICTION ||--o{ TAX_RATE : "rated"
+    LOCATION ||--o{ REGISTER : "hosts"
+    REGISTER ||--o{ SHIFT : "drawer_session"
+    PARTY ||--o{ SHIFT : "opened_by"
+    JOURNAL_ENTRY ||--o| SHIFT : "over_short"
+    REGISTER ||--o{ SALE : "rung_on"
+    SHIFT ||--o{ SALE : "during"
+    PARTY ||--o{ SALE : "customer"
+    SALE ||--o| SALE : "refunds"
+    JOURNAL_ENTRY ||--o| SALE : "records"
+    SALE ||--o{ SALE_LINE : "contains"
+    CONSIGNMENT_ITEM ||--o{ SALE_LINE : "sold_as"
+    PARTY ||--o{ SALE_LINE : "consignor"
+    PARTY ||--o{ SALE_LINE : "vendor"
+    SALE_LINE ||--o{ SALE_LINE_TAX : "taxed_by"
+    TAX_JURISDICTION ||--o{ SALE_LINE_TAX : "levies"
+    SALE ||--o{ PAYMENT : "paid_by"
+    JOURNAL_ENTRY ||--o| PAYMENT : "records"
+    PAYMENT ||--o{ PAYMENT_TENDER : "split_into"
+    TENDER_TYPE ||--o{ PAYMENT_TENDER : "typed"
+    PARTY ||--o{ PAYMENT_TENDER : "liability_party"
+    JOURNAL_ENTRY ||--o| MERCHANT_SETTLEMENT : "records"
