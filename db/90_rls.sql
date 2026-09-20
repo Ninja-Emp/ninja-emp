@@ -43,7 +43,9 @@ SELECT _apply_tenant_rls(t) FROM unnest(ARRAY[
   -- POS & Payments (Part 5)
   'tender_type','tax_jurisdiction','tax_rate','register','shift',
   'sale','sale_line','sale_line_tax','payment','payment_tender',
-  'merchant_settlement'
+  'merchant_settlement',
+  -- Inventory & stored value (Part 6, ADR-0031/0032)
+  'inventory_item','inventory_movement','stored_value','stored_value_activity'
 ]) AS t;
 
 -- Subtype tables (person/organization) have no tenant_id; isolate via their party.

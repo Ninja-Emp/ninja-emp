@@ -9,12 +9,12 @@
 - [x] Test suite: close + statements (23 assertions)
 
 ## Round B — Tier 2 core
-- [ ] ADR: inventory valuation method
-- [ ] Inventory tables + movements + owned-goods COGS on sale
-- [ ] ADR: gift certificate breakage / escheatment
-- [ ] Gift certificate + store credit issuance tables & posting
-- [ ] Vendor payable draw as tender (+ overdraw guard)
-- [ ] Test suite: inventory, stored value
+- [x] ADR-0031: weighted average cost
+- [x] Inventory tables + movements + owned-goods COGS on sale
+- [x] ADR-0032: breakage opt-in, default never
+- [x] Gift certificate + store credit issuance tables & posting
+- [x] Vendor payable draw as tender (+ overdraw guard)
+- [x] Test suite: inventory, stored value (30 assertions)
 
 ## Round C — Tier 2 remainder
 - [ ] 1099-NEC threshold tracking + annual extract

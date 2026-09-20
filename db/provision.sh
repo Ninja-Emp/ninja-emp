@@ -59,7 +59,8 @@ $PSQL -d "$TENANT_DB" -c "SET search_path = $TENANT, kernel; SET app.tenant_id =
 # Domain + posting + RLS last.
 for f in 40_subledger.sql 45_openitem.sql 50_vendormall.sql 55_vendormall_posting.sql \
          60_consignment.sql 65_consignment_posting.sql \
-         70_pos.sql 75_pos_posting.sql 80_vendor_portal.sql 85_close.sql 90_rls.sql; do
+         70_pos.sql 72_inventory.sql 75_pos_posting.sql 77_pos_inventory.sql \
+         78_stored_value.sql 79_vendor_draw.sql 80_vendor_portal.sql 85_close.sql 90_rls.sql; do
   echo "   - $f"
   # tenant_id is needed because some domain files seed tenant reference data
   # (e.g. 70_pos.sql seeds tender_type).

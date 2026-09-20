@@ -308,6 +308,72 @@ reporting and tax defect. Clearing accounts are the world-class default.
 
 ---
 
+## ADR-0030 — Period close and year-end close via Income Summary
+
+**Status:** Accepted.
+**Context:** The ledger enforced period locks but nothing could actually close a book, and there was no
+Retained Earnings account for a year-end roll-up.
+**Decision:**
+1. Two lock levels: `closed` is a **soft lock** (reopenable via `reopen_period`); `locked` is a **hard
+   lock** applied by year-end close and is not reopenable without reversing the close entry.
+2. `close_period` refuses if the ledger is **out of balance** or if an **earlier period is still open**.
+   Closing out of order hides gaps.
+3. `close_fiscal_year` zeroes every income-statement account against **Income Summary (3950)**, then
+   clears Income Summary to **Retained Earnings (3900)**, in a single balanced entry posted on the last
+   day of the year. Income Summary must net to **zero** afterwards or the function raises.
+4. Closing **posts a real journal entry**; it never mutates history. Undoing a close is a reversal.
+**Consequences:** P&L accounts start each year at zero; equity carries forward correctly; the close is
+idempotent by `idempotency_key` like every other poster.
+**Pushback:** Many systems "close" by flipping a flag and computing retained earnings on the fly. That
+leaves no audit trail for the roll-up. Posting a real close entry is the auditable default.
+
+---
+
+## ADR-0031 — Inventory valuation: weighted average cost
+
+**Status:** Accepted (default; revisit before go-live if tax strategy requires FIFO).
+**Context:** Owned goods could be sold through POS but nothing decremented stock or booked COGS, so
+margin on owned inventory was invisible. Consigned goods are unaffected — the store never owns them.
+**Decision:**
+1. **Weighted average cost** (moving average), recomputed on every receipt.
+2. Inventory is tracked in `inventory_item` (the definition + current on-hand + current average cost)
+   with an append-only `inventory_movement` ledger. **Movements are never edited**, mirroring the
+   journal.
+3. COGS is booked **at the moment of sale** for owned lines: debit COGS, credit Inventory — consistent
+   with ADR-0028 (accrue at sale).
+4. Consigned items are explicitly **excluded** from inventory valuation: the store holds them but does
+   not own them, so they are not a balance-sheet asset.
+**Consequences:** Margin is reportable per sale; the Inventory control account ties to
+`Σ (on_hand × avg_cost)`, and this is asserted in the test suite.
+**Pushback:** FIFO gives better matching in a rising-cost environment and is often preferred for tax,
+but it requires layer tracking and makes every sale a multi-layer relief. For a mall/consignment store
+whose owned inventory is a minority of volume, weighted average is materially simpler and defensible
+under GAAP. **This is a reversible decision** — the movement ledger retains enough detail to rebuild
+FIFO layers later if you want it.
+
+---
+
+## ADR-0032 — Stored value: gift certificates and store credit
+
+**Status:** Accepted.
+**Context:** Gift certificates and store credit were **redeemable as tenders but could not be issued** —
+the liability had no origin. Views existed over journal lines with no backing document.
+**Decision:**
+1. Issuance creates a **liability, never revenue**: selling a gift certificate debits cash and credits
+   the gift-certificate control. Revenue is recognised only on **redemption**.
+2. Stored value is an **open-item subledger** keyed by certificate/credit, so each instrument has its own
+   balance and ties to the GL control account like AR/AP.
+3. **Breakage** (unredeemed value recognised as income) is **opt-in and explicit**, controlled by
+   `tenant_config.breakage_after_months`. Default is **NULL = never**.
+4. Escheatment is a **jurisdictional legal question, not a software default**. The schema records the
+   data needed to comply; it does not silently take unredeemed balances into income.
+**Consequences:** Stored value is auditable per instrument; the liability cannot drift from the GL.
+**Pushback:** Recognising breakage automatically on a fixed schedule is common and is **legally wrong in
+many US states**, where unredeemed balances escheat to the state rather than becoming income. Defaulting
+to "never" is the safe, correct default; enabling it must be a deliberate act.
+
+---
+
 ## Open decisions for you
 1. ~~**ADR-0006:** switch `journal_line.id` to `bigint`?~~ **DONE.**
 2. ~~**ADR-0007:** keep RLS on the hot `journal_line` path?~~ **DONE** — measured ~3× cost; RLS disabled on journal tables, kept elsewhere; `ninja_migrator` BYPASSRLS added.
@@ -318,4 +384,10 @@ reporting and tax defect. Clearing accounts are the world-class default.
 7. ~~**ADR-0018:** PII key management?~~ **DONE** — resolved by **ADR-0027** (envelope encryption, KMS-wrapped per-tenant data key).
 8. ~~**Accrual at sale vs at settlement?**~~ **DONE** — resolved by **ADR-0028** (accrual at sale; realtime vendor portal).
 
-**No open decisions remain.** New questions will be raised as ADRs when Part 5+ work surfaces them.
+9. ~~**Inventory valuation: FIFO or weighted average?**~~ **DONE** — resolved by **ADR-0031** (weighted average; reversible).
+10. ~~**Gift certificate breakage policy?**~~ **DONE** — resolved by **ADR-0032** (opt-in, default never; escheatment is a legal question).
+
+**No open decisions remain.** New questions will be raised as ADRs as work surfaces them.
+
+> **Two ADRs above are defaults I chose so work could continue — both are cheap to reverse and worth
+> your explicit sign-off:** ADR-0031 (weighted average vs FIFO) and ADR-0032 (breakage default of never).
