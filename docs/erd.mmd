@@ -1,0 +1,376 @@
+erDiagram
+    CURRENCY {
+        char3 code PK
+        smallint numeric_code
+        smallint minor_unit
+    }
+    ACCOUNT_TYPE {
+        text code PK
+        char1 normal_balance
+        text statement
+    }
+    PARTY_ROLE_TYPE {
+        text code PK
+    }
+    SUBLEDGER_TYPE {
+        text code PK
+    }
+    POSTING_ROLE {
+        text code PK
+    }
+    SPACE_TYPE {
+        text code PK
+    }
+    RENT_COMPONENT_TYPE {
+        text code PK
+        boolean is_variable
+    }
+    IDENTIFIER_TYPE {
+        text code PK
+        boolean is_sensitive
+    }
+    DATA_CLASSIFICATION {
+        text schema_name PK
+        text table_name PK
+        text column_name PK
+        text class
+    }
+    TENANT {
+        uuid id PK
+        text slug
+        text schema_name
+        text pool_group
+    }
+    TENANT_CONFIG {
+        uuid tenant_id PK
+        char3 functional_currency FK
+        smallint fiscal_year_start_month
+    }
+    EXCHANGE_RATE {
+        uuid id PK
+        char3 from_currency FK
+        char3 to_currency FK
+        numeric rate
+        date as_of
+    }
+    PARTY {
+        uuid id PK
+        text party_type
+        text display_name
+        boolean is_active
+        int version
+        timestamptz deleted_at
+    }
+    PERSON {
+        uuid party_id PK
+        text given_name
+        text family_name
+        date date_of_birth
+    }
+    ORGANIZATION {
+        uuid party_id PK
+        text legal_name
+        text entity_type
+    }
+    PARTY_ROLE {
+        uuid id PK
+        uuid party_id FK
+        text role_type_code FK
+        boolean is_house
+        date from_date
+        date thru_date
+    }
+    PARTY_RELATIONSHIP {
+        uuid id PK
+        uuid from_party_id FK
+        uuid to_party_id FK
+        text relationship_type_code FK
+    }
+    PARTY_CONTACT_MECHANISM {
+        uuid id PK
+        uuid party_id FK
+        text mechanism_type_code FK
+        text value
+    }
+    POSTAL_ADDRESS {
+        uuid id PK
+        uuid party_id FK
+        text line1
+        text city
+        char2 country_code
+    }
+    PARTY_IDENTIFIER {
+        uuid id PK
+        uuid party_id FK
+        text identifier_type FK
+        bytea identifier_value_enc
+        text identifier_hash
+    }
+    ACCOUNT {
+        uuid id PK
+        text code
+        text account_type_code FK
+        uuid parent_id FK
+        boolean is_control
+        text control_subledger_type_code FK
+    }
+    POSTING_MAP {
+        uuid id PK
+        text role_code FK
+        uuid account_id FK
+    }
+    FISCAL_PERIOD {
+        uuid id PK
+        smallint fiscal_year
+        smallint period_no
+        date start_date
+        date end_date
+        text status
+    }
+    JOURNAL_ENTRY {
+        uuid id PK
+        bigint entry_no
+        date entry_date
+        text source
+        text idempotency_key
+        uuid reversal_of_id FK
+    }
+    JOURNAL_LINE {
+        bigint id PK
+        uuid journal_entry_id FK
+        smallint line_no
+        uuid account_id FK
+        numeric debit
+        numeric credit
+        char3 currency
+        numeric base_debit
+        numeric base_credit
+        uuid party_id FK
+        text subledger_type_code FK
+    }
+    AUDIT_LOG {
+        bigint id PK
+        text table_name
+        text row_id
+        text op
+        uuid actor_id
+        jsonb before_data
+        jsonb after_data
+    }
+    LOCATION {
+        uuid id PK
+        text code
+        text name
+        text city
+    }
+    FLOOR {
+        uuid id PK
+        uuid location_id FK
+        text code
+        smallint level_no
+    }
+    SPACE {
+        uuid id PK
+        uuid floor_id FK
+        text code
+        text space_type_code FK
+        numeric area_sqft
+        text status
+    }
+    SPACE_ATTRIBUTE {
+        uuid id PK
+        uuid space_id FK
+        text attr_key
+        text attr_value
+    }
+    WAITLIST {
+        uuid id PK
+        uuid party_id FK
+        text space_type_code FK
+        uuid preferred_location_id FK
+        text status
+    }
+    LEASE {
+        uuid id PK
+        bigint lease_no
+        uuid lessee_party_id FK
+        uuid location_id FK
+        text status
+        date start_date
+        date end_date
+        smallint billing_day
+    }
+    LEASE_SPACE {
+        uuid id PK
+        uuid lease_id FK
+        uuid space_id FK
+        numeric allocated_area_sqft
+        date from_date
+        date thru_date
+    }
+    RENT_COMPONENT {
+        uuid id PK
+        uuid lease_id FK
+        text component_type_code FK
+        numeric amount
+        char3 currency
+        numeric percent_rate
+        date effective_from
+    }
+    LEASE_DEPOSIT {
+        uuid id PK
+        uuid lease_id FK
+        numeric deposit_amount
+        char3 currency
+        text status
+        uuid journal_entry_id FK
+    }
+    DELINQUENCY {
+        uuid id PK
+        uuid lease_id FK
+        date as_of_date
+        numeric amount_due
+        numeric amount_paid
+        int days_past_due
+        text status
+    }
+    OPEN_ITEM {
+        uuid id PK
+        text subledger_type_code FK
+        uuid party_id FK
+        text source
+        numeric original_amount
+        numeric open_amount
+        date due_date
+        text status
+    }
+    PAYMENT_APPLICATION {
+        uuid id PK
+        uuid open_item_id FK
+        numeric applied_amount
+        date applied_date
+        uuid journal_entry_id FK
+    }
+    CONSIGNOR_AGREEMENT {
+        uuid id PK
+        bigint agreement_no
+        uuid consignor_party_id FK
+        text status
+        numeric default_commission_rate
+    }
+    COMMISSION_RULE {
+        uuid id PK
+        uuid agreement_id FK
+        text rule_type
+        numeric rate
+        numeric breakpoint_amount
+        date effective_from
+    }
+    CONSIGNMENT_ITEM {
+        uuid id PK
+        uuid agreement_id FK
+        bigint item_no
+        text sku
+        numeric agreed_price
+        text status
+    }
+    ITEM_PRICE_CHANGE {
+        uuid id PK
+        uuid item_id FK
+        numeric old_price
+        numeric new_price
+    }
+    CONSIGNMENT_SALE {
+        uuid id PK
+        bigint sale_no
+        date sale_date
+        text channel
+        text status
+        uuid journal_entry_id FK
+    }
+    CONSIGNMENT_SALE_LINE {
+        uuid id PK
+        uuid sale_id FK
+        uuid item_id FK
+        uuid consignor_party_id FK
+        numeric sale_price
+        numeric commission_amount
+        numeric net_to_consignor
+    }
+    CONSIGNOR_SETTLEMENT {
+        uuid id PK
+        bigint settlement_no
+        uuid consignor_party_id FK
+        numeric gross_sales
+        numeric commission_total
+        numeric net_payable
+        text status
+    }
+    SETTLEMENT_LINE {
+        uuid id PK
+        uuid settlement_id FK
+        uuid sale_line_id FK
+        numeric net_amount
+    }
+    CONSIGNOR_PAYOUT {
+        uuid id PK
+        uuid settlement_id FK
+        numeric payout_amount
+        text method
+        uuid journal_entry_id FK
+    }
+    CURRENCY ||--o{ TENANT_CONFIG : "functional"
+    CURRENCY ||--o{ EXCHANGE_RATE : "from_to"
+    ACCOUNT_TYPE ||--o{ ACCOUNT : "types"
+    SUBLEDGER_TYPE ||--o{ ACCOUNT : "controls"
+    SUBLEDGER_TYPE ||--o{ JOURNAL_LINE : "tags"
+    POSTING_ROLE ||--o{ POSTING_MAP : "role"
+    ACCOUNT ||--o{ POSTING_MAP : "mapped_to"
+    PARTY ||--o| PERSON : "is_a"
+    PARTY ||--o| ORGANIZATION : "is_a"
+    PARTY ||--o{ PARTY_ROLE : "plays"
+    PARTY_ROLE_TYPE ||--o{ PARTY_ROLE : "typed"
+    PARTY ||--o{ PARTY_RELATIONSHIP : "from"
+    PARTY ||--o{ PARTY_RELATIONSHIP : "to"
+    PARTY ||--o{ PARTY_CONTACT_MECHANISM : "has"
+    PARTY ||--o{ POSTAL_ADDRESS : "has"
+    PARTY ||--o{ PARTY_IDENTIFIER : "has"
+    IDENTIFIER_TYPE ||--o{ PARTY_IDENTIFIER : "typed"
+    ACCOUNT ||--o{ ACCOUNT : "parent_of"
+    ACCOUNT ||--o{ JOURNAL_LINE : "posted_to"
+    JOURNAL_ENTRY ||--o{ JOURNAL_LINE : "contains"
+    JOURNAL_ENTRY ||--o| JOURNAL_ENTRY : "reverses"
+    PARTY ||--o{ JOURNAL_LINE : "subledger_party"
+    LOCATION ||--o{ FLOOR : "has"
+    LOCATION ||--o{ LEASE : "hosts"
+    FLOOR ||--o{ SPACE : "contains"
+    SPACE_TYPE ||--o{ SPACE : "typed"
+    SPACE ||--o{ SPACE_ATTRIBUTE : "has"
+    SPACE ||--o{ LEASE_SPACE : "allocated"
+    PARTY ||--o{ WAITLIST : "waits"
+    PARTY ||--o{ LEASE : "lessee"
+    LEASE ||--o{ LEASE_SPACE : "covers"
+    LEASE ||--o{ RENT_COMPONENT : "billed_by"
+    RENT_COMPONENT_TYPE ||--o{ RENT_COMPONENT : "typed"
+    LEASE ||--o{ LEASE_DEPOSIT : "secured_by"
+    LEASE ||--o{ DELINQUENCY : "snapshots"
+    JOURNAL_ENTRY ||--o| LEASE_DEPOSIT : "records"
+    SUBLEDGER_TYPE ||--o{ OPEN_ITEM : "typed"
+    PARTY ||--o{ OPEN_ITEM : "owes"
+    JOURNAL_ENTRY ||--o| OPEN_ITEM : "records"
+    OPEN_ITEM ||--o{ PAYMENT_APPLICATION : "settled_by"
+    JOURNAL_ENTRY ||--o| PAYMENT_APPLICATION : "records"
+    PARTY ||--o{ CONSIGNOR_AGREEMENT : "consigns"
+    CONSIGNOR_AGREEMENT ||--o{ COMMISSION_RULE : "terms"
+    CONSIGNOR_AGREEMENT ||--o{ CONSIGNMENT_ITEM : "places"
+    CONSIGNMENT_ITEM ||--o{ ITEM_PRICE_CHANGE : "repriced"
+    CONSIGNMENT_SALE ||--o{ CONSIGNMENT_SALE_LINE : "contains"
+    CONSIGNMENT_ITEM ||--o{ CONSIGNMENT_SALE_LINE : "sold_as"
+    PARTY ||--o{ CONSIGNMENT_SALE_LINE : "consignor_of"
+    JOURNAL_ENTRY ||--o| CONSIGNMENT_SALE : "records"
+    PARTY ||--o{ CONSIGNOR_SETTLEMENT : "settled_with"
+    CONSIGNOR_SETTLEMENT ||--o{ SETTLEMENT_LINE : "rolls_up"
+    CONSIGNMENT_SALE_LINE ||--o{ SETTLEMENT_LINE : "included_in"
+    JOURNAL_ENTRY ||--o| CONSIGNOR_SETTLEMENT : "records"
+    CONSIGNOR_SETTLEMENT ||--o{ CONSIGNOR_PAYOUT : "paid_by"
+    JOURNAL_ENTRY ||--o| CONSIGNOR_PAYOUT : "records"

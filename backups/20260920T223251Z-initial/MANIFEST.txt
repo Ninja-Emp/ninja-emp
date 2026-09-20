@@ -1,0 +1,6 @@
+backup_utc=20260920T223251Z
+label=initial
+control_db=ninja_control
+tenant_db=ninja_emp
+pg_dump=pg_dump (PostgreSQL) 18.6 (Debian 18.6-1.pgdg12+2)
+host=172.20.98.170

@@ -1,0 +1,32 @@
+# --- Sandbox / agent runtime (never commit) ---
+.browser_data/
+.psiphon_data/
+.agent_hooks/
+outputs/
+summarized_conversations/
+*.log
+
+# --- Secrets / local env ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# --- Build / dist artifacts ---
+dist/
+*.zip
+*.tar.gz
+
+# --- Large binary DB dumps (keep the SQL text backups; ignore raw custom dumps) ---
+backups/**/*.dump
+backups/**/*.tar
+
+# --- OS / editor cruft ---
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/

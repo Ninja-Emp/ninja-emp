@@ -1,0 +1,24 @@
+# Normalize line endings to LF in the repo; check out LF everywhere (cross-platform safe).
+* text=auto eol=lf
+
+# Explicit text types
+*.sql   text eol=lf
+*.sh    text eol=lf
+*.md    text eol=lf
+*.php   text eol=lf
+*.json  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.mmd   text eol=lf
+
+# Binary types (never diff/merge as text)
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.pdf   binary
+*.dump  binary
+*.zip   binary
+
+# Keep shell scripts executable bit
+*.sh    text eol=lf
