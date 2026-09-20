@@ -337,7 +337,15 @@ INSERT INTO kernel.posting_role (code, name, description) VALUES
   ('sales_tax_payable',          'Sales Tax Payable',           'Sales tax collected and owed to jurisdictions.'),
   ('cash_over_short',            'Cash Over/Short',             'Drawer count differences (never netted into revenue).'),
   ('merchant_fees',              'Merchant Fees',               'Card processor fees expensed at settlement.'),
-  ('sales_discounts',            'Sales Discounts',             'Contra-revenue discounts granted at POS.')
+  ('sales_discounts',            'Sales Discounts',             'Contra-revenue discounts granted at POS.'),
+  -- Period / year-end close (Part 6, ADR-0030)
+  ('retained_earnings',          'Retained Earnings',           'Accumulated prior-year net income; target of year-end close.'),
+  ('income_summary',             'Income Summary',              'Clearing account used during year-end close; always nets to zero.'),
+  -- Inventory & owned goods (Part 6, ADR-0031)
+  ('inventory_adjustment',       'Inventory Adjustment',        'Shrink/spoilage/count adjustments to inventory value.'),
+  ('purchase_clearing',          'Purchase Clearing',           'Goods received not yet invoiced (GRNI).'),
+  -- Stored value (Part 6, ADR-0032)
+  ('gift_certificate_breakage',  'Gift Certificate Breakage',   'Unredeemed stored value recognized as income.')
 ON CONFLICT (code) DO NOTHING;
 
 -- Seed the classification registry for the columns we know are sensitive.

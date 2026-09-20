@@ -1,37 +1,38 @@
-# Ninja EMP — Round 6: Part 5 (POS & Payments) + Realtime Vendor Portal
+# Ninja EMP — Finish the DB
 
-Decisions locked: **accrual at sale** (consignor/vendor liability recognized at the moment of
-sale, not at settlement) → enables **realtime vendor portal numbers**.
+## Round A — Tier 1: Complete the accounting core
+- [x] 3900 Retained Earnings + `retained_earnings` posting role
+- [x] `close_period()` / `reopen_period()` / `close_fiscal_year()`
+- [x] `income_statement()` / `balance_sheet()`
+- [x] `cash_basis_income_statement()` (ADR-0022 derivation)
+- [x] `write_off_open_item()` (wire up dead `bad_debt_expense` role)
+- [x] Test suite: close + statements (23 assertions)
 
-## A. Decisions
-- [x] ADR-0028: accrual at sale confirmed; vendor portal reads realtime from the ledger (no batch)
-- [x] ADR-0029: tender model — split tenders, clearing accounts, over/short
+## Round B — Tier 2 core
+- [ ] ADR: inventory valuation method
+- [ ] Inventory tables + movements + owned-goods COGS on sale
+- [ ] ADR: gift certificate breakage / escheatment
+- [ ] Gift certificate + store credit issuance tables & posting
+- [ ] Vendor payable draw as tender (+ overdraw guard)
+- [ ] Test suite: inventory, stored value
 
-## B. Chart of accounts additions
-- [x] db/38_coa_pos.sql: undeposited funds/card clearing, sales tax payable, merchant fees,
-      store credit liability, gift certificate liability, cash over/short, inventory/COGS(owned)
-      + posting_map roles
+## Round C — Tier 2 remainder
+- [ ] 1099-NEC threshold tracking + annual extract
+- [ ] Percentage-rent true-up from POS sales
+- [ ] CAM reconciliation
+- [ ] Lease renewals & escalations
+- [ ] Markdown engine + layaway
+- [ ] Percentage-commission true-ups
+- [ ] Test suites
 
-## C. POS schema (DB-first)
-- [x] db/70_pos.sql: tender_type, tax_jurisdiction, tax_rate, register, shift (drawer),
-      sale, sale_line, sale_line_tax, payment, payment_tender, store_credit, gift_certificate,
-      return/refund linkage
-- [x] Enforce: sale totals = Σ lines; tenders = sale total; line ownership (consignment vs owned)
+## Round D — Tier 3 + Ops (user request)
+- [ ] Migrations runner (versioned, resumable, idempotent)
+- [ ] Fix partition-test schema pollution
+- [ ] Per-tenant backup/restore (tenant go-live snapshot)
+- [ ] Prod -> local dev sync WITH PII SCRUBBING (raw requires explicit flag)
+- [ ] Laragon/Windows dev sync docs
 
-## D. Posting functions
-- [x] db/75_pos_posting.sql: post_sale (accrual at sale), post_refund (reversal-not-edit),
-      post_shift_close (over/short), post_merchant_settlement — idempotent, posting_map-driven
-
-## E. Realtime vendor portal
-- [x] db/80_vendor_portal.sql: v_vendor_balance_realtime, v_vendor_sales_today,
-      v_vendor_statement, v_vendor_payout_available — read straight from the ledger
-
-## F. Wire-up + tests
-- [x] Add new tables to 90_rls.sql; update provision.sh
-- [x] db/tests/pos.sql: assertions (totals, tenders, tax, accrual-at-sale, refund, over/short,
-      vendor realtime balance ties to control, trial balance = 0, idempotency)
-- [x] Re-provision clean; run ALL suites green
-
-## G. Sync + deliver
-- [x] Update SRS Part 5, DECISIONS, ERD + render, README
-- [ ] Backup + zip + commit + push; attach; complete
+## Round E — Sync & deliver
+- [ ] Full test run (all suites green)
+- [ ] ERD re-render + SRS/README/ROADMAP/DECISIONS sync
+- [ ] Backup + zip + push
