@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My Money — Ninja EMP Vendor Portal</title>
+  <meta name="description" content="See how much the mall owes you, when you get paid, and a plain-language history of your money.">
+  <link rel="stylesheet" href="css/styles.css">
+<script src="https://sites.super.myninja.ai/_assets/ninja-daytona-script.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to the main part of the page</a>
+
+  <header class="topbar">
+    <div class="wrap">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">&#127978;</div>
+        <div>
+          <div class="brand-name">Ninja EMP</div>
+          <div class="brand-sub">Your Vendor Portal</div>
+        </div>
+      </div>
+      <div class="toolbar" role="group" aria-label="Comfort settings">
+        <button id="btn-bigger-text" class="tool-btn" type="button" aria-pressed="false">
+          <span aria-hidden="true">&#128203;</span><span class="label">Bigger Text</span>
+        </button>
+        <button id="btn-read-aloud" class="tool-btn" type="button" aria-pressed="false">
+          <span aria-hidden="true">&#128266;</span><span class="label">Read This Page</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <nav class="mainnav" aria-label="Main menu">
+    <ul>
+      <li><a href="index.html"><span class="ico" aria-hidden="true">&#127968;</span> Home</a></li>
+      <li><a href="sales.html"><span class="ico" aria-hidden="true">&#128717;</span> What Sold</a></li>
+      <li><a href="money.html"><span class="ico" aria-hidden="true">&#128176;</span> My Money</a></li>
+      <li><a href="space.html"><span class="ico" aria-hidden="true">&#128506;</span> My Booth</a></li>
+      <li><a href="help.html"><span class="ico" aria-hidden="true">&#128222;</span> Need Help?</a></li>
+    </ul>
+  </nav>
+
+  <main id="main" class="wrap">
+    <section class="hero">
+      <p class="hello">My money</p>
+      <h1>Here is what the mall owes you.</h1>
+      <p class="sub">This is money from things that already sold. It is set aside for you and it is safe.</p>
+    </section>
+
+    <!-- The big number -->
+    <section class="card brand mt-2">
+      <p class="card-label">The mall owes you right now</p>
+      <p class="money">$1,247<span class="cents">.75</span></p>
+      <p class="money-note">This number updates the moment something sells. It is never out of date.</p>
+      <div class="grid grid-2 mt-2">
+        <div>
+          <p class="card-label">Ready to pay out</p>
+          <p class="money" style="font-size:var(--fs-2xl)">$1,247.75</p>
+        </div>
+        <div>
+          <p class="card-label">Next payout day</p>
+          <p class="money" style="font-size:var(--fs-2xl)">In 12 days</p>
+        </div>
+      </div>
+      <a class="btn btn-primary btn-block mt-2" href="help.html">
+        <span class="ico" aria-hidden="true">&#128179;</span> Ask for an Early Payout
+      </a>
+    </section>
+
+    <!-- How it works, in plain words -->
+    <section class="card mt-2">
+      <h2 class="mt-0">How your money works</h2>
+      <ul class="rowlist">
+        <li>
+          <span class="row-ico" aria-hidden="true">&#128717;</span>
+          <span class="row-main">
+            <span class="row-title">1. Something sells</span>
+            <span class="row-sub">A shopper buys one of your items at the register.</span>
+          </span>
+        </li>
+        <li>
+          <span class="row-ico" aria-hidden="true">&#9986;</span>
+          <span class="row-main">
+            <span class="row-title">2. The mall takes its small share</span>
+            <span class="row-sub">This is the commission we agreed on. It is taken out right away.</span>
+          </span>
+        </li>
+        <li>
+          <span class="row-ico" aria-hidden="true">&#128176;</span>
+          <span class="row-main">
+            <span class="row-title">3. The rest is set aside for you</span>
+            <span class="row-sub">It adds up here until payout day.</span>
+          </span>
+        </li>
+        <li>
+          <span class="row-ico" aria-hidden="true">&#127974;</span>
+          <span class="row-main">
+            <span class="row-title">4. You get paid</span>
+            <span class="row-sub">By check or direct deposit, whichever you chose.</span>
+          </span>
+        </li>
+      </ul>
+    </section>
+
+    <!-- Plain-language history -->
+    <section class="card mt-2">
+      <h2 class="mt-0">Your money history</h2>
+      <p class="muted">Newest at the top. Green means money coming to you. Red means money paid out to you.</p>
+      <table class="ledger">
+        <thead>
+          <tr>
+            <th scope="col">When</th>
+            <th scope="col">What happened</th>
+            <th scope="col" class="num">Amount</th>
+            <th scope="col" class="num">Running total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Today</td>
+            <td>Sales from your booth</td>
+            <td class="num in">+$184.50</td>
+            <td class="num">$1,247.75</td>
+          </tr>
+          <tr>
+            <td>Yesterday</td>
+            <td>Sales from your booth</td>
+            <td class="num in">+$142.50</td>
+            <td class="num">$1,063.25</td>
+          </tr>
+          <tr>
+            <td>3 days ago</td>
+            <td>Payout sent to your bank</td>
+            <td class="num out">&minus;$980.00</td>
+            <td class="num">$920.75</td>
+          </tr>
+          <tr>
+            <td>4 days ago</td>
+            <td>Sales from your booth</td>
+            <td class="num in">+$158.00</td>
+            <td class="num">$1,900.75</td>
+          </tr>
+          <tr>
+            <td>5 days ago</td>
+            <td>Sales from your booth</td>
+            <td class="num in">+$96.25</td>
+            <td class="num">$1,742.75</td>
+          </tr>
+          <tr>
+            <td>1 week ago</td>
+            <td>Booth rent for this month</td>
+            <td class="num out">&minus;$450.00</td>
+            <td class="num">$1,646.50</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Reassurance -->
+    <section class="mt-2">
+      <div class="notice good">
+        <span class="notice-ico" aria-hidden="true">&#128274;</span>
+        <div>
+          <h3 class="mt-0">Your money is always correct</h3>
+          <p class="mb-0 lead">These numbers come straight from the mall&rsquo;s official books. They are
+            checked every single day, so what you see here is exactly what you are owed.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-3 center">
+      <a class="btn btn-ghost" href="space.html">
+        <span class="ico" aria-hidden="true">&#128506;</span> Now Let&rsquo;s See My Booth
+      </a>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <div>
+        <strong>Ninja EMP</strong> &mdash; Vendor Portal<br>
+        <span class="tiny">Your numbers come straight from the mall&rsquo;s books, so they are always correct.</span>
+      </div>
+      <div class="tiny">Last updated just now &middot; &copy; 2026 Ninja EMP</div>
+    </div>
+  </footer>
+
+  <div id="live-region" class="sr-only" aria-live="polite"></div>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your Home Page — Ninja EMP Vendor Portal</title>
+  <meta name="description" content="A friendly home page for mall vendors: see what sold today, what you earned, and what the mall owes you.">
+  <link rel="stylesheet" href="css/styles.css">
+<script src="https://sites.super.myninja.ai/_assets/ninja-daytona-script.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to the main part of the page</a>
+
+  <!-- ===================== TOP BAR ===================== -->
+  <header class="topbar">
+    <div class="wrap">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">&#127978;</div>
+        <div>
+          <div class="brand-name">Ninja EMP</div>
+          <div class="brand-sub">Your Vendor Portal</div>
+        </div>
+      </div>
+      <div class="toolbar" role="group" aria-label="Comfort settings">
+        <button id="btn-bigger-text" class="tool-btn" type="button" aria-pressed="false">
+          <span aria-hidden="true">&#128203;</span><span class="label">Bigger Text</span>
+        </button>
+        <button id="btn-read-aloud" class="tool-btn" type="button" aria-pressed="false">
+          <span aria-hidden="true">&#128266;</span><span class="label">Read This Page</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================== NAV ===================== -->
+  <nav class="mainnav" aria-label="Main menu">
+    <ul>
+      <li><a href="index.html"><span class="ico" aria-hidden="true">&#127968;</span> Home</a></li>
+      <li><a href="sales.html"><span class="ico" aria-hidden="true">&#128717;</span> What Sold</a></li>
+      <li><a href="money.html"><span class="ico" aria-hidden="true">&#128176;</span> My Money</a></li>
+      <li><a href="space.html"><span class="ico" aria-hidden="true">&#128506;</span> My Booth</a></li>
+      <li><a href="help.html"><span class="ico" aria-hidden="true">&#128222;</span> Need Help?</a></li>
+    </ul>
+  </nav>
+
+  <main id="main" class="wrap">
+    <!-- ===================== GREETING ===================== -->
+    <section class="hero">
+      <p class="hello">Good morning, Rose! &#128075;</p>
+      <h1>Here is how your booth is doing today.</h1>
+      <p class="sub">Everything on this page is up to the minute. If you ever feel lost, just press the
+        <strong>Read This Page</strong> button at the top and we will read it to you.</p>
+    </section>
+
+    <!-- ===================== TODAY'S MONEY ===================== -->
+    <section class="grid grid-2 mt-2" aria-label="Today's numbers">
+      <div class="card highlight">
+        <p class="card-label">You earned today</p>
+        <p class="money sun">$184<span class="cents">.50</span></p>
+        <p class="money-note">That is after the mall&rsquo;s commission. Nice work!</p>
+        <p class="pill pill-good mt-2">&#9650; $42.00 more than yesterday</p>
+      </div>
+
+      <div class="card brand">
+        <p class="card-label">The mall owes you</p>
+        <p class="money">$1,247<span class="cents">.75</span></p>
+        <p class="money-note">This is money from your sales that we are holding for you.</p>
+        <a class="btn btn-primary mt-2" href="money.html">
+          <span class="ico" aria-hidden="true">&#128176;</span> See My Money
+        </a>
+      </div>
+    </section>
+
+    <!-- ===================== QUICK STATS ===================== -->
+    <section class="grid grid-3 mt-2" aria-label="Quick facts">
+      <div class="card stat">
+        <span class="stat-ico" aria-hidden="true">&#128230;</span>
+        <span class="stat-num">7</span>
+        <span class="stat-cap">items sold today</span>
+      </div>
+      <div class="card stat">
+        <span class="stat-ico" aria-hidden="true">&#127991;</span>
+        <span class="stat-num">38</span>
+        <span class="stat-cap">items on your shelves</span>
+      </div>
+      <div class="card stat">
+        <span class="stat-ico" aria-hidden="true">&#128197;</span>
+        <span class="stat-num">12</span>
+        <span class="stat-cap">days until your next payout</span>
+      </div>
+    </section>
+
+    <!-- ===================== FRIENDLY NOTICE ===================== -->
+    <section class="mt-2">
+      <div class="notice good">
+        <span class="notice-ico" aria-hidden="true">&#9989;</span>
+        <div>
+          <h3 class="mt-0">Your booth rent is all paid up</h3>
+          <p class="mb-0 lead">You are paid through the end of the month. Nothing to worry about here.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== WHAT SOLD (preview) ===================== -->
+    <section class="card mt-2">
+      <h2 class="mt-0">A few things that sold today</h2>
+      <p class="muted">Here is a quick peek. Press &ldquo;See Everything&rdquo; for the full list.</p>
+      <ul class="rowlist">
+        <li>
+          <span class="row-ico" aria-hidden="true">&#127812;</span>
+          <span class="row-main">
+            <span class="row-title">Blueberry Jam (large jar)</span>
+            <span class="row-sub">Sold at 10:14 in the morning</span>
+          </span>
+          <span class="row-amt good">+$12.00</span>
+        </li>
+        <li>
+          <span class="row-ico" aria-hidden="true">&#129472;</span>
+          <span class="row-main">
+            <span class="row-title">Handmade Goat Cheese</span>
+            <span class="row-sub">Sold at 11:02 in the morning</span>
+          </span>
+          <span class="row-amt good">+$18.50</span>
+        </li>
+        <li>
+          <span class="row-ico" aria-hidden="true">&#127855;</span>
+          <span class="row-main">
+            <span class="row-title">Strawberry Preserves</span>
+            <span class="row-sub">Sold at 1:40 in the afternoon</span>
+          </span>
+          <span class="row-amt good">+$9.75</span>
+        </li>
+      </ul>
+      <a class="btn btn-ghost btn-block mt-2" href="sales.html">
+        <span class="ico" aria-hidden="true">&#128717;</span> See Everything That Sold
+      </a>
+    </section>
+
+    <!-- ===================== BIG HELP CARD ===================== -->
+    <section class="mt-3">
+      <div class="phone-card">
+        <p class="card-label" style="color:#fff;opacity:.9">Questions? We are happy to help.</p>
+        <p class="num"><a href="tel:+15551234567">Call us: (555) 123-4567</a></p>
+        <p class="hours">A real person answers Monday to Saturday, 9 in the morning to 6 at night.</p>
+        <a class="btn btn-sun mt-2" href="help.html">
+          <span class="ico" aria-hidden="true">&#128222;</span> More Ways to Get Help
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <div>
+        <strong>Ninja EMP</strong> &mdash; Vendor Portal<br>
+        <span class="tiny">Your numbers come straight from the mall&rsquo;s books, so they are always correct.</span>
+      </div>
+      <div class="tiny">Last updated just now &middot; &copy; 2026 Ninja EMP</div>
+    </div>
+  </footer>
+
+  <div id="live-region" class="sr-only" aria-live="polite"></div>
+  <script src="js/app.js"></script>
+</body>
+</html>
