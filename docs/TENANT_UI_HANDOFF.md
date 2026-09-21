@@ -264,22 +264,27 @@ would expose.
 The Tenant UI is a **front-end slice** running on a mock data layer. The following is the
 remaining work to make Ninja EMP a real application. This is the handoff for the next phase.
 
-### A. Data access layer (DBAL) — ADR-0025
-- Implement `DbalRepository implements Repository` with **PDO + named params**, **bcmath +
-  string money** end-to-end, **savepoints** for nested transactions, and **emulated prepares**
-  (PgBouncer compatibility).
-- One method per `MockRepository` method; keep signatures identical so controllers/views don't change.
-- Bind `Repository → DbalRepository` in `public/index.php`; delete the mock.
-- Read the realtime vendor views: `v_vendor_balance_realtime`, `v_vendor_sales_realtime`,
-  `v_vendor_sales_today`, `v_vendor_payout_available`, `v_vendor_statement`.
+### A. Data access layer (DBAL) — ADR-0025 — ✅ DELIVERED
+- `src/Db/` implements the contract in `docs/DBAL.md`: `Connection`, `PdoConnection`,
+  `TenantContext`/`Tenant`, `ResultSet`, `Row`, `PlaceholderRewriter` (quote-aware named→positional),
+  `Identifier`, `TypeMapper`, `ErrorMapper`, and typed exceptions.
+- **bcmath + string money** end-to-end (`src/Money/Money.php`); **emulated prepares** (PgBouncer);
+  **nested `transactional()` joins the outer transaction**; `SET LOCAL` tenant context per tx.
+- **83 unit assertions green** (`php tests/run.php`), zero deps. Functional tests auto-skip without a DB.
+- **Still to do:** a `DbalRepository implements Repository` with one method per `MockRepository`
+  method (identical signatures) so controllers/views don't change; bind it in `public/index.php`
+  and delete the mock. Read the realtime vendor views: `v_vendor_balance_realtime`,
+  `v_vendor_sales_realtime`, `v_vendor_sales_today`, `v_vendor_payout_available`, `v_vendor_statement`.
 
-### B. Ledger engine — ADR-0020 / ADR-0028 / ADR-0029
-- **Append-only, reversal-not-edit, idempotent** posting. A sale posts a balanced journal entry.
-- **Account determination** via `posting_map` (ADR-0020) — no hard-coded account numbers.
-- **Accrual at sale** → realtime vendor portal (ADR-0028).
-- **Tenders** (ADR-0029): cash / check / card→clearing / gift certificate / customer store
-  credit / vendor payable draw. Wire `PosController::checkout` to post.
-- Vendor payable accrual on sale; payout/aging; commission per `commission_rule`.
+### B. Ledger engine — ADR-0020 / ADR-0028 / ADR-0029 — ✅ DELIVERED
+- `src/Ledger/` implements **append-only, reversal-not-edit, idempotent** posting via
+  `LedgerService::post()` → `post_journal_entry()`; `reverse()` → `reverse_journal_entry()`.
+- **Account determination** via `posting_map` (`resolveAccount()` → `posting_account()`), no
+  hard-coded account numbers. `JournalEntry` validates balance in PHP before the DB.
+- **Tenders** (ADR-0029) mapped in `Tender`: cash/check→undeposited funds, card→clearing,
+  gift cert→liability, store credit→customer credit, vendor draw→vendor payable.
+- **Still to do:** wire `PosController::checkout` to post; vendor payable accrual on sale;
+  payout/aging; commission per `commission_rule`; accrual-at-sale → realtime vendor portal (ADR-0028).
 
 ### C. Auth & tenancy
 - Real authentication (sessions, password hashing, CSRF), replacing the mock role switcher.
@@ -306,8 +311,9 @@ remaining work to make Ninja EMP a real application. This is the handoff for the
 - Tests (unit for money/ledger; integration for posting; e2e for POS).
 - CI (lint + tests), deploy pipeline.
 
-**Suggested next step:** start with **A (DBAL)** and **B (ledger engine)** — they unblock
-everything else and the UI is already shaped to consume them.
+**Suggested next step:** **A (DBAL)** and **B (ledger engine)** are delivered (`src/`, 83 unit
+assertions green). Next: **C (auth & tenancy)** and the **DbalRepository** that swaps the mock
+data layer for the real DBAL — then the domain modules in **E**.
 
 ---
 

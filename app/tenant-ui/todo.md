@@ -16,11 +16,11 @@
 
 ## Verify + ship
 - [x] Verify all routes + POST endpoints
-- [ ] Screenshots (light + dark)
-- [ ] Update README + handoff doc
-- [ ] Push + update PR #2
+- [x] Screenshots (light + dark)
+- [x] Update README + handoff doc
+- [x] Push + update PR #2
 
 ## Handoff
-- [ ] Write handoff doc for remaining app work (DBAL, auth, ledger, etc.)
-- [ ] Push handoff doc
-- [ ] Start on handoff items
+- [x] Write handoff doc for remaining app work (DBAL, auth, ledger, etc.)
+- [x] Push handoff doc
+- [ ] Start on handoff items (DBAL + ledger engine)
