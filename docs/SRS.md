@@ -1,6 +1,6 @@
 # Ninja EMP — Software Requirements Specification (SRS)
 
-**Version:** 0.2 · **Status:** DB-first, pre-build · **Scope of this revision:** Parts 0–3 expanded; Parts 4–8 outlined.
+**Version:** 0.3 · **Status:** DB complete and proven · **Scope of this revision:** Parts 0–5 built; Parts 6–8 outlined.
 
 > Pragmatic SRS. We expand a section only when we build it. This document is the
 > durable spec; chat is not load-bearing. Decisions live in `docs/DECISIONS.md`;
@@ -186,8 +186,13 @@ A consignor places goods with the store; the store sells them and owes the consi
 - R4: All posting is idempotent (verified).
 - R5: Commission rules may not overlap in time (exclusion constraint, verified).
 
-### 4.6 Not yet built (future Parts)
-Markdown/discount engine, returns, layaway, gift certificates, vendor statements, 1099-NEC reporting, and percentage-commission true-ups.
+### 4.6 Built in Round C (was "not yet built")
+- **Markdown engine** (`84_markdown_layaway.sql`, ADR-0036): `markdown_reason` (reason-driven absorption defaults) and append-only `markdown_event`. A markdown is an **event**, never an overwrite; price can only fall; the store/consignor/shared split is recorded per event.
+- **Layaway** (`84_markdown_layaway.sql`, ADR-0036): `layaway` / `layaway_line` / `layaway_payment`. Deposits are a **liability** (`2450`), not revenue, until pickup; cancellation splits refund vs. fee income.
+- **Percentage-commission true-up** (`86_commission_trueup.sql`, ADR-0037): `commission_trueup`, rated **marginally** per period (not cliff) so the effective rate is monotonic in sales.
+- **1099-NEC reporting** (`82_tax_1099.sql`, ADR-0034): cash-basis accumulation, year-keyed thresholds, TIN/W-9 tracking, exception report.
+
+Still deferred (non-blocking): returns beyond the POS refund path, and formal vendor statements.
 
 ---
 
@@ -220,8 +225,13 @@ R6. Refunds must be new documents; the original entry is never mutated.
 R7. A refund must relieve both the GL control account and the open items.
 R8. The realtime portal balance must equal the GL control balance at all times.
 
-### 5.7 Not yet built (future Parts)
-Square/processor API integration, 1099-NEC generation and threshold tracking, vendor payable draw as a tender, gift-certificate issuance flow, and inventory decrement for owned goods.
+### 5.7 Built in Rounds B/C (was "not yet built")
+- **Inventory for owned goods** (`72_inventory.sql`, ADR-0031): moving weighted-average cost, COGS booked on owned-line sales.
+- **Stored value** (`78_stored_value.sql`, ADR-0032): gift-certificate / store-credit issuance as a liability, with opt-in breakage.
+- **Vendor payable draw** (`79_vendor_draw.sql`): draw as a tender with an overdraw guard.
+- **1099-NEC** (`82_tax_1099.sql`, ADR-0034): threshold tracking and annual extract.
+
+Still deferred (non-blocking): Square/processor API integration.
 
 ## Part 6 — Application Layer (outline)
 Feature modules, service contracts, routing, middleware, auth, API surface (OpenAPI 3.1), server-rendered UI + map island. **Not built.**

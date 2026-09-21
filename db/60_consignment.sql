@@ -72,10 +72,34 @@ CREATE TABLE commission_rule (
 COMMENT ON TABLE commission_rule IS 'Effective-dated commission terms (flat or tiered) per agreement.';
 
 -- Effective-dated integrity: no overlapping rules for the same agreement (ADR-0021).
+--
+-- The exclusion key MUST include the band identity (rule_type + breakpoint),
+-- not just the agreement.
+--
+-- The first version of this constraint keyed on (agreement_id, daterange) only.
+-- That is correct for a flat rate and catastrophically wrong for a tiered one:
+-- a tiered schedule IS a set of concurrently-effective rows, one per band
+-- ("40% to 5,000, 30% to 20,000, 25% above"). Keying on the agreement alone
+-- made the second band collide with the first, so a tiered commission was
+-- physically unstorable and every tiered code path was unreachable. The
+-- constraint did not merely over-restrict -- it silently deleted a headline
+-- feature, and nothing failed until something tried to use it.
+--
+-- Compare rent_component (50_vendormall.sql), which got this right by keying
+-- on component_type_code as well: base rent and percentage rent coexist on one
+-- lease for the same dates because they are different THINGS, not competing
+-- versions of one thing. A commission band is the same shape of object.
+--
+-- COALESCE(...,-1) folds flat rules (breakpoint NULL) into a single "base
+-- band" slot. Two flat rates overlapping in time still collide, which is the
+-- real error this constraint exists to prevent, as does re-declaring the same
+-- breakpoint twice over overlapping dates.
 ALTER TABLE commission_rule
   ADD CONSTRAINT ex_commission_rule_no_overlap
   EXCLUDE USING gist (
     agreement_id WITH =,
+    rule_type    WITH =,
+    (COALESCE(breakpoint_amount::numeric, -1)) WITH =,
     daterange(effective_from, effective_thru, '[]') WITH &&
   );
 CREATE INDEX ix_commission_rule_agreement ON commission_rule(agreement_id);
@@ -97,8 +121,11 @@ CREATE TABLE consignment_item (
   agreed_price     kernel.money_amount NOT NULL CHECK (agreed_price >= 0),
   currency         kernel.currency_code NOT NULL DEFAULT 'USD',
   received_date    date NOT NULL DEFAULT current_date,
+  -- 'reserved' = held against an open layaway (84_markdown_layaway.sql). It is
+  -- off the sales floor but NOT sold: no revenue, no consignor payable, and it
+  -- returns to 'available' if the layaway is cancelled.
   status           text NOT NULL DEFAULT 'received'
-                     CHECK (status IN ('received','available','sold','returned','withdrawn','lost')),
+                     CHECK (status IN ('received','available','reserved','sold','returned','withdrawn','lost')),
   created_at       timestamptz NOT NULL DEFAULT now(),
   created_by       uuid DEFAULT kernel.current_actor(),
   updated_at       timestamptz NOT NULL DEFAULT now(),

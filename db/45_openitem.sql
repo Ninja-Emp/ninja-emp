@@ -24,6 +24,26 @@ CREATE TABLE open_item (
   source              text NOT NULL,                 -- rent | consignment | pos | manual
   source_ref          text,                          -- e.g. lease id / sale id
   document_no         text,                          -- human-readable invoice no
+
+  -- An open item is a DOCUMENT, and documents come in two directions.
+  --
+  -- 'invoice'     the party owes this amount (AR) or the store owes it (AP).
+  -- 'credit_memo' the direction is reversed: an AR credit memo is money the
+  --               store owes back to the customer.
+  --
+  -- Amounts stay NON-NEGATIVE on both. Modelling a credit as a negative
+  -- invoice looks tempting and is wrong: it breaks the >= 0 constraints that
+  -- catch real bugs, it makes FIFO allocation ambiguous, and "open_amount"
+  -- stops meaning "how much of this document is outstanding". A credit memo
+  -- for 400.00 is an open credit of 400.00, not an invoice for -400.00.
+  --
+  -- This exists because CAM over-recovery (83_lease_trueup.sql) genuinely
+  -- produces a credit balance: the landlord billed estimates above actual and
+  -- owes the difference back. Before this, that path violated
+  -- open_item_open_amount_check and the credit simply could not be recorded.
+  item_kind           text NOT NULL DEFAULT 'invoice'
+                        CHECK (item_kind IN ('invoice','credit_memo')),
+
   original_amount     kernel.money_amount NOT NULL CHECK (original_amount >= 0),
   open_amount         kernel.money_amount NOT NULL CHECK (open_amount >= 0),
   currency            kernel.currency_code NOT NULL DEFAULT 'USD',
@@ -79,6 +99,10 @@ CREATE TRIGGER trg_payment_application_audit
 -- ----------------------------------------------------------------------------
 -- open_item — helper to create an open item (used by domain posting functions).
 -- ----------------------------------------------------------------------------
+-- A NEGATIVE p_amount is interpreted as a CREDIT MEMO of the absolute value,
+-- not stored as a negative invoice. Callers that compute a signed balance
+-- (CAM reconciliation, commission true-ups) can therefore pass their result
+-- through unchanged and get the right document either way.
 CREATE OR REPLACE FUNCTION open_item_create(
   p_subledger_type text,
   p_party_id       uuid,
@@ -93,18 +117,43 @@ CREATE OR REPLACE FUNCTION open_item_create(
 ) RETURNS uuid
 LANGUAGE plpgsql AS $$
 DECLARE
-  v_id uuid;
+  v_id   uuid;
+  v_kind text;
+  v_abs  kernel.money_amount;
 BEGIN
+  IF p_amount = 0 THEN
+    RAISE EXCEPTION 'An open item of zero has nothing to settle' USING ERRCODE='23514';
+  END IF;
+
+  v_kind := CASE WHEN p_amount < 0 THEN 'credit_memo' ELSE 'invoice' END;
+  v_abs  := abs(p_amount);
+
   INSERT INTO open_item (
-    subledger_type_code, party_id, source, source_ref, document_no,
+    subledger_type_code, party_id, source, source_ref, document_no, item_kind,
     original_amount, open_amount, currency, issue_date, due_date, journal_entry_id
   ) VALUES (
-    p_subledger_type, p_party_id, p_source, p_source_ref, p_document_no,
-    p_amount, p_amount, p_currency, p_issue_date, p_due_date, p_journal_entry
+    p_subledger_type, p_party_id, p_source, p_source_ref, p_document_no, v_kind,
+    v_abs, v_abs, p_currency, p_issue_date, p_due_date, p_journal_entry
   ) RETURNING id INTO v_id;
   RETURN v_id;
 END; $$;
-COMMENT ON FUNCTION open_item_create IS 'Creates an open item (AR/AP detail) linked to its originating journal entry.';
+COMMENT ON FUNCTION open_item_create IS
+  'Creates an open item linked to its journal entry. A negative amount creates a CREDIT MEMO, never a negative invoice.';
+
+-- ----------------------------------------------------------------------------
+-- open_item_signed — the ledger-facing value of an open item.
+--
+-- Invoices add to the balance, credit memos subtract. Every invariant and
+-- aging query must use this rather than open_amount, or credit memos inflate
+-- the balance instead of reducing it.
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION open_item_signed(p_kind text, p_amount kernel.money_amount)
+RETURNS kernel.money_amount
+LANGUAGE sql IMMUTABLE AS $$
+  SELECT CASE WHEN p_kind = 'credit_memo' THEN -p_amount ELSE p_amount END;
+$$;
+COMMENT ON FUNCTION open_item_signed IS
+  'Signed contribution of an open item to its subledger balance: credit memos are negative.';
 
 -- ----------------------------------------------------------------------------
 -- subledger_control_role — maps a subledger type to its control posting role.
@@ -191,6 +240,11 @@ BEGIN
      WHERE party_id = p_party_id
        AND subledger_type_code = p_subledger_type
        AND status IN ('open','partial')
+       -- Credit memos are not payable. Cash settles what is OWED; an open
+       -- credit is netted at invoicing time, not paid off with more cash.
+       -- Including them here would let a payment "settle" a credit and then
+       -- fail with an unapplied remainder on the invoice it should have paid.
+       AND item_kind = 'invoice'
        AND deleted_at IS NULL
      ORDER BY COALESCE(due_date, issue_date), issue_date, id
      FOR UPDATE
@@ -224,8 +278,10 @@ COMMENT ON FUNCTION apply_payment IS 'Idempotent payment: posts cash entry and a
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE VIEW v_open_item AS
   SELECT oi.id, oi.subledger_type_code, oi.party_id, p.display_name AS party_name,
-         oi.source, oi.source_ref, oi.document_no,
-         oi.original_amount, oi.open_amount, oi.currency,
+         oi.source, oi.source_ref, oi.document_no, oi.item_kind,
+         oi.original_amount, oi.open_amount,
+         open_item_signed(oi.item_kind, oi.open_amount) AS signed_amount,
+         oi.currency,
          oi.issue_date, oi.due_date, oi.status,
          (current_date - COALESCE(oi.due_date, oi.issue_date)) AS days_outstanding
     FROM open_item oi
@@ -235,12 +291,14 @@ COMMENT ON VIEW v_open_item IS 'Open items with party name and days outstanding.
 
 -- Aging buckets (0-30, 31-60, 61-90, 90+), per party per subledger type.
 CREATE OR REPLACE VIEW v_aging AS
+  -- Signed throughout: an unapplied credit memo must REDUCE what the aging
+  -- says a party owes, otherwise collections chase money already refunded.
   SELECT subledger_type_code, party_id, party_name,
-         sum(CASE WHEN days_outstanding <= 30 THEN open_amount ELSE 0 END) AS bucket_0_30,
-         sum(CASE WHEN days_outstanding BETWEEN 31 AND 60 THEN open_amount ELSE 0 END) AS bucket_31_60,
-         sum(CASE WHEN days_outstanding BETWEEN 61 AND 90 THEN open_amount ELSE 0 END) AS bucket_61_90,
-         sum(CASE WHEN days_outstanding > 90 THEN open_amount ELSE 0 END) AS bucket_90_plus,
-         sum(open_amount) AS total_open
+         sum(CASE WHEN days_outstanding <= 30 THEN signed_amount ELSE 0 END) AS bucket_0_30,
+         sum(CASE WHEN days_outstanding BETWEEN 31 AND 60 THEN signed_amount ELSE 0 END) AS bucket_31_60,
+         sum(CASE WHEN days_outstanding BETWEEN 61 AND 90 THEN signed_amount ELSE 0 END) AS bucket_61_90,
+         sum(CASE WHEN days_outstanding > 90 THEN signed_amount ELSE 0 END) AS bucket_90_plus,
+         sum(signed_amount) AS total_open
     FROM v_open_item
    WHERE status IN ('open','partial')
    GROUP BY subledger_type_code, party_id, party_name;
@@ -259,7 +317,12 @@ RETURNS TABLE (
 )
 LANGUAGE sql STABLE AS $$
   WITH oi AS (
-    SELECT subledger_type_code AS st, sum(open_amount) AS total
+    -- SIGNED: a credit memo reduces the subledger balance. Summing
+    -- open_amount raw would make a 400.00 credit look like 400.00 more owed,
+    -- and the control check would then fail by 800.00 -- twice the credit,
+    -- which is a confusing way to discover a correct credit memo.
+    SELECT subledger_type_code AS st,
+           sum(open_item_signed(item_kind, open_amount)) AS total
       FROM open_item
      WHERE status IN ('open','partial') AND deleted_at IS NULL
      GROUP BY subledger_type_code
@@ -272,11 +335,30 @@ LANGUAGE sql STABLE AS $$
      WHERE a.is_control
      GROUP BY a.control_subledger_type_code
   )
+  -- Scoped to the subledgers whose detail actually lives in open_item.
+  --
+  -- Security deposits (lease_deposit), layaway deposits (layaway_payment),
+  -- stored value (stored_value) and accrued vendor payables all carry a real
+  -- GL control balance with NO open item behind it. That is correct by
+  -- design, and reporting them here produced a permanent non-zero difference
+  -- on a healthy database.
+  --
+  -- That matters more than it looks: a check that always shows failures is a
+  -- check everybody learns to ignore, and it hides the one real imbalance
+  -- when it finally appears. Each of those subledgers has its own
+  -- reconciliation (layaway_liability_check, stored_value_control_check) and
+  -- all of them are covered by subledger_control_check().
+  --
+  -- Driven by subledger_type.uses_open_items rather than a hard-coded list,
+  -- so adding an open-item-backed subledger extends the check automatically
+  -- instead of silently escaping it.
   SELECT COALESCE(oi.st, ctl.st),
          COALESCE(oi.total, 0),
          COALESCE(ctl.total, 0),
          COALESCE(oi.total, 0) - COALESCE(ctl.total, 0)
     FROM oi FULL OUTER JOIN ctl ON oi.st = ctl.st
+   WHERE COALESCE(oi.st, ctl.st) IN (
+           SELECT code FROM kernel.subledger_type WHERE uses_open_items)
    ORDER BY 1;
 $$;
 COMMENT ON FUNCTION open_item_control_check IS 'Invariant: Σ open items must equal the GL control balance per subledger type (difference = 0).';

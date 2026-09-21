@@ -160,7 +160,33 @@ CREATE TABLE kernel.contact_mechanism_type (
 CREATE TABLE kernel.subledger_type (
   code        text PRIMARY KEY,   -- ar | ap | vendor_payable | customer_credit | gift_certificate | security_deposit
   name        text NOT NULL,
-  description text
+  description text,
+  -- Whether money may sit in this control account with NO party attached.
+  --
+  -- Normally false, and that is the point: a control account balance is a
+  -- promise to or from a NAMED party, and an untagged line is money nobody
+  -- can be billed for or paid. Only a genuine BEARER instrument is exempt --
+  -- a gift certificate sold to a walk-in is anonymous by design, not by
+  -- oversight, and there is no party to record.
+  --
+  -- This is a whitelist rather than a blanket allowance so the exemption is
+  -- a visible, reviewable data decision instead of an accident.
+  allows_untagged boolean NOT NULL DEFAULT false,
+
+  -- Whether this subledger's detail lives in open_item.
+  --
+  -- Not all of them do. Security deposits live in lease_deposit, layaway
+  -- deposits in layaway/layaway_payment, stored value in stored_value, and
+  -- vendor payables can be accrued straight to the control account. Those
+  -- carry a real GL balance with no open item behind it, which is correct,
+  -- not a defect.
+  --
+  -- This flag is what lets open_item_control_check() tell a genuine imbalance
+  -- from a subledger that simply keeps its detail elsewhere. The alternative
+  -- -- every caller hard-coding IN ('ar','ap','consignor_payable') -- means
+  -- the day a new open-item-backed subledger is added, every existing check
+  -- silently stops covering it.
+  uses_open_items boolean NOT NULL DEFAULT false
 );
 COMMENT ON TABLE kernel.subledger_type IS 'Subledger kinds that must tie to a GL control account.';
 
@@ -268,14 +294,30 @@ INSERT INTO kernel.contact_mechanism_type (code, name) VALUES
   ('web','Website'), ('fax','Fax'), ('social','Social')
 ON CONFLICT (code) DO NOTHING;
 
-INSERT INTO kernel.subledger_type (code, name, description) VALUES
-  ('ar',               'Accounts Receivable', 'Money owed TO the store by customers.'),
-  ('ap',               'Accounts Payable',    'Money the store owes suppliers.'),
-  ('vendor_payable',   'Vendor Payable',      'Net settlement owed to vendors/consignors.'),
-  ('customer_credit',  'Customer Store Credit','Refund liability owed to a customer.'),
-  ('gift_certificate', 'Gift Certificate',    'Outstanding gift certificate liability.'),
-  ('security_deposit', 'Security Deposit',    'Refundable deposit held for a lessee.'),
-  ('consignor_payable','Consignor Payable',   'Net proceeds owed to a consignor after commission.')
+--                                                        untagged? open items?
+INSERT INTO kernel.subledger_type (code, name, description, allows_untagged, uses_open_items) VALUES
+  ('ar',               'Accounts Receivable', 'Money owed TO the store by customers.', false, true),
+  ('ap',               'Accounts Payable',    'Money the store owes suppliers.', false, true),
+  -- Vendor payables can be accrued straight to the control account by the
+  -- settlement engine, so they are not open-item backed.
+  ('vendor_payable',   'Vendor Payable',      'Net settlement owed to vendors/consignors.', false, false),
+  -- Detail lives in stored_value, reconciled by stored_value_control_check().
+  ('customer_credit',  'Customer Store Credit','Refund liability owed to a customer.', false, false),
+  -- The one legitimate untagged exception. A bearer gift certificate sold over
+  -- the counter has no holder to record; whoever presents it may redeem it.
+  ('gift_certificate', 'Gift Certificate',    'Outstanding gift certificate liability. Bearer instruments have no party.', true, false),
+  -- Detail lives in lease_deposit.
+  ('security_deposit', 'Security Deposit',    'Refundable deposit held for a lessee.', false, false),
+  ('consignor_payable','Consignor Payable',   'Net proceeds owed to a consignor after commission.', false, true),
+  -- Layaway deposits are per-CUSTOMER money held on trust, exactly the same
+  -- shape as a security deposit: a liability the store owes to one identified
+  -- person, with the detail living in its own table (layaway/layaway_payment)
+  -- rather than in open_item. Without its own subledger type the deposits
+  -- would pile up in a control account with no way to answer "whose money is
+  -- this", which is the first question asked in a layaway dispute.
+  -- Detail lives in layaway/layaway_payment, reconciled by
+  -- layaway_liability_check().
+  ('layaway_deposit',  'Layaway Deposit',     'Customer money held on trust against an open layaway.', false, false)
 ON CONFLICT (code) DO NOTHING;
 
 INSERT INTO kernel.identifier_type (code, name, is_pii, is_sensitive) VALUES

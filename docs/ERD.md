@@ -421,6 +421,139 @@ erDiagram
         numeric net_amount
         uuid journal_entry_id FK
     }
+    TAX_FORM_THRESHOLD {
+        uuid tenant_id PK
+        text form_code PK
+        text box_code PK
+        smallint tax_year PK
+        numeric threshold_amount
+        char3 currency FK
+    }
+    PAYEE_TAX_PROFILE {
+        uuid party_id PK
+        uuid tenant_id FK
+        boolean is_exempt
+        date w9_received_date
+        text tin_type
+        boolean backup_withholding
+        numeric backup_withholding_rate
+    }
+    TAX_YEAR_PAYMENT {
+        uuid id PK
+        uuid party_id FK
+        smallint tax_year
+        text form_code FK
+        text box_code FK
+        date payment_date
+        numeric amount
+        numeric withheld_amount
+        text source
+        uuid journal_entry_id FK
+        text idempotency_key
+    }
+    LEASE_SALES_REPORT {
+        uuid id PK
+        uuid lease_id FK
+        date period_start
+        date period_end
+        numeric reported_amount
+        numeric pos_amount
+        char3 currency FK
+        text source
+    }
+    CAM_POOL {
+        uuid id PK
+        uuid location_id FK
+        smallint pool_year
+        date period_start
+        date period_end
+        numeric admin_fee_rate
+        text status
+        char3 currency FK
+    }
+    CAM_POOL_EXPENSE {
+        uuid id PK
+        uuid cam_pool_id FK
+        date expense_date
+        text category
+        numeric amount
+        char3 currency FK
+        boolean is_recoverable
+        text exclusion_reason
+        uuid journal_entry_id FK
+    }
+    MARKDOWN_REASON {
+        text code PK
+        uuid tenant_id FK
+        text name
+        text default_absorbed_by
+        boolean is_active
+    }
+    MARKDOWN_EVENT {
+        uuid id PK
+        uuid consignment_item_id FK
+        uuid inventory_item_id FK
+        text reason_code FK
+        numeric old_price
+        numeric new_price
+        char3 currency FK
+        text absorbed_by
+        numeric share_store_rate
+        date effective_from
+        date effective_thru
+        uuid approved_by FK
+    }
+    LAYAWAY {
+        uuid id PK
+        bigint layaway_no
+        uuid customer_party_id FK
+        date opened_date
+        date due_date
+        numeric goods_total
+        numeric tax_total
+        numeric total
+        numeric paid_total
+        char3 currency FK
+        numeric cancellation_fee
+        text status
+        uuid sale_id FK
+    }
+    LAYAWAY_LINE {
+        uuid id PK
+        uuid layaway_id FK
+        integer line_no
+        uuid consignment_item_id FK
+        uuid inventory_item_id FK
+        numeric quantity
+        numeric unit_price
+        numeric extended_price
+        char3 currency FK
+    }
+    LAYAWAY_PAYMENT {
+        uuid id PK
+        uuid layaway_id FK
+        date payment_date
+        numeric amount
+        char3 currency FK
+        text tender_type_code FK
+        uuid journal_entry_id FK
+        text idempotency_key
+    }
+    COMMISSION_TRUEUP {
+        uuid id PK
+        uuid agreement_id FK
+        uuid consignor_party_id FK
+        date period_start
+        date period_end
+        numeric gross_sales
+        numeric accrued_commission
+        numeric correct_commission
+        numeric adjustment_amount
+        char3 currency FK
+        numeric effective_rate
+        text status
+        uuid journal_entry_id FK
+    }
     CURRENCY ||--o{ TENANT_CONFIG : "functional"
     CURRENCY ||--o{ EXCHANGE_RATE : "from_to"
     ACCOUNT_TYPE ||--o{ ACCOUNT : "types"
@@ -500,6 +633,26 @@ erDiagram
     TENDER_TYPE ||--o{ PAYMENT_TENDER : "typed"
     PARTY ||--o{ PAYMENT_TENDER : "liability_party"
     JOURNAL_ENTRY ||--o| MERCHANT_SETTLEMENT : "records"
+    PARTY ||--o| PAYEE_TAX_PROFILE : "tax_profile"
+    PARTY ||--o{ TAX_YEAR_PAYMENT : "paid"
+    TAX_FORM_THRESHOLD ||--o{ TAX_YEAR_PAYMENT : "box"
+    JOURNAL_ENTRY ||--o| TAX_YEAR_PAYMENT : "records"
+    LEASE ||--o{ LEASE_SALES_REPORT : "reports_sales"
+    LOCATION ||--o{ CAM_POOL : "pools_cam"
+    CAM_POOL ||--o{ CAM_POOL_EXPENSE : "contains"
+    JOURNAL_ENTRY ||--o| CAM_POOL_EXPENSE : "records"
+    MARKDOWN_REASON ||--o{ MARKDOWN_EVENT : "explains"
+    CONSIGNMENT_ITEM ||--o{ MARKDOWN_EVENT : "marked_down"
+    PARTY ||--o{ LAYAWAY : "reserves"
+    LAYAWAY ||--o{ LAYAWAY_LINE : "contains"
+    CONSIGNMENT_ITEM ||--o{ LAYAWAY_LINE : "held_as"
+    LAYAWAY ||--o{ LAYAWAY_PAYMENT : "deposits"
+    TENDER_TYPE ||--o{ LAYAWAY_PAYMENT : "typed"
+    JOURNAL_ENTRY ||--o| LAYAWAY_PAYMENT : "records"
+    SALE ||--o| LAYAWAY : "completed_as"
+    CONSIGNOR_AGREEMENT ||--o{ COMMISSION_TRUEUP : "trued_up"
+    PARTY ||--o{ COMMISSION_TRUEUP : "consignor_of"
+    JOURNAL_ENTRY ||--o| COMMISSION_TRUEUP : "records"
 ```
 
 ## Notes

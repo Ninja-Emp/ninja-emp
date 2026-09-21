@@ -233,4 +233,128 @@ SELECT CASE WHEN (SELECT updated_by FROM organization
 UPDATE person SET given_name = 'Jane'
  WHERE party_id = '33333333-3333-7333-8333-333333333333';
 
+\echo '=== T19: posting roles do not collide on an account (ADR-0020) ==='
+-- Account-code collisions are SILENT: the seeds use ON CONFLICT DO NOTHING,
+-- so a duplicate code makes the second account vanish and its posting role
+-- resolve to the first one. It shipped twice (5100 Consignment COGS vs
+-- Inventory Adjustments; 2400 Security Deposits vs Layaway Deposits). Both
+-- kept the trial balance at zero while putting real money in the wrong
+-- account. Balanced is not the same as correct.
+SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM assert_posting_map_sane())
+            THEN 'PASS: every posting role owns a distinct, type-compatible account'
+            ELSE 'FAIL: ' || (SELECT string_agg(role_code || ' -> ' || account_code
+                                                || ' (' || problem || ')', '; ')
+                                FROM assert_posting_map_sane())
+       END AS t19;
+
+\echo '=== T20: a credit memo REDUCES the subledger balance ==='
+-- open_item could originally only express a debt, so CAM over-recovery could
+-- not be recorded at all. Credit memos carry a non-negative amount and a
+-- direction; anything that sums balances must go through open_item_signed(),
+-- or an unapplied credit inflates what the party appears to owe.
+DO $$
+DECLARE
+  v_party uuid;
+  v_inv   uuid;
+  v_crd   uuid;
+  v_bal   numeric;
+BEGIN
+  SELECT id INTO v_party FROM party
+   WHERE display_name = 'Acme Supply Co' LIMIT 1;
+  IF v_party IS NULL THEN
+    SELECT id INTO v_party FROM party LIMIT 1;
+  END IF;
+
+  v_inv := open_item_create('ar', v_party, 'test', 'inv-probe', 'T20-INV',
+                            1000.00, 'USD', current_date, NULL, NULL);
+  -- Negative amount must become a CREDIT MEMO, not a negative invoice.
+  v_crd := open_item_create('ar', v_party, 'test', 'crd-probe', 'T20-CRD',
+                            -400.00, 'USD', current_date, NULL, NULL);
+
+  IF (SELECT item_kind FROM open_item WHERE id = v_crd) <> 'credit_memo' THEN
+    RAISE NOTICE 'FAIL: negative amount did not create a credit memo';
+  ELSIF (SELECT open_amount FROM open_item WHERE id = v_crd) <> 400.00 THEN
+    RAISE NOTICE 'FAIL: credit memo stored a negative amount';
+  ELSE
+    SELECT sum(open_item_signed(item_kind, open_amount)) INTO v_bal
+      FROM open_item WHERE id IN (v_inv, v_crd);
+    IF v_bal = 600.00 THEN
+      RAISE NOTICE 'PASS: 1000 invoice + 400 credit memo nets to 600 owed';
+    ELSE
+      RAISE NOTICE 'FAIL: net balance was % (expected 600)', v_bal;
+    END IF;
+  END IF;
+
+  -- Clean up so the suite stays re-runnable and the control check stays sane
+  -- (these probes have no journal entry behind them).
+  DELETE FROM open_item WHERE id IN (v_inv, v_crd);
+END $$;
+
+\echo '=== T21: money cannot be orphaned in a control account ==='
+-- The ledger used to allow this:
+--
+--   debit  1100 Accounts Receivable  500.00    <-- no party
+--   credit 4000 Sales Revenue        500.00
+--
+-- It balances. The trial balance stays at zero. Every other assertion in this
+-- file passes. And the 500.00 is owed by NOBODY: on no statement, invoiceable
+-- to no one, collectable never. It surfaced only later as an unexplained
+-- difference in subledger_control_check(), long after the originating
+-- transaction was findable.
+--
+-- assert_subledger_control() guarded only the other direction (a tagged line
+-- landing on the wrong account). This is the gap that mattered more.
+DO $$
+DECLARE
+  v_ok  boolean := false;
+  v_je  uuid;
+BEGIN
+  SELECT id INTO v_je FROM journal_entry ORDER BY created_at DESC LIMIT 1;
+  IF v_je IS NULL THEN
+    RAISE NOTICE 'FAIL: no journal entry available to probe against';
+    RETURN;
+  END IF;
+
+  BEGIN
+    INSERT INTO journal_line (journal_entry_id, line_no, account_id,
+                              debit, credit, currency, fx_rate, base_debit, base_credit)
+    VALUES (v_je, 999, posting_account('ar_control'),
+            1.00, 0, 'USD', 1, 1.00, 0);
+  EXCEPTION WHEN check_violation THEN v_ok := true;
+  END;
+
+  IF v_ok THEN
+    RAISE NOTICE 'PASS: an untagged posting to the AR control account was refused';
+  ELSE
+    RAISE NOTICE 'FAIL: money can still be orphaned in a control account';
+  END IF;
+END $$;
+
+\echo '=== T22: the bearer exemption is a whitelist, not a hole ==='
+-- An anonymous gift certificate genuinely has no holder, so gift_certificate
+-- is allowed to carry untagged balances. Nothing else is. If this ever
+-- returns more than that one row, someone has widened the exemption to make
+-- a failing test pass, which is how the original hole would come back.
+SELECT CASE WHEN (SELECT count(*) FROM kernel.subledger_type WHERE allows_untagged) = 1
+             AND (SELECT bool_and(code = 'gift_certificate')
+                    FROM kernel.subledger_type WHERE allows_untagged)
+            THEN 'PASS: gift_certificate is the only bearer subledger'
+            ELSE 'FAIL: the untagged exemption has been widened to ' ||
+                 (SELECT string_agg(code, ', ') FROM kernel.subledger_type WHERE allows_untagged)
+       END AS t22;
+
+\echo '=== T23: no existing line orphans money in a control account ==='
+-- T21 proves the guard is installed; this proves the BOOKS are clean. A guard
+-- added after the fact says nothing about history that predates it.
+SELECT CASE WHEN count(*) = 0
+            THEN 'PASS: every control-account line names its party'
+            ELSE 'FAIL: ' || count(*)::text || ' untagged control-account line(s) exist'
+       END AS t23
+  FROM journal_line jl
+  JOIN account a ON a.id = jl.account_id
+  JOIN kernel.subledger_type st ON st.code = a.control_subledger_type_code
+ WHERE jl.subledger_type_code IS NULL
+   AND a.is_control
+   AND NOT st.allows_untagged;
+
 \echo '=== ALL INVARIANT TESTS COMPLETE ==='

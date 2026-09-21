@@ -30,7 +30,12 @@ COMMENT ON COLUMN fiscal_period.status IS
 -- ----------------------------------------------------------------------------
 INSERT INTO account (code, name, account_type_code, is_control, control_subledger_type_code) VALUES
   ('1210','Goods Received Not Invoiced','asset',   false, NULL),
-  ('5100','Inventory Adjustments',      'expense', false, NULL),
+  -- 5200, NOT 5100. 5100 is Consignment COGS (37_coa_consignment.sql). This
+  -- previously read 5100, and because these seeds use ON CONFLICT DO NOTHING
+  -- the duplicate insert silently vanished and inventory_adjustment resolved
+  -- to the Consignment COGS account -- shrink and write-offs were being booked
+  -- as cost of consigned goods sold. Silent, and wrong on the P&L.
+  ('5200','Inventory Adjustments',      'expense', false, NULL),
   ('4920','Gift Certificate Breakage',  'revenue', false, NULL)
 ON CONFLICT (tenant_id, code) DO NOTHING;
 
@@ -38,7 +43,7 @@ INSERT INTO posting_map (role_code, account_id)
 SELECT v.role_code, a.id
   FROM (VALUES
     ('purchase_clearing',         '1210'),
-    ('inventory_adjustment',      '5100'),
+    ('inventory_adjustment',      '5200'),
     ('gift_certificate_breakage', '4920')
   ) AS v(role_code, account_code)
   JOIN account a ON a.code = v.account_code

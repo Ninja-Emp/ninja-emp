@@ -3,8 +3,12 @@
 A greenfield **vendor mall + consignment store SaaS** with world-class double-entry accounting.
 **DB-first**: the PostgreSQL schema is the contract; application code follows.
 
-> **Status:** DB foundation complete through **Part 5 (POS & Payments)**, including a **realtime
-> vendor portal**. All invariants proven on live PostgreSQL 18.6. Application layer (Part 6) not yet built.
+> **Status:** **Database complete.** Parts 0–5 plus the full Tier 1/2/3 backlog — financial
+> statements, period/year-end close, AR write-off, inventory with weighted-average cost, stored
+> value, vendor draw, 1099-NEC, percentage-rent/CAM true-up, markdown engine, layaway, and
+> percentage-commission true-up — all built and proven on live PostgreSQL 18.6.
+> **222 assertions across 10 suites, all green**, from a clean provision → migrate → test run.
+> Application layer (Part 6) is the next build.
 
 ---
 
@@ -26,9 +30,12 @@ DB backups are written into `backups/` and bundled into `dist/*.zip` for downloa
 ```
 db/                 PostgreSQL schema (DB-first). Numbered, idempotent, re-runnable.
   provision.sh      One-shot: creates both DBs, roles, kernel, tenant schema, seeds.
-  tests/            Assertion suites (invariants, vendormall, partition, consignment).
-docs/               SRS, DECISIONS (ADRs), DATA_STANDARDS, ERD, DBAL, LOCAL_DEV, ROADMAP.
-scripts/            backup.sh, restore.sh, zip_backup.sh, push.sh
+  migrations/       Versioned, resumable, idempotent migrations (0001…0005).
+  tests/            Assertion suites (10 suites, 222 assertions).
+  scrub.sql         PII scrubbing for prod→dev sync.
+docs/               SRS, DECISIONS (ADRs), DATA_STANDARDS, ERD, DBAL, LOCAL_DEV, ROADMAP, DB_AUDIT.
+scripts/            run_tests.sh, migrate.sh, backup.sh, restore.sh, backup_tenant.sh,
+                    restore_tenant.sh, sync_to_dev.sh, zip_backup.sh, push.sh
 backups/            Timestamped DB dumps (schema + data + custom). LATEST symlink.
 dist/               Downloadable zip bundles (git-ignored).
 HANDOFF.md          Original project context + working agreements.
@@ -59,15 +66,31 @@ bash scripts/zip_backup.sh
 
 ## Test results (all green, re-runnable)
 
+Run everything with one command:
+
+```bash
+bash scripts/run_tests.sh          # all suites
+bash scripts/run_tests.sh close    # just one suite
+```
+
 | Suite | Assertions | Result |
 |-------|-----------|--------|
-| `invariants.sql` | 19 | **19/19 PASS** |
-| `vendormall.sql` | 20 | **20/20 PASS** |
-| `partition.sql` | 5 | **5/5 PASS** |
+| `invariants.sql` | 28 | **28/28 PASS** |
 | `consignment.sql` | 12 | **12/12 PASS** |
+| `vendormall.sql` | 20 | **20/20 PASS** |
 | `pos.sql` | 27 | **27/27 PASS** |
+| `partition.sql` | 6 | **6/6 PASS** |
+| `close.sql` | 23 | **23/23 PASS** |
+| `inventory.sql` | 30 | **30/30 PASS** |
+| `tax1099.sql` | 19 | **19/19 PASS** |
+| `lease.sql` | 20 | **20/20 PASS** |
+| `retail.sql` | 37 | **37/37 PASS** |
+| **Total** | **222** | **GREEN** |
 
-Verified **after a full backup→restore round-trip** — the dumps are genuinely restorable.
+The suites are **delta-based and re-runnable** — they assert on the change they
+cause, not on absolute totals, so they can be run repeatedly without
+reprovisioning. Verified from a clean `db/provision.sh` → `scripts/migrate.sh` →
+`scripts/run_tests.sh`, and after a full backup→restore round-trip.
 
 ## GitHub
 
@@ -91,13 +114,14 @@ accepts account passwords over HTTPS), or install the GitHub CLI and run `gh aut
 
 ## Documentation map
 
-- `docs/SRS.md` — Software Requirements Spec (Parts 1–8; Parts 1–4 built).
-- `docs/DECISIONS.md` — Architecture Decision Records (ADR-0001 … ADR-0027).
+- `docs/SRS.md` — Software Requirements Spec (Parts 1–8; Parts 1–5 built).
+- `docs/DECISIONS.md` — Architecture Decision Records (ADR-0001 … ADR-0038).
 - `docs/DATA_STANDARDS.md` — Normative enterprise data standards (ADR-0015).
 - `docs/ERD.md` / `docs/erd.png` — Entity-relationship diagram.
 - `docs/DBAL.md` — Database abstraction layer design.
 - `docs/LOCAL_DEV.md` — Set up PostgreSQL 18 alongside Laragon + Navicat.
-- `docs/ROADMAP.md` — What's next (Part 5 onward).
+- `docs/DB_AUDIT.md` — Verified inventory of database work (now complete).
+- `docs/ROADMAP.md` — What's next (Part 6 onward).
 
 ## Key decisions (see DECISIONS.md for the full set)
 

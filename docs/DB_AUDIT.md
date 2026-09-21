@@ -3,25 +3,26 @@
 Generated against the live `ninja_emp` database and the repo working tree.
 All findings below are **verified by query or file inspection**, not assumed.
 
-> **Updated after Rounds A, B and D.** Tier 1 is closed, Tier 2 is largely
-> closed, and the Tier 3 operational gaps are closed. The original audit text is
+> **Updated after Rounds A, B, C and D.** Tier 1 is closed, Tier 2 is closed,
+> and the Tier 3 operational gaps are closed. The original audit text is
 > preserved below for traceability; items now done are marked as such.
 
-## Current state (verified, post Round D)
+## Current state (verified, post Round C)
 
 | Metric | Count |
 | --- | --- |
-| Base tables (`tenant_demo`) | 52 (partition scaffolding no longer leaks) |
-| Views (`tenant_demo`) | 19 |
-| Functions (`tenant_demo`) | 55 |
+| Base tables (`tenant_demo`) | 64 (partition scaffolding no longer leaks) |
+| Views (`tenant_demo`) | 23 |
+| Functions (`tenant_demo`) | 85 |
 | Kernel tables | 13 |
-| Test assertions | **141 across 7 suites — all green** |
+| Test assertions | **222 across 10 suites — all green** |
 | Posting roles with no `posting_map` entry | **0** (everything is wired) |
 | Fiscal periods | 24, all `open` |
 
-Suite results: invariants 23, consignment 12, vendormall 20, pos 27,
-partition 6, close 23, inventory 30. Zero failures, zero errors, from a clean
-`db/provision.sh` and stable across repeated runs.
+Suite results: invariants 28, consignment 12, vendormall 20, pos 27,
+partition 6, close 23, inventory 30, tax1099 19, lease 20, retail 37. Zero
+failures, zero errors, from a clean `db/provision.sh` → `scripts/migrate.sh` →
+`scripts/run_tests.sh`, and stable across repeated runs without reprovisioning.
 
 ### Closed since the original audit
 
@@ -41,11 +42,73 @@ partition 6, close 23, inventory 30. Zero failures, zero errors, from a clean
   update a person. Fixed, migrated, and guarded by a structural test that
   asserts the whole class rather than the two tables that happened to be broken.
 
+### Round C — Tier 2 remainder (closed)
+
+- **1099-NEC reporting** (`82_tax_1099.sql`, ADR-0034): `tax_form_threshold`
+  (year-keyed, so the OBBBA 600→2,000 change is data not code),
+  `payee_tax_profile` (TIN type, W-9 date, backup withholding), and an
+  append-only `tax_year_payment` accumulated as payments happen. Reporting is
+  derived from **cash**, not accrual, and an exception report surfaces missing
+  TIN / W-9 / address.
+- **Percentage rent + CAM true-up** (`83_lease_trueup.sql`, ADR-0035):
+  `lease_sales_report` (reported vs. POS-measured sales), `cam_pool` +
+  `cam_pool_expense` with recoverable/excluded classification, excess-only
+  true-up, over-recovery credited back, effective-dated escalations.
+- **Markdown engine + layaway** (`84_markdown_layaway.sql`, ADR-0036):
+  `markdown_reason` (reason-driven absorption defaults), append-only
+  `markdown_event` (a markdown is an event, never an overwrite; price can only
+  fall), and `layaway` / `layaway_line` / `layaway_payment` where deposits are
+  a **liability** (`2450`), not revenue, until pickup.
+- **Percentage-commission true-up** (`86_commission_trueup.sql`, ADR-0037):
+  `commission_trueup` rated **marginally** per period (not cliff), so the
+  effective rate is monotonic in sales.
+
+### Round C.1 — Defects found while testing (all fixed + regression-guarded)
+
+Testing the new modules surfaced ten defects, several in code that had already
+shipped. Each is fixed at the model level and guarded by a test:
+
+1. **Tiered commission schedules were physically unstorable.** The
+   `commission_rule` no-overlap exclusion keyed only on `(agreement_id,
+   daterange)`, so several concurrent bands — the entire ADR-0037 feature —
+   could not be inserted. Nothing errored at deploy time; the feature was dead
+   code. Widened the key to include `rule_type` and `breakpoint_amount`
+   (migration 0004, regression-guarded by retail R24/R25).
+2. **Untagged postings to a control account were legal.** Debiting `ar_control`
+   with no party balanced fine and orphaned the money — owed to nobody, never
+   collectable. Added the preventive trigger `assert_control_account_tagged()`
+   (migration 0005, invariants T21/T22/T23).
+3. **`post_commission_trueup` wrote an open item for only one direction**, so
+   every under-charge true-up permanently broke `open_item_control_check()`.
+4. **`open_item_control_check()` reported permanent false positives** for
+   subledgers whose detail lives elsewhere; fixed at the model level with
+   `subledger_type.uses_open_items`.
+5. **`2450` was modelled as a plain liability**, so layaway deposits violated
+   `journal_line_check4`; promoted to a control account with a new
+   `layaway_deposit` subledger type.
+6. **`5100` account-code collision** (Consignment COGS vs. Inventory
+   Adjustments) sent shrink to the wrong expense; moved to `5200` and added
+   `assert_posting_map_sane()`.
+7. **`83_lease_trueup` read `je.reversed_by_id` off the base table** — that
+   column exists only on the status view.
+8. **`open_item` could not hold a credit balance**; added `item_kind` +
+   migration 0003.
+9. **`lease.sql`'s CAM-estimate fixture posted AR with no open item behind it**,
+   manufacturing the exact orphaned-balance defect the suite exists to catch.
+10. **Migration verification probes assumed `app.tenant_id` was set** (0003,
+    0004) and **0005's probe was vacuous** — it inserted zero rows on a fresh
+    tenant and reported a failure that never happened. Rewritten to manufacture
+    its own fixture and assert **both** directions (untagged refused *and*
+    tagged accepted), proven non-vacuous by disabling the guard and by stubbing
+    an over-broad guard.
+
 ### Still open
 
-Round C (Tier 2 remainder): 1099-NEC threshold tracking and annual extract,
-percentage-rent true-up from POS sales, CAM reconciliation, lease renewals and
-escalations, markdown engine, layaway, percentage-commission true-ups.
+Nothing in the database is blocking. The remaining work is the **application
+layer** (Part 6) and **integrations/reporting** (Part 7) — see `ROADMAP.md`.
+Deferred, non-blocking follow-ons: Square/processor API integration, formal
+vendor statements, abandoned-property/liens, and journal partitioning at the
+20M-row threshold (ADR-0026).
 
 ---
 

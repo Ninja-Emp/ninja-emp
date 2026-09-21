@@ -21,7 +21,8 @@ OUT="$(mktemp -d)"
 trap 'rm -rf "$OUT"' EXIT
 
 # rls_benchmark is a performance probe, not an assertion suite.
-DEFAULT_SUITES=(invariants consignment vendormall pos partition close inventory)
+DEFAULT_SUITES=(invariants consignment vendormall pos partition close inventory \
+                tax1099 lease retail)
 
 if [[ $# -gt 0 ]]; then
   SUITES=("$@")

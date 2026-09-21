@@ -144,8 +144,8 @@ END $$;
 SELECT adjust_inventory(:'item'::uuid, -1, '2026-02-13', 'Damaged', 'inv-adj-' || :'run') AS adj \gset
 SELECT CASE WHEN (SELECT on_hand FROM inventory_item WHERE id=:'item'::uuid) = 17
              AND (SELECT sum(base_debit) FROM journal_line jl JOIN account a ON a.id=jl.account_id
-                   WHERE a.code='5100' AND jl.journal_entry_id = :'adj'::uuid) = 15.00
-            THEN 'PASS: shrink of 1 unit expensed 15.00 to 5100'
+                   WHERE a.code='5200' AND jl.journal_entry_id = :'adj'::uuid) = 15.00
+            THEN 'PASS: shrink of 1 unit expensed 15.00 to 5200 Inventory Adjustments'
             ELSE 'FAIL' END AS i11;
 
 \echo '=== I12: adjustment cannot drive stock negative ==='
@@ -376,15 +376,14 @@ SELECT CASE WHEN (SELECT owned_cogs FROM v_sale_margin WHERE sale_id = :'sale1':
                  COALESCE((SELECT owned_cogs FROM v_sale_margin WHERE sale_id=:'sale1'::uuid)::text,'null') END AS d5;
 
 \echo '=== X1: full-book invariants still hold ==='
--- open_item_control_check is scoped to the OPEN-ITEM-BACKED subledgers. Security
--- deposits live in lease_deposit and vendor payables can be accrued straight to
--- the control account, so both legitimately carry a GL balance with no open
--- item behind it. Asserting on those would be a false positive, not a defect.
+-- open_item_control_check() is now scoped at the SOURCE, via
+-- subledger_type.uses_open_items, so this no longer has to carry a hard-coded
+-- allow-list. That list was a workaround: it meant the day a new
+-- open-item-backed subledger was added, this assertion silently stopped
+-- covering it. The exclusion now lives with the data that defines it.
 SELECT CASE WHEN (SELECT sum(balance) FROM trial_balance('2027-12-31')) = 0
              AND (SELECT count(*) FROM subledger_control_check() WHERE difference <> 0) = 0
-             AND (SELECT count(*) FROM open_item_control_check()
-                   WHERE difference <> 0
-                     AND subledger_type_code IN ('ar','ap','consignor_payable')) = 0
+             AND (SELECT count(*) FROM open_item_control_check() WHERE difference <> 0) = 0
              AND balance_sheet_check('2027-12-31') = 0
             THEN 'PASS: trial balance, subledgers, AR/AP/consignor open items and balance sheet all tie'
             ELSE 'FAIL: an invariant broke' END AS x1;

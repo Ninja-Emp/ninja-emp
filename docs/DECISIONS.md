@@ -412,6 +412,128 @@ precisely why the check is against the artefact rather than the script's own not
 
 ---
 
+## ADR-0034 — 1099 reporting is derived from CASH, accumulated as it happens
+
+**Status:** Accepted.
+**Context:** The store pays consignors and vendors, and above a threshold must report those payments to
+the IRS. The book of record is accrual (ADR-0022), but 1099 is unambiguously a **cash-basis** return:
+what was actually paid in the calendar year, not what was earned or accrued in it.
+**Decision:** A `tax_year_payment` row is written at the moment a reportable payment is made, keyed to
+the year the money actually moved. It is append-only, and a CHECK enforces that `tax_year` equals the
+year of `payment_date` so the two can never drift. Thresholds live in `tax_form_threshold`, keyed by
+form, box and **tax year**, because they change: 600 for 2024–2025, then 2,000 from 2026 under OBBBA
+s.70433. An unseeded future year falls back to the most recent seeded value rather than reporting
+nothing. `form_1099_exceptions()` surfaces payees who are over the threshold but missing a TIN, a W-9
+or an address, because those are the ones that make the filing fail.
+**Consequences:** A payment made on 2 January is reported in the new year even though it settles the
+prior year's accrual, which is correct and is asserted directly (tax1099 X4). Backup withholding at 24%
+is posted to its own liability account rather than netted into the payment.
+**Rejected:** deriving 1099 totals by querying the ledger at year end. The accrual ledger does not know
+when cash moved, reversals and reclassifications make the query non-deterministic, and a number the
+store cannot reproduce next year is a number it cannot defend in an audit.
+
+---
+
+## ADR-0035 — Percentage rent and CAM are accrued on estimate, trued up on actuals
+
+**Status:** Accepted.
+**Context:** Percentage rent ("5% of sales over a 50,000 breakpoint") and CAM recovery cannot be known
+until the period ends, but the landlord bills monthly throughout it.
+**Decision:** Bill estimates during the period, then post a single adjusting true-up entry against
+actuals. Four rules are enforced in the DB rather than left to the biller:
+1. Percentage rent applies **only to the excess** above the breakpoint. Charging the rate on gross is
+   the classic error and it over-bills every tenant who trades above breakpoint.
+2. Refunds **reduce the sales base**. Otherwise a tenant is billed percentage rent on goods that came
+   back.
+3. The CAM pro-rata denominator is **leased area, not total area**. Including vacant units silently
+   shifts the landlord's cost of their own empty space onto the tenants who did turn up.
+4. Over-recovery is **credited back**, not kept.
+Escalations and renewals are **effective-dated** (GiST no-overlap), never overwrites, so the rent in
+force on any past date remains answerable.
+**Consequences:** Re-running a true-up must not double-bill, and the guard cannot be the idempotency
+key alone — an operator re-running year end with a fresh key must still be refused (lease L6). The
+already-billed amount is subtracted inside the calculation itself.
+
+---
+
+## ADR-0036 — Markdowns are events; layaway deposits are liabilities
+
+**Status:** Accepted.
+**Context:** Two retail mechanics that are really accounting questions in merchandising costume.
+**Decision (markdowns):** A markdown is recorded as an **event**, never as a price overwrite. The
+current price is derived; history is never lost. Every event records **who absorbs** the reduction —
+store, consignor, or shared with an explicit split — because that has a direct cash consequence and it
+is the single thing consignors dispute. Most systems assume "consignor" silently and then cannot
+defend the settlement. Marking down posts **no journal entry**: nothing has been bought, sold or paid.
+The margin consequence lands when the item sells, through the commission split.
+**Decision (layaway):** A deposit is a **liability**, not revenue. The customer has paid, the store has
+not delivered, and the customer can usually walk away. Deposits credit a layaway control account; at
+pickup the liability is released into revenue and **cash is not touched again**, because it arrived at
+deposit time. On cancellation the liability unwinds into a refund (not income) plus any forfeited fee
+(which is income). Goods on layaway are **reserved** — off the floor, not sold — and cannot be
+reserved twice.
+**Consequences:** Recognising deposits as revenue on receipt overstates income, overstates tax, and is
+unlawful in states that regulate layaway. The reservation guard is scoped to **open** layaways: a plain
+unique index would also brick the item forever after a cancellation, when the goods are physically back
+on the shelf (retail R22).
+
+---
+
+## ADR-0037 — Tiered commission is trued up per period, and rated MARGINALLY
+
+**Status:** Accepted.
+**Context:** ADR-0028 accrues the consignor split at sale, which is right — the store owes the
+consignor the moment the goods leave. But a **tiered** rule cannot be evaluated one sale at a time: at
+the moment of a given sale, nobody knows where it will sit in the consignor's cumulative total for the
+period.
+**Decision:** Keep accruing at the sale-time rate, then compute the correct tiered commission over the
+whole period and post the **difference** as a visible adjusting entry. Never rewrite the original
+accrual: the sale is posted, the period may be closed, and the consignor may already have been paid.
+Tiers are **marginal**, not cliff: a 5,000 breakpoint means the first 5,000 is charged at the base rate
+and only the excess at the tier rate.
+**Consequences:** Charging the flat rate and never revisiting it systematically **overcharges
+high-volume consignors** — and it does so in proportion to volume, so the best consignors are the most
+overcharged and they are the ones who leave. Cliff rating is the other plausible reading and it is
+perverse: it makes commission **fall** as sales rise, so selling one more dollar of goods can make the
+store hundreds poorer. Marginal is the only monotonic structure (retail R27).
+**Both sides of the arithmetic are stored** (accrued *and* correct, not just the delta) so the store can
+explain the adjustment to the consignor months later without re-deriving it from the sales history.
+
+---
+
+## ADR-0038 — Money may never rest in a control account without naming a party
+
+**Status:** Accepted.
+**Context:** `assert_subledger_control()` guarded only one direction: it stopped a **tagged** line from
+landing on the wrong account. Nothing stopped an **untagged** line from landing on a control account.
+So this was legal:
+
+```
+debit  1100 Accounts Receivable   500.00     <-- no party
+credit 4000 Sales Revenue         500.00
+```
+
+It balances. The trial balance stays at zero. Every assertion in the suite passed. And that 500.00 of
+receivable is owed by **nobody**: it appears on no customer statement, it can be invoiced to no one, and
+it will never be collected. It surfaces only later as an unexplained difference in
+`subledger_control_check()`, long after the originating transaction is findable.
+**Decision:** A `BEFORE INSERT` trigger refuses any journal line hitting a control account without
+`party_id` + `subledger_type_code`. The sole exception is a genuine **bearer** instrument — an
+anonymous gift certificate has no holder to record — whitelisted per subledger type via
+`subledger_type.allows_untagged` so the exemption is a reviewable data decision rather than a hole.
+**Consequences:** Balanced is not the same as correct. A detective control that tells you the books are
+wrong is worth far less than a preventive one that stops them going wrong; `subledger_control_check()`
+remains as the backstop, and this trigger is what makes it boring. Migration 0005 **refuses to install
+the guard** if existing data already violates it, reporting the offending lines instead, because
+installing a constraint the live books already break is how a migration becomes an outage.
+**Related:** `subledger_type.uses_open_items` was added at the same time. Security deposits, layaway
+deposits, stored value and accrued vendor payables legitimately carry a GL control balance with no
+`open_item` behind it, and `open_item_control_check()` was reporting all four as permanent differences
+on a healthy database. A check that always shows failures is a check everyone learns to ignore — and
+it hides the one real imbalance when it finally appears.
+
+---
+
 ## Open decisions for you
 1. ~~**ADR-0006:** switch `journal_line.id` to `bigint`?~~ **DONE.**
 2. ~~**ADR-0007:** keep RLS on the hot `journal_line` path?~~ **DONE** — measured ~3× cost; RLS disabled on journal tables, kept elsewhere; `ninja_migrator` BYPASSRLS added.

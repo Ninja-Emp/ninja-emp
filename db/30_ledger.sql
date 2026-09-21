@@ -258,6 +258,61 @@ CREATE TRIGGER trg_journal_line_subledger_control
   BEFORE INSERT ON journal_line
   FOR EACH ROW EXECUTE FUNCTION assert_subledger_control();
 
+-- (5) THE REVERSE DIRECTION: a line posting TO a control account must be TAGGED.
+--
+-- assert_subledger_control() above only guards one way: it stops a TAGGED line
+-- from landing on the wrong account. It says nothing about an UNTAGGED line
+-- landing on a control account, and that gap is the more dangerous of the two.
+--
+-- Without this trigger it was possible to debit Accounts Receivable with no
+-- party at all. The entry balances, the trial balance stays at zero, and
+-- nothing complains -- but the money is ORPHANED: no party owes it, it appears
+-- on no statement, no one can be invoiced for it, and it will never be
+-- collected. It shows up only later as an unexplained difference in
+-- subledger_control_check(), by which time the originating transaction is
+-- buried in months of history.
+--
+-- A detective control that tells you the books are wrong is worth far less
+-- than a preventive one that stops them going wrong. subledger_control_check()
+-- remains as the backstop; this trigger is what makes it boring.
+--
+-- The single legitimate exception is a BEARER instrument (an anonymous gift
+-- certificate), whitelisted per subledger type via allows_untagged so the
+-- exemption is a reviewable data decision rather than a hole in the rule.
+CREATE OR REPLACE FUNCTION assert_control_account_tagged() RETURNS trigger
+LANGUAGE plpgsql AS $$
+DECLARE
+  v_sub     text;
+  v_untagged boolean;
+  v_code    text;
+  v_name    text;
+BEGIN
+  IF NEW.subledger_type_code IS NOT NULL THEN RETURN NEW; END IF;
+
+  SELECT a.control_subledger_type_code, a.code, a.name
+    INTO v_sub, v_code, v_name
+    FROM account a
+   WHERE a.id = NEW.account_id AND a.is_control;
+
+  IF v_sub IS NULL THEN RETURN NEW; END IF;   -- not a control account
+
+  SELECT st.allows_untagged INTO v_untagged
+    FROM kernel.subledger_type st WHERE st.code = v_sub;
+
+  IF COALESCE(v_untagged, false) THEN RETURN NEW; END IF;
+
+  RAISE EXCEPTION
+    'Account % (%) is the % control account; a posting to it must name the party (party_id + subledger_type_code). Untagged money here is owed to nobody and will never be collected or paid.',
+    v_code, v_name, v_sub
+    USING ERRCODE = '23514';
+END; $$;
+COMMENT ON FUNCTION assert_control_account_tagged IS
+  'Prevents orphaned balances: every line hitting a control account must identify the party, unless the subledger allows bearer instruments.';
+
+CREATE TRIGGER trg_journal_line_control_tagged
+  BEFORE INSERT ON journal_line
+  FOR EACH ROW EXECUTE FUNCTION assert_control_account_tagged();
+
 -- ============================================================================
 -- POSTING API (idempotent) + REVERSAL + TRIAL BALANCE
 -- ============================================================================

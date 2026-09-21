@@ -45,7 +45,15 @@ SELECT _apply_tenant_rls(t) FROM unnest(ARRAY[
   'sale','sale_line','sale_line_tax','payment','payment_tender',
   'merchant_settlement',
   -- Inventory & stored value (Part 6, ADR-0031/0032)
-  'inventory_item','inventory_movement','stored_value','stored_value_activity'
+  'inventory_item','inventory_movement','stored_value','stored_value_activity',
+  -- Tax / 1099 (Round C, ADR-0034)
+  'tax_form_threshold','payee_tax_profile','tax_year_payment',
+  -- Lease true-up & CAM (Round C, ADR-0035)
+  'lease_sales_report','cam_pool','cam_pool_expense',
+  -- Markdown & layaway (Round C, ADR-0036)
+  'markdown_reason','markdown_event','layaway','layaway_line','layaway_payment',
+  -- Commission true-up (Round C, ADR-0037)
+  'commission_trueup'
 ]) AS t;
 
 -- Subtype tables (person/organization) have no tenant_id; isolate via their party.

@@ -50,7 +50,7 @@ $PSQL -d "$TENANT_DB" -c "SET search_path = $TENANT, kernel; \
     VALUES ('Demo Mall LLC','USD') ON CONFLICT (tenant_id) DO NOTHING;"
 
 # Seeds (CoA + posting_map, consignment CoA, fiscal calendar generator).
-for f in 35_coa_seed.sql 37_coa_consignment.sql 38_coa_pos.sql 39_coa_close.sql 36_tenant_seed.sql; do
+for f in 35_coa_seed.sql 37_coa_consignment.sql 38_coa_pos.sql 39_coa_close.sql 39_coa_tax.sql 36_tenant_seed.sql; do
   echo "   - $f"
   $PSQL -d "$TENANT_DB" -c "SET search_path = $TENANT, kernel; SET app.tenant_id = '$DEMO_TENANT_ID';" -f "$HERE/$f"
 done
@@ -60,7 +60,9 @@ $PSQL -d "$TENANT_DB" -c "SET search_path = $TENANT, kernel; SET app.tenant_id =
 for f in 40_subledger.sql 45_openitem.sql 50_vendormall.sql 55_vendormall_posting.sql \
          60_consignment.sql 65_consignment_posting.sql \
          70_pos.sql 72_inventory.sql 75_pos_posting.sql 77_pos_inventory.sql \
-         78_stored_value.sql 79_vendor_draw.sql 80_vendor_portal.sql 85_close.sql 90_rls.sql; do
+         78_stored_value.sql 79_vendor_draw.sql 80_vendor_portal.sql \
+         82_tax_1099.sql 83_lease_trueup.sql 84_markdown_layaway.sql 86_commission_trueup.sql \
+         85_close.sql 90_rls.sql; do
   echo "   - $f"
   # tenant_id is needed because some domain files seed tenant reference data
   # (e.g. 70_pos.sql seeds tender_type).
