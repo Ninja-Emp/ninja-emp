@@ -28,8 +28,8 @@
 - [x] Test suite: lease     (20 assertions)
 - [x] Test suite: retail    (37 assertions)
 - [x] Register tax1099/lease/retail in scripts/run_tests.sh
-- [ ] ADR-0034 (1099), ADR-0035 (lease true-up), ADR-0036 (markdown/layaway),
-      ADR-0037 (commission true-up) in docs/DECISIONS.md
+- [x] ADR-0034 (1099), ADR-0035 (lease true-up), ADR-0036 (markdown/layaway),
+      ADR-0037 (commission true-up), ADR-0038 (control-account tagging) in docs/DECISIONS.md
 
 ## Round C.1 — Bugs found while testing (all fixed + regression-guarded)
 - [x] 5100 account-code collision: Consignment COGS vs Inventory Adjustments.
@@ -74,6 +74,8 @@
 - [x] `scripts/run_tests.sh` — one-command full regression
 
 ## Round E — Sync & deliver
-- [ ] Full test run (all suites green)
-- [ ] ERD re-render + SRS/README/ROADMAP/DECISIONS sync
-- [ ] Backup + zip + push
+- [x] Full test run (all suites green) — 222 assertions, 10 suites, GREEN
+      from a clean provision -> migrate -> test
+- [x] ERD re-render (erd.mmd + erd.png + ERD.md rebuilt from source)
+- [x] SRS / README / ROADMAP / DB_AUDIT / DECISIONS sync
+- [x] Backup (backups/20260921T014903Z-round-c) + zip (dist/) + push to origin/main
