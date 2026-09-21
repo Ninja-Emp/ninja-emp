@@ -34,17 +34,29 @@ stable.
 `provision.sh` → `migrate.sh` → `run_tests.sh`, and verified after a
 backup→restore round-trip. The database is complete.
 
-## Next — Part 6: Application Layer
+## In progress — Part 6: Application Layer
 
-With the domain schema **complete and proven**, the next build is the PHP application layer.
+With the domain schema **complete and proven**, the PHP application layer is underway.
 
-1. **DBAL** per ADR-0025 — bcmath + string money, savepoints, emulated prepares (PgBouncer).
-2. **Feature modules + service contracts** (PHP 8.5, no frameworks, PSR-3/4/7/11/12/15).
-3. **Routing + middleware**; auth (sessions, RBAC via party roles).
-4. **Vendor portal UI** — the realtime views from Part 5 are already built and proven.
-5. **API-first**: OpenAPI 3.1 spec generated from the contracts.
-6. **Server-rendered PHP templates** + a map island for the mall floor plan.
-7. **Quality gate**: PHP-CS-Fixer, PHPStan L10, PHPMD, Deptrac, mutation testing (MSI ≥ 80%).
+| Step | Scope | Status |
+|------|-------|--------|
+| 6.1 | **DBAL** per ADR-0025 — bcmath + string money, savepoints, emulated prepares (PgBouncer) | ✅ |
+| 6.2 | **Ledger engine** — idempotent posting, posting_map account determination, reversal, tenders | ✅ |
+| 6.3 | **Auth & tenancy** — sessions, RBAC via party roles, schema-per-tenant resolution | ✅ |
+| 6.4 | **Feature modules + service contracts** (PHP 8.5, no frameworks, PSR-3/4/7/11/12/15) | ⏳ |
+5. **Routing + middleware**; wire auth into the request pipeline.
+6. **Vendor portal UI** — the realtime views from Part 5 are already built and proven.
+7. **API-first**: OpenAPI 3.1 spec generated from the contracts.
+8. **Server-rendered PHP templates** + a map island for the mall floor plan.
+9. **Quality gate**: PHP-CS-Fixer, PHPStan L10, PHPMD, Deptrac, mutation testing (MSI ≥ 80%).
+
+**Delivered so far (6.1–6.3):** `src/` now contains the DBAL (`NinjaEMP\Db\*`:
+`Connection`, `PdoConnection`, `TenantContext`, `PlaceholderRewriter`, `TypeMapper`,
+`Identifier`, `ErrorMapper`, typed exceptions), the ledger engine
+(`NinjaEMP\Ledger\*`: `LedgerService`, `JournalEntry`, `JournalLine`, `Tender`),
+the `Money`/`Currency` value objects, and auth & tenancy (`NinjaEMP\Auth\*`,
+`NinjaEMP\Tenancy\*`). **118 unit assertions green** (`php tests/run.php`),
+zero dependencies. Functional DBAL tests auto-skip without a live database.
 
 ## Deferred follow-ons (not blocking)
 
@@ -67,5 +79,7 @@ journal partitioning at the 20M-row threshold (ADR-0026) · PII envelope encrypt
 
 ## Immediate next action
 
-**Part 6, step 1: the DBAL** (ADR-0025) — the foundation every service will sit on. The database
-is complete and proven; the application layer is the next build.
+**Part 6, step 4: feature modules + service contracts.** The DBAL (6.1), ledger engine (6.2)
+and auth & tenancy (6.3) are delivered and unit-tested. Next: build the domain services
+(Vendor Mall, Consignment, POS, Inventory) on top of `LedgerService`, then routing + middleware,
+then the vendor portal UI and the OpenAPI 3.1 surface.
