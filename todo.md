@@ -33,10 +33,24 @@ Delivered: DBAL (6.1), ledger engine (6.2), auth & tenancy (6.3). 118 unit asser
 - [x] Update ROADMAP + handoff docs + src/README
 - [x] Commit + push to feat/tenant-ui (5583120, bba948d)
 
-## Next (needs a live PostgreSQL to verify)
-- [ ] DbalRepository implementing the MockRepository signatures (swap the mock)
-- [ ] Domain modules: Vendor Mall, Consignment, POS, Inventory (on LedgerService)
-- [ ] Routing + middleware (wire SessionAuth + TenantResolver)
-- [ ] Vendor portal UI (realtime views already exist)
-- [ ] OpenAPI 3.1 surface
-- [ ] Quality gate (PHP-CS-Fixer, PHPStan L10, PHPMD, Deptrac, mutation MSI ≥ 80%)
+## E. Repository layer (swap the mock) — `src/Repository/` — ⏳
+- [x] `Repository` interface (mirrors MockRepository signatures exactly)
+- [x] `DbalRepository` — real SQL against the normalized schema
+- [x] Pure row-mappers (space/vendor/item/register/sale) — unit-testable
+- [x] `FakeConnection` test double + `RepositoryTest`
+- [ ] Domain services on top (Vendor Mall, Consignment, POS, Inventory)
+
+## F. Routing + middleware — ⏳
+- [ ] Wire SessionAuth + TenantResolver into the front controller
+- [ ] Attribute-based routing (PSR-15 middleware)
+
+## G. OpenAPI 3.1 surface — ⏳
+- [ ] Machine-readable contract for the API-first surface
+
+## H. Quality gate — ⏳
+- [ ] PHP-CS-Fixer, PHPStan L10, PHPMD, Deptrac, mutation MSI ≥ 80%
+
+## Notes
+- No live PostgreSQL in this sandbox: functional DBAL tests auto-skip; repository
+  SQL is written against the verified schema and unit-tested via a fake Connection.
+- Push often to feat/tenant-ui.
