@@ -46,8 +46,13 @@ Delivered: DBAL (6.1), ledger engine (6.2), auth & tenancy (6.3). 118 unit asser
 - [x] `DomainServicesTest` (53 assertions)
 
 ## F. Routing + middleware — ⏳
+- [ ] Vendor PSR-7/11/15 interfaces (no Composer)
+- [ ] PSR-7 concrete: Stream, Uri, Request, Response, Emitter
+- [ ] Attribute routing: #[Route], RouteCollection, Router, RouteMatch
+- [ ] PSR-15 pipeline + middleware (error, tenant, auth, rbac, csrf, json)
+- [ ] HttpKernel wiring SessionAuth + TenantResolver
 - [ ] Wire SessionAuth + TenantResolver into the front controller
-- [ ] Attribute-based routing (PSR-15 middleware)
+- [ ] HttpKernelTest (routing, middleware, RBAC, tenant)
 
 ## G. OpenAPI 3.1 surface — ⏳
 - [ ] Machine-readable contract for the API-first surface

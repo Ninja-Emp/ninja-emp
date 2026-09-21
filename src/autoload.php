@@ -13,6 +13,9 @@ spl_autoload_register(static function (string $class): void {
     $prefixes = [
         'NinjaEMP\\' => __DIR__ . '/',
         'Psr\\Log\\' => __DIR__ . '/Psr/Log/',
+        'Psr\\Http\\Message\\' => __DIR__ . '/Psr/Http/Message/',
+        'Psr\\Http\\Server\\' => __DIR__ . '/Psr/Http/Server/',
+        'Psr\\Container\\' => __DIR__ . '/Psr/Container/',
     ];
 
     foreach ($prefixes as $prefix => $baseDir) {
