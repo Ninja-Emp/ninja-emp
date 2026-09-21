@@ -62,7 +62,14 @@ Delivered: DBAL (6.1), ledger engine (6.2), auth & tenancy (6.3). 118 unit asser
 - [x] Serve /api/openapi.json + /api/docs (Swagger UI-free)
 - [x] OpenApiTest (369 assertions green)
 
-## H. Quality gate — ⏳
+## H. Domain modules (handoff §E) — ✅
+- [x] `ShiftService` — register CRUD, open/close shift, over/short preview (ADR-0029)
+- [x] `OpenItemService` — AR/AP open items, FIFO apply, write-off, aging (ADR-0023)
+- [x] `StoredValueService` — gift certs / store credit, redeem, opt-in breakage (ADR-0032)
+- [x] `ReportingService` — P&L, balance sheet, sales, valuation, tax, vendor balances
+- [x] `DomainModulesTest` (38 assertions) — 407 total green
+
+## I. Quality gate — ⏳
 - [ ] PHP-CS-Fixer, PHPStan L10, PHPMD, Deptrac, mutation MSI ≥ 80%
 
 ## Notes
