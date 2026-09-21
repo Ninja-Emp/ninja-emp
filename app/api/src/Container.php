@@ -7,6 +7,10 @@ namespace NinjaEmp\Api;
 use NinjaEMP\Db\Connection;
 use NinjaEMP\Db\ConnectionFactory;
 use NinjaEMP\Db\TenantContext;
+use NinjaEMP\Domain\OpenItem\OpenItemService;
+use NinjaEMP\Domain\Pos\ShiftService;
+use NinjaEMP\Domain\Reporting\ReportingService;
+use NinjaEMP\Domain\StoredValue\StoredValueService;
 use NinjaEMP\Repository\DbalRepository;
 use NinjaEMP\Repository\Repository;
 use NinjaEMP\Support\Log\NullLogger;
@@ -96,6 +100,12 @@ final class Container implements ContainerInterface
                 $c->get(TenantContextHolder::class)->get(),
             );
         });
+
+        // Domain services — each is a thin orchestration layer over the ledger.
+        $container->set(ShiftService::class, static fn (self $c): ShiftService => new ShiftService($c->get(Connection::class)));
+        $container->set(OpenItemService::class, static fn (self $c): OpenItemService => new OpenItemService($c->get(Connection::class)));
+        $container->set(StoredValueService::class, static fn (self $c): StoredValueService => new StoredValueService($c->get(Connection::class)));
+        $container->set(ReportingService::class, static fn (self $c): ReportingService => new ReportingService($c->get(Connection::class)));
 
         return $container;
     }

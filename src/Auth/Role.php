@@ -24,10 +24,11 @@ final class Role
         self::OWNER => [
             'dashboard.view', 'pos.use', 'booths.manage', 'vendors.manage',
             'inventory.manage', 'reports.view', 'settings.manage', 'accounting.view',
+            'registers.manage', 'stored_value.manage',
         ],
         self::MANAGER => [
             'dashboard.view', 'pos.use', 'booths.manage', 'vendors.manage',
-            'inventory.manage', 'reports.view',
+            'inventory.manage', 'reports.view', 'registers.manage', 'stored_value.manage',
         ],
         self::ACCOUNTANT => [
             'dashboard.view', 'vendors.manage', 'reports.view', 'accounting.view',

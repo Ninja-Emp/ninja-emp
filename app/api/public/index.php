@@ -19,6 +19,9 @@ use NinjaEmp\Api\Container;
 use NinjaEmp\Api\Http\Controllers\HealthController;
 use NinjaEmp\Api\Http\Controllers\MeController;
 use NinjaEmp\Api\Http\Controllers\OpenApiController;
+use NinjaEmp\Api\Http\Controllers\ReportingController;
+use NinjaEmp\Api\Http\Controllers\ShiftController;
+use NinjaEmp\Api\Http\Controllers\StoredValueController;
 use NinjaEmp\Api\Http\Controllers\VendorController;
 use NinjaEMP\Auth\Csrf;
 use NinjaEMP\Auth\SessionAuth;
@@ -100,6 +103,9 @@ $controllers = [
     HealthController::class,
     MeController::class,
     VendorController::class,
+    ReportingController::class,
+    ShiftController::class,
+    StoredValueController::class,
 ];
 
 $routes = new RouteCollection();
