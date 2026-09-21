@@ -286,11 +286,14 @@ remaining work to make Ninja EMP a real application. This is the handoff for the
 - **Still to do:** wire `PosController::checkout` to post; vendor payable accrual on sale;
   payout/aging; commission per `commission_rule`; accrual-at-sale → realtime vendor portal (ADR-0028).
 
-### C. Auth & tenancy
-- Real authentication (sessions, password hashing, CSRF), replacing the mock role switcher.
-- **Schema-per-tenant** resolution: map the request host/session to a tenant schema; set
-  `search_path` per connection.
-- RBAC enforcement server-side (the UI already gates routes; the API must too).
+### C. Auth & tenancy — ✅ DELIVERED
+- `src/Auth/`: `Role` (permission matrix — the server-side enforcement point), `User`,
+  `PasswordHasher` (Argon2id/bcrypt), `Csrf` (constant-time), `SessionAuth` (fixation-safe).
+- `src/Tenancy/`: `TenantRegistry` (control-plane seam), `TenantRecord` (validates schema name),
+  `InMemoryTenantRegistry`, `TenantResolver` (slug → host → `TenantContext`, rejects
+  suspended/unknown tenants).
+- **Still to do:** wire `SessionAuth` + `TenantResolver` into the request pipeline (routing +
+  middleware), replace the mock role switcher, and enforce RBAC on the API surface.
 
 ### D. API-first surface — OpenAPI 3.1
 - Expose the same operations as JSON endpoints (PSR-7/15 + attribute routing) so the UI and
@@ -311,9 +314,10 @@ remaining work to make Ninja EMP a real application. This is the handoff for the
 - Tests (unit for money/ledger; integration for posting; e2e for POS).
 - CI (lint + tests), deploy pipeline.
 
-**Suggested next step:** **A (DBAL)** and **B (ledger engine)** are delivered (`src/`, 83 unit
-assertions green). Next: **C (auth & tenancy)** and the **DbalRepository** that swaps the mock
-data layer for the real DBAL — then the domain modules in **E**.
+**Suggested next step:** **A (DBAL)**, **B (ledger engine)** and **C (auth & tenancy)** are
+delivered (`src/`, 118 unit assertions green). Next: the **DbalRepository** that swaps the mock
+data layer for the real DBAL, then the domain modules in **E** (Vendor Mall, Consignment, POS,
+Inventory) built on `LedgerService`.
 
 ---
 

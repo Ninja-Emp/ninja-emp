@@ -32,6 +32,17 @@ src/
     JournalEntry.php           ← balanced entry (validated in PHP before the DB)
     JournalLine.php            ← debit XOR credit, subledger tagging
     Tender.php                 ← tender → posting role map (ADR-0029)
+  Auth/                        ← authentication & RBAC
+    Role.php                   ← role → permission matrix (server-side authority)
+    User.php                   ← authenticated principal
+    PasswordHasher.php         ← Argon2id/bcrypt hashing (never plaintext)
+    Csrf.php                   ← CSRF token generate/validate (constant-time)
+    SessionAuth.php            ← session login/logout, fixation-safe
+  Tenancy/                     ← schema-per-tenant resolution (ADR-0008)
+    TenantRegistry.php         ← control-plane seam (findBySlug / findByHost)
+    TenantRecord.php           ← a control.tenant row (validates schema name)
+    InMemoryTenantRegistry.php ← test/dev registry
+    TenantResolver.php         ← request → TenantContext
   Support/Log/NullLogger.php   ← PSR-3 no-op (swap for Monolog in prod)
   Psr/Log/*.php                ← vendored PSR-3 interfaces (no Composer)
 ```
@@ -64,13 +75,21 @@ throw means someone bypassed the DBAL.
 `post_journal_entry()` — which is idempotent on `idempotency_key`. `reverse()`
 posts a mirror entry; the original is never edited.
 
+## Auth & tenancy
+
+`Auth\Role` holds the permission matrix (the enforcement point; the UI gates for
+UX only). `SessionAuth` stores only id/role/tenant in the session and regenerates
+the session id on login. `Csrf` issues a 32-byte token validated with
+`hash_equals`. `Tenancy\TenantResolver` maps a request (slug, then host) to a
+`TenantContext`, rejecting suspended/unknown tenants and unsafe schema names.
+
 ## Running the tests
 
 ```bash
 php tests/run.php
 ```
 
-83 assertions, zero dependencies. The functional DBAL tests auto-skip unless a
+118 assertions, zero dependencies. The functional DBAL tests auto-skip unless a
 live database is configured:
 
 ```bash
