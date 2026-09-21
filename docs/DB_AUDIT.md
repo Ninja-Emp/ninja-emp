@@ -3,20 +3,53 @@
 Generated against the live `ninja_emp` database and the repo working tree.
 All findings below are **verified by query or file inspection**, not assumed.
 
-## Current state (verified)
+> **Updated after Rounds A, B and D.** Tier 1 is closed, Tier 2 is largely
+> closed, and the Tier 3 operational gaps are closed. The original audit text is
+> preserved below for traceability; items now done are marked as such.
+
+## Current state (verified, post Round D)
 
 | Metric | Count |
 | --- | --- |
-| Base tables (`tenant_demo`) | 54 (48 real + 6 partition-test leftovers) |
-| Views (`tenant_demo`) | 17 |
-| Functions (`tenant_demo`) | 31 |
-| Kernel tables | 12 |
-| Test assertions | 83 across 5 suites — **all green** |
+| Base tables (`tenant_demo`) | 52 (partition scaffolding no longer leaks) |
+| Views (`tenant_demo`) | 19 |
+| Functions (`tenant_demo`) | 55 |
+| Kernel tables | 13 |
+| Test assertions | **141 across 7 suites — all green** |
 | Posting roles with no `posting_map` entry | **0** (everything is wired) |
 | Fiscal periods | 24, all `open` |
 
-Suite results at time of audit: invariants 19, consignment 12, vendormall 20,
-pos 27, partition 5. Zero errors.
+Suite results: invariants 23, consignment 12, vendormall 20, pos 27,
+partition 6, close 23, inventory 30. Zero failures, zero errors, from a clean
+`db/provision.sh` and stable across repeated runs.
+
+### Closed since the original audit
+
+- **Tier 1, all of it.** `income_statement()`, `balance_sheet()`,
+  `cash_basis_income_statement()`, `close_period()` / `reopen_period()` /
+  `close_fiscal_year()`, Retained Earnings + Income Summary,
+  `write_off_open_item()`. (Round A, ADR-0030)
+- **Tier 2 core.** Inventory with moving weighted-average cost and COGS on sale
+  (ADR-0031), stored value issuance as a liability with opt-in breakage
+  (ADR-0032), vendor draw as a tender with an overdraw guard. (Round B)
+- **Tier 3 operations.** Migrations runner with checksum drift detection,
+  per-tenant backup, verified restore, scrubbed prod→dev sync with a leak test,
+  and the partition-test schema pollution. (Round D, ADR-0033)
+- **A latent schema bug.** `person` and `organization` carried a
+  `kernel.touch_audit()` trigger but no `updated_by` column, so every `UPDATE`
+  to either table failed. Found while building the scrubber — the first code to
+  update a person. Fixed, migrated, and guarded by a structural test that
+  asserts the whole class rather than the two tables that happened to be broken.
+
+### Still open
+
+Round C (Tier 2 remainder): 1099-NEC threshold tracking and annual extract,
+percentage-rent true-up from POS sales, CAM reconciliation, lease renewals and
+escalations, markdown engine, layaway, percentage-commission true-ups.
+
+---
+
+## Original audit (for traceability)
 
 **SRS parts:** 0–5 built. Part 6 (Application Layer) and Part 7 (Integrations &
 Reporting) remain outlines.
