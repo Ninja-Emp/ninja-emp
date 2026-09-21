@@ -38,7 +38,12 @@ Delivered: DBAL (6.1), ledger engine (6.2), auth & tenancy (6.3). 118 unit asser
 - [x] `DbalRepository` — real SQL against the normalized schema
 - [x] Pure row-mappers (space/vendor/item/register/sale) — unit-testable
 - [x] `FakeConnection` test double + `RepositoryTest`
-- [ ] Domain services on top (Vendor Mall, Consignment, POS, Inventory)
+- [x] `Allocator` — largest-remainder exact split (ADR-0009)
+- [x] `PosService` — ring up / refund / shift open+close / merchant settlement
+- [x] `InventoryService` — item master, receive, adjust, valuation (ADR-0031)
+- [x] `ConsignmentService` — agreements, items, sales, settlement+payout (ADR-0028)
+- [x] `VendorMallService` — leases, space allocation, rent, deposits
+- [x] `DomainServicesTest` (53 assertions)
 
 ## F. Routing + middleware — ⏳
 - [ ] Wire SessionAuth + TenantResolver into the front controller
