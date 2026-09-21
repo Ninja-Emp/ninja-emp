@@ -45,17 +45,22 @@ Delivered: DBAL (6.1), ledger engine (6.2), auth & tenancy (6.3). 118 unit asser
 - [x] `VendorMallService` — leases, space allocation, rent, deposits
 - [x] `DomainServicesTest` (53 assertions)
 
-## F. Routing + middleware — ⏳
-- [ ] Vendor PSR-7/11/15 interfaces (no Composer)
-- [ ] PSR-7 concrete: Stream, Uri, Request, Response, Emitter
-- [ ] Attribute routing: #[Route], RouteCollection, Router, RouteMatch
-- [ ] PSR-15 pipeline + middleware (error, tenant, auth, rbac, csrf, json)
-- [ ] HttpKernel wiring SessionAuth + TenantResolver
-- [ ] Wire SessionAuth + TenantResolver into the front controller
-- [ ] HttpKernelTest (routing, middleware, RBAC, tenant)
+## F. Routing + middleware — ✅
+- [x] Vendor PSR-7/11/15 interfaces (no Composer)
+- [x] PSR-7 concrete: Stream, Uri, Request, Response, Emitter
+- [x] Attribute routing: #[Route], RouteCollection, Router, RouteMatch
+- [x] PSR-15 pipeline + middleware (error, tenant, auth, rbac, csrf)
+- [x] HttpKernel wiring SessionAuth + TenantResolver
+- [x] Wire SessionAuth + TenantResolver into the front controller (app/api)
+- [x] HttpKernelTest (54 assertions) — 319 total green
+- [x] Commit + push (7440606)
 
-## G. OpenAPI 3.1 surface — ⏳
-- [ ] Machine-readable contract for the API-first surface
+## G. OpenAPI 3.1 surface — ✅
+- [x] OpenAPI 3.1 document builder (info/servers/paths/components)
+- [x] Schema builder (JSON Schema 2020-12 subset)
+- [x] Reflect #[Route] + #[ApiSchema] into paths/operations
+- [x] Serve /api/openapi.json + /api/docs (Swagger UI-free)
+- [x] OpenApiTest (369 assertions green)
 
 ## H. Quality gate — ⏳
 - [ ] PHP-CS-Fixer, PHPStan L10, PHPMD, Deptrac, mutation MSI ≥ 80%

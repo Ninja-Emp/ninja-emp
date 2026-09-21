@@ -18,6 +18,7 @@ declare(strict_types=1);
 use NinjaEmp\Api\Container;
 use NinjaEmp\Api\Http\Controllers\HealthController;
 use NinjaEmp\Api\Http\Controllers\MeController;
+use NinjaEmp\Api\Http\Controllers\OpenApiController;
 use NinjaEmp\Api\Http\Controllers\VendorController;
 use NinjaEMP\Auth\Csrf;
 use NinjaEMP\Auth\SessionAuth;
@@ -95,10 +96,24 @@ $registry->add(
 $resolver = new TenantResolver($registry);
 
 // ---- Routes (attribute-discovered) ----------------------------------------
+$controllers = [
+    HealthController::class,
+    MeController::class,
+    VendorController::class,
+];
+
 $routes = new RouteCollection();
-$routes->addController(HealthController::class);
-$routes->addController(MeController::class);
-$routes->addController(VendorController::class);
+foreach ($controllers as $controller) {
+    $routes->addController($controller);
+}
+
+// The OpenAPI controller reflects the other controllers, so it is constructed
+// with the list and registered last (it documents itself too).
+$container->instance(
+    OpenApiController::class,
+    new OpenApiController([...$controllers, OpenApiController::class]),
+);
+$routes->addController(OpenApiController::class);
 
 $kernel = new HttpKernel(new Router($routes), new ControllerResolver($container));
 

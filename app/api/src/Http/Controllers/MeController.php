@@ -7,6 +7,7 @@ namespace NinjaEmp\Api\Http\Controllers;
 use NinjaEMP\Auth\User;
 use NinjaEMP\Http\Message\JsonResponse;
 use NinjaEMP\Http\Routing\Route;
+use NinjaEMP\OpenApi\ApiSchema;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
@@ -16,6 +17,13 @@ use Psr\Http\Message\ServerRequestInterface;
 final class MeController
 {
     #[Route('GET', '/api/me', name: 'me', permission: 'dashboard.view')]
+    #[ApiSchema(
+        summary: 'Current principal',
+        description: 'Returns the authenticated user and the resolved tenant.',
+        response: 'Me',
+        tags: ['System'],
+        errors: [401, 403],
+    )]
     public function me(ServerRequestInterface $request, array $params): ResponseInterface
     {
         /** @var User|null $user */
