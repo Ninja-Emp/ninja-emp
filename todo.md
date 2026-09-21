@@ -26,11 +26,15 @@
 - [ ] Test suites
 
 ## Round D — Tier 3 + Ops (user request)
-- [ ] Migrations runner (versioned, resumable, idempotent)
-- [ ] Fix partition-test schema pollution
-- [ ] Per-tenant backup/restore (tenant go-live snapshot)
-- [ ] Prod -> local dev sync WITH PII SCRUBBING (raw requires explicit flag)
-- [ ] Laragon/Windows dev sync docs
+- [x] Migrations runner (versioned, resumable, idempotent)
+- [x] Fix partition-test schema pollution (scratch schema + P5 guard)
+- [x] Per-tenant backup/restore (tenant go-live snapshot), verified on restore
+- [x] Prod -> local dev sync WITH PII SCRUBBING (raw requires explicit flag)
+- [x] Leak test: reload the shipped export and diff PII columns vs prod
+- [x] Laragon/Windows dev sync docs
+- [x] BUG: person/organization missing `updated_by` — every UPDATE failed
+      (fixed in 10_party.sql + migration 0002 + invariants T17/T18)
+- [x] `scripts/run_tests.sh` — one-command full regression
 
 ## Round E — Sync & deliver
 - [ ] Full test run (all suites green)

@@ -362,3 +362,22 @@ INSERT INTO kernel.data_classification (schema_name, table_name, column_name, cl
   ('*','journal_line','memo','confidential',NULL),
   ('*','lease','*','confidential','Contract terms.')
 ON CONFLICT (schema_name, table_name, column_name) DO NOTHING;
+
+-- ----------------------------------------------------------------------------
+-- schema_migration — applied-migration ledger (one row per tenant schema).
+--
+-- provision.sh builds from scratch; this table is how the schema evolves AFTER
+-- a tenant is live. The runner (scripts/migrate.sh) is resumable and refuses to
+-- proceed if an already-applied file changed on disk.
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS kernel.schema_migration (
+  tenant_schema text        NOT NULL,
+  version       text        NOT NULL,
+  filename      text        NOT NULL,
+  checksum      text        NOT NULL,
+  applied_at    timestamptz NOT NULL DEFAULT now(),
+  applied_by    text        NOT NULL DEFAULT current_user,
+  duration_ms   integer,
+  PRIMARY KEY (tenant_schema, version)
+);
+COMMENT ON TABLE kernel.schema_migration IS 'Applied migrations per tenant schema. Checksums detect edited migrations.';

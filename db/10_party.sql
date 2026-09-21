@@ -56,7 +56,13 @@ CREATE TABLE person (
   date_of_birth date,          -- pii_sensitive (ADR-0018)
   gender        text,
   created_at    timestamptz NOT NULL DEFAULT now(),
+  created_by    uuid,
   updated_at    timestamptz NOT NULL DEFAULT now(),
+  -- updated_by is REQUIRED: trg_person_audit runs kernel.touch_audit(), which
+  -- assigns NEW.updated_by. Without this column every UPDATE to person raises
+  -- 'record "new" has no field "updated_by"'. Keep the audit column set and the
+  -- touch_audit trigger in lockstep.
+  updated_by    uuid,
   version       integer NOT NULL DEFAULT 1
 );
 
@@ -67,7 +73,10 @@ CREATE TABLE organization (
   entity_type    text,          -- llc | corp | sole_prop | partnership | nonprofit
   incorporation_date date,
   created_at     timestamptz NOT NULL DEFAULT now(),
+  created_by     uuid,
   updated_at     timestamptz NOT NULL DEFAULT now(),
+  -- See person.updated_by: required by kernel.touch_audit().
+  updated_by     uuid,
   version        integer NOT NULL DEFAULT 1
 );
 

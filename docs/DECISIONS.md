@@ -374,6 +374,44 @@ to "never" is the safe, correct default; enabling it must be a deliberate act.
 
 ---
 
+## ADR-0033 — Production backup and developer data are first-class, verified operations
+
+**Status:** Accepted.
+**Context:** Two operational gaps were called out as having caused real pain before: there was no easy
+way to back up a tenant at go-live, and no way to run local development against real data. Both had
+previously been handled ad hoc, which is how ad-hoc backups become unrestorable and how dev databases
+quietly fill with invented data that hides real bugs.
+**Decision:**
+1. Backup is **per tenant**, not per cluster. Schema-per-tenant means one customer is one schema; there
+   is no reason to move the entire cluster to protect one of them.
+2. Schema dumps keep **GRANTs**. RLS policies without the grants they depend on restore into an
+   isolation model that silently does not isolate.
+3. **Every backup is verified when written, and restores are verified when performed.** Verification
+   means trial balance zero, every subledger tying to its GL control account, RLS policies present, and
+   row-count parity with the source — not "psql exited 0". `restore_tenant.sh --into <scratch>` exists
+   so a backup can be proved restorable without touching the live tenant.
+4. Developer datasets are **scrubbed by default**. `--raw` requires typing `EXPORT RAW PII`.
+5. Scrubbing runs on a **throwaway staging copy**. Production is only ever read.
+6. Scrubbing removes **identities**, never **amounts**. Amounts, dates, ids, relationships and row
+   counts are what make the copy worth having; names are what make it a liability. The scrub aborts
+   unless the books still balance afterwards.
+7. The export is **leak-tested against the artefact**: the shipped dump is reloaded and its PII columns
+   compared to production row by row. A failed leak test deletes the export.
+**Consequences:** Backups are trustworthy because they are exercised. Dev runs on production-shaped data
+without production-grade risk.
+**Pushback, recorded because it is the substance of this ADR:** syncing raw production PII to a laptop
+was the stated goal, and shipping that as the default would have been wrong. A laptop is not a
+compliance boundary — it is outside production controls, it lands in personal backups, and it puts
+every affected customer in scope for breach notification. The scrubbed copy preserves everything that
+makes real data useful for development. `--raw` remains available behind deliberate, typed consent.
+**Evidence this was not theoretical:** building the leak test caught three leaks that had already been
+packaged into an export and would have shipped — the unscrubbed intermediate dump zipped alongside the
+scrubbed one, `audit_log` before/after snapshots preserving every original value, and
+`organization.trading_name`, simply missed. The scrub had reported success in all three cases. This is
+precisely why the check is against the artefact rather than the script's own notices.
+
+---
+
 ## Open decisions for you
 1. ~~**ADR-0006:** switch `journal_line.id` to `bigint`?~~ **DONE.**
 2. ~~**ADR-0007:** keep RLS on the hot `journal_line` path?~~ **DONE** — measured ~3× cost; RLS disabled on journal tables, kept elsewhere; `ninja_migrator` BYPASSRLS added.

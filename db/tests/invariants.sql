@@ -187,4 +187,50 @@ SELECT CASE WHEN (SELECT identifier_masked FROM v_party_identifier_masked WHERE 
 SELECT CASE WHEN posting_account('rent_revenue') = (SELECT id FROM account WHERE code='4100')
             THEN 'PASS: posting_map resolves rent_revenue -> 4100' ELSE 'FAIL' END AS t16;
 
+\echo '=== T17: every touch_audit table has the columns touch_audit writes ==='
+-- Structural test. kernel.touch_audit() assigns updated_at, updated_by and
+-- version. If it is attached to a table missing any of them, EVERY update to
+-- that table fails at runtime. person and organization shipped that way and it
+-- went unnoticed because the suites only INSERT parties, never UPDATE them.
+-- This asserts the whole class, not just the two tables that were broken.
+SELECT CASE WHEN count(*) = 0
+            THEN 'PASS: all touch_audit tables have updated_at/updated_by/version'
+            ELSE 'FAIL: missing audit columns on ' || string_agg(relname, ', ')
+       END AS t17
+  FROM (
+    SELECT c.relname
+      FROM pg_trigger t
+      JOIN pg_class c     ON c.oid = t.tgrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0
+                         AND NOT a.attisdropped
+     WHERE n.nspname = 'tenant_demo'
+       AND t.tgfoid  = 'kernel.touch_audit'::regproc
+     GROUP BY c.relname
+    HAVING NOT bool_or(a.attname = 'updated_by')
+        OR NOT bool_or(a.attname = 'updated_at')
+        OR NOT bool_or(a.attname = 'version')
+  ) s;
+
+\echo '=== T18: person/organization are actually updatable ==='
+-- The regression that T17 generalises: prove a real UPDATE round-trips and is
+-- audit-stamped, for both party subtypes.
+UPDATE person SET given_name = 'Janet'
+ WHERE party_id = '33333333-3333-7333-8333-333333333333';
+SELECT CASE WHEN (SELECT updated_by FROM person
+                   WHERE party_id='33333333-3333-7333-8333-333333333333')
+                 = '99999999-9999-7999-8999-999999999999'
+            THEN 'PASS: person update stamped updated_by' ELSE 'FAIL' END AS t18a;
+
+UPDATE organization SET trading_name = 'Acme Trading'
+ WHERE party_id = '22222222-2222-7222-8222-222222222222';
+SELECT CASE WHEN (SELECT updated_by FROM organization
+                   WHERE party_id='22222222-2222-7222-8222-222222222222')
+                 = '99999999-9999-7999-8999-999999999999'
+            THEN 'PASS: organization update stamped updated_by' ELSE 'FAIL' END AS t18b;
+
+-- Restore the seeded name so the suite stays re-runnable.
+UPDATE person SET given_name = 'Jane'
+ WHERE party_id = '33333333-3333-7333-8333-333333333333';
+
 \echo '=== ALL INVARIANT TESTS COMPLETE ==='

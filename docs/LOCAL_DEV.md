@@ -149,3 +149,140 @@ bash scripts/push.sh "feat: ..."   # commit + push
 
 The GitHub repo is the source of truth. The sandbox can be destroyed at any time without loss
 because everything lives in git.
+
+---
+
+# Developing against real production data
+
+Inventing seed data hides the bugs that only real data produces: the vendor with four thousand
+items, the lease with the odd proration, the refund that straddles a period boundary. The point
+of this workflow is that your Laragon instance runs on the same shapes production runs on.
+
+Two scripts cover it. `scripts/backup_tenant.sh` snapshots one tenant on the server, and
+`scripts/sync_to_dev.sh` produces a loadable, **de-identified** copy for your laptop.
+
+## Step 1 — snapshot the tenant on the server (go-live and beyond)
+
+Run this on the production host before anything risky, and on a schedule afterwards. It is
+per-tenant, because schema-per-tenant means one customer is one schema and there is no reason to
+move the whole cluster to protect one of them.
+
+```bash
+bash scripts/backup_tenant.sh tenant_acme --label pre-golive
+bash scripts/backup_tenant.sh --all --label nightly
+```
+
+Each run writes `backups/tenants/<tenant>/<UTC-timestamp>[-label]/` containing a schema-only dump
+**with grants** (RLS policies are worthless if the GRANTs do not come back with them), a portable
+data-only dump, a custom-format dump for fast `pg_restore`, and a `MANIFEST.txt` recording row
+counts and the trial balance at the moment of capture. A `LATEST` symlink points at the newest run.
+
+Every backup is verified as it is written. An unverified backup is a guess.
+
+### Prove the backup is restorable
+
+A backup you have never restored is a hypothesis. Restore it into a scratch schema, which leaves
+the live tenant untouched:
+
+```bash
+bash scripts/restore_tenant.sh backups/tenants/tenant_acme/LATEST --into tenant_restore_test
+```
+
+The restore fails loudly and exits non-zero unless the trial balance is zero, every subledger ties
+to its GL control account, the RLS policies came back, and the row counts match the source. Wire
+it into cron and let it page you when a backup stops being restorable.
+
+## Step 2 — build a dev dataset
+
+Run on the production host:
+
+```bash
+bash scripts/sync_to_dev.sh tenant_acme
+```
+
+This writes `dist/ninja-emp-devdata-tenant_acme-<timestamp>.zip`.
+
+**It is scrubbed by default, and production is never modified.** The script restores into a
+throwaway staging database, scrubs that, dumps it, and drops it. Your live data is only ever read.
+
+What is replaced: person names and dates of birth, party display names, organisation legal and
+trading names, contact details, street addresses, tax identifiers (**both** the ciphertext and the
+unsalted SHA-256 hash — a hashed SSN is a nine-digit keyspace and falls to brute force in seconds),
+card last-4 and processor references, journal memos, and the `audit_log` before/after row
+snapshots, which otherwise preserve a verbatim copy of every value the scrub just removed.
+
+What is kept: every id, foreign key and relationship, every monetary amount, every date, the whole
+chart of accounts, and all row counts. Amounts are deliberately untouched — they are what make the
+copy useful for debugging, and they are not what identifies anyone. The scrub verifies the books
+still balance before the export is allowed out.
+
+The export is then **leak-tested**: the shipped dump is loaded into a scratch database and its
+PII-bearing columns are compared against production row by row. If any value survives, the zip is
+deleted and the script exits non-zero. Nothing ships on the strength of the script believing it
+succeeded.
+
+### If you genuinely need unscrubbed data
+
+```bash
+bash scripts/sync_to_dev.sh tenant_acme --raw
+```
+
+You must type `EXPORT RAW PII` at the prompt. Once real personal data is on a laptop it is outside
+your production controls, it is in your laptop backups, and it is in scope for breach notification.
+The scrubbed copy has the same row counts, the same amounts and the same edge cases; reach for
+`--raw` only when you have a specific reason that the scrubbed copy cannot serve.
+
+## Step 3 — load it into Laragon
+
+Copy the zip to your machine, unzip it, and run the loader inside it. **PowerShell:**
+
+```powershell
+cd ninja-emp-devdata-tenant_acme-20260101T000000Z
+.\load_dev_data.ps1                  # creates/loads database "ninja_emp"
+.\load_dev_data.ps1 ninja_dev        # or a database name of your choosing
+```
+
+**Git Bash / WSL:**
+
+```bash
+./load_dev_data.sh
+```
+
+The loader drops and recreates the target database, creates `pgcrypto` and `btree_gist`
+**in the `kernel` schema** (they must not go in `public`; the dump calls
+`kernel.pgp_sym_decrypt(...)` and the load fails with a confusing
+`function kernel.pgp_sym_decrypt(bytea, text) does not exist` if they are anywhere else), loads the
+data, and prints the trial balance. **The trial balance must be `0.0000`.** If it is not, the
+dataset did not load cleanly — do not develop against it.
+
+Then point Navicat at the database you just created. Same connection settings as above, only the
+database name changes.
+
+## A reasonable rhythm
+
+Refresh dev data weekly, or whenever you are about to work on something where data shape matters —
+a reporting change, a migration, a performance problem. Refreshing is cheap and destructive only to
+your local copy.
+
+```bash
+# on the server
+bash scripts/backup_tenant.sh --all --label nightly    # cron
+bash scripts/sync_to_dev.sh tenant_acme                # when you want fresh dev data
+
+# on your machine
+.\load_dev_data.ps1
+```
+
+## Running migrations locally
+
+Once the dev data is loaded, apply pending migrations against it exactly as production will:
+
+```bash
+bash scripts/migrate.sh --status      # what would run
+bash scripts/migrate.sh --dry-run     # parse and roll back
+bash scripts/migrate.sh               # apply
+```
+
+Each migration runs in a single transaction, and its checksum is recorded. If a migration file is
+edited after it has been applied, the runner refuses to continue rather than silently diverging
+your environments.

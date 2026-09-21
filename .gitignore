@@ -23,6 +23,14 @@ dist/
 backups/**/*.dump
 backups/**/*.tar
 
+# --- Per-tenant backups: CUSTOMER DATA. Never commit. ---
+# backup_tenant.sh writes real tenant rows here, including names, addresses and
+# encrypted tax identifiers. A git repository is a replication mechanism with no
+# deletion story: once this is pushed it is in every clone and every fork
+# forever. Tenant backups belong in object storage with lifecycle rules and
+# access control, not in version control.
+backups/tenants/
+
 # --- OS / editor cruft ---
 .DS_Store
 Thumbs.db

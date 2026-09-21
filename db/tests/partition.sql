@@ -6,11 +6,22 @@
 -- Run: psql -d ninja_emp -v ON_ERROR_STOP=1 -f db/tests/partition.sql
 -- ============================================================================
 \set ON_ERROR_STOP on
-SET search_path = tenant_demo, kernel;
 
--- Re-runnable: drop any prior run's artifacts.
-DROP TABLE IF EXISTS jl_p CASCADE;
-DROP TABLE IF EXISTS je_p CASCADE;
+-- ----------------------------------------------------------------------------
+-- Scaffolding lives in a DISPOSABLE SCHEMA, not in tenant_demo.
+--
+-- These je_p / jl_p tables are a design proof, not part of the product. Built
+-- directly in tenant_demo they persisted after every run, so the tenant schema
+-- carried six tables that are not part of the schema -- which then showed up in
+-- backups, in the table counts used to verify restores, and in the dev-data
+-- export. Test fixtures must not contaminate the thing under test.
+--
+-- The schema is dropped at the end of this file and re-created on each run, so
+-- the suite stays re-runnable and leaves nothing behind.
+-- ----------------------------------------------------------------------------
+DROP SCHEMA IF EXISTS partition_proof CASCADE;
+CREATE SCHEMA partition_proof;
+SET search_path = partition_proof, tenant_demo, kernel;
 
 -- Partitioned journal header (PK includes the partition key).
 CREATE TABLE je_p (
@@ -100,5 +111,20 @@ BEGIN
 END $$;
 SELECT CASE WHEN (SELECT count(*) FROM jl_p_2027) = 2
             THEN 'PASS: 2027 lines landed in jl_p_2027' ELSE 'FAIL' END AS p4;
+
+\echo '=== P5: the proof leaves no scaffolding in the tenant schema ==='
+-- Guards the regression this file used to cause.
+SELECT CASE WHEN count(*) = 0
+            THEN 'PASS: no je_p/jl_p tables in tenant_demo'
+            ELSE 'FAIL: scaffolding leaked into tenant_demo: '
+                 || string_agg(tablename, ', ')
+       END AS p5
+  FROM pg_tables
+ WHERE schemaname = 'tenant_demo'
+   AND (tablename LIKE 'je\_p%' OR tablename LIKE 'jl\_p%');
+
+-- Tear down. Nothing from this proof survives the run.
+RESET search_path;
+DROP SCHEMA IF EXISTS partition_proof CASCADE;
 
 \echo '=== ALL PARTITION TESTS COMPLETE ==='
