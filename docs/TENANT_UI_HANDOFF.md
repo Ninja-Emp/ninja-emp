@@ -46,8 +46,9 @@ not ask to split it out; revisit if needed).
 - **Composer:** not preinstalled; install if a dependency is ever needed (we aim for **zero** deps).
 - **Repo:** `Ninja-Emp/ninja-emp`, default branch `main`. Auth via `gh` / `$GITHUB_TOKEN`.
 - **Push pattern:** `git push https://x-access-token:$GITHUB_TOKEN@github.com/Ninja-Emp/ninja-emp.git <branch>`
-- **Ports:** 8080 is taken by a pre-existing server. Use **8090** for local preview
-  (`php -S localhost:8090 -t public`). Expose with the `expose-port` tool when sharing.
+- **Ports:** 8080 and 8090 are taken by pre-existing servers. Use **8091** for local preview
+  (`php -S localhost:8091 -t public public/router.php`). Expose with the `expose-port` tool when sharing.
+- **bcmath:** required by `Support/Money.php`. Install with `sudo apt-get install -y php-bcmath`.
 
 ---
 
@@ -194,18 +195,22 @@ items and block routes the role can't use. Document the permission matrix in `Au
 - [x] Environment recon (PHP missing → install step documented in §2)
 - [x] Branch `feat/tenant-ui` created off `main`
 - [x] This handoff doc written
-- [ ] Scaffold app structure
-- [ ] Design system (themes)
-- [ ] App shell
-- [ ] Mock data layer
-- [ ] Dashboard
-- [ ] POS
-- [ ] Booths + map
-- [ ] Vendors
-- [ ] Inventory
-- [ ] Reports
-- [ ] Settings
-- [ ] Verify + push + PR
+- [x] Scaffold app structure (front controller + router.php + PSR-4 autoloader)
+- [x] Design system (themes: neutral + dark-blue; light + dark modes)
+- [x] App shell (collapsible sidebar, topbar search/account, theme switcher)
+- [x] Mock data layer (MockRepository + seed.php)
+- [x] Dashboard (KPIs, 14-day trend, occupancy, recent sales, low stock)
+- [x] POS (barcode scan, split payments, hold/resume, discounts, tax-free)
+- [x] Booths + 2D map (CRUD + interactive map island)
+- [x] Vendors (list + statement view)
+- [x] Inventory (search + detail)
+- [x] Reports (tender mix, vendor payouts, tax)
+- [x] Settings (appearance, tenant config, role/permission matrix)
+- [x] Verify (all routes 200, no warnings, RBAC gating) + screenshots (light + dark)
+- [x] README + push + PR
+
+**Build complete.** All modules implemented and verified. See `app/tenant-ui/README.md`
+for run instructions and the DBAL wiring guide.
 
 ---
 
