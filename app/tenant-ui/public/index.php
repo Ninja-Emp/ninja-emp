@@ -16,6 +16,7 @@ use NinjaEmp\TenantUi\Http\Controllers\BoothController;
 use NinjaEmp\TenantUi\Http\Controllers\DashboardController;
 use NinjaEmp\TenantUi\Http\Controllers\InventoryController;
 use NinjaEmp\TenantUi\Http\Controllers\PosController;
+use NinjaEmp\TenantUi\Http\Controllers\RegisterController;
 use NinjaEmp\TenantUi\Http\Controllers\ReportController;
 use NinjaEmp\TenantUi\Http\Controllers\SettingsController;
 use NinjaEmp\TenantUi\Http\Controllers\VendorController;
@@ -95,6 +96,16 @@ $router->get('/', [DashboardController::class, 'index']);
 $router->get('/pos', [PosController::class, 'index']);
 $router->post('/pos/scan', [PosController::class, 'scan']);
 $router->post('/pos/checkout', [PosController::class, 'checkout']);
+$router->post('/pos/quick-add', [PosController::class, 'quickAdd']);
+$router->post('/pos/buy', [PosController::class, 'buyFromVendor']);
+
+$router->get('/registers', [RegisterController::class, 'index']);
+$router->get('/registers/new', [RegisterController::class, 'create']);
+$router->post('/registers', [RegisterController::class, 'store']);
+$router->get('/registers/{id}/edit', [RegisterController::class, 'edit']);
+$router->post('/registers/{id}', [RegisterController::class, 'update']);
+$router->post('/registers/{id}/open', [RegisterController::class, 'open']);
+$router->post('/registers/{id}/close', [RegisterController::class, 'close']);
 
 $router->get('/booths', [BoothController::class, 'index']);
 $router->get('/booths/map', [BoothController::class, 'map']);
@@ -104,9 +115,18 @@ $router->get('/booths/{id}', [BoothController::class, 'show']);
 $router->post('/booths/{id}', [BoothController::class, 'update']);
 
 $router->get('/vendors', [VendorController::class, 'index']);
+$router->get('/vendors/new', [VendorController::class, 'create']);
+$router->post('/vendors', [VendorController::class, 'store']);
+$router->get('/vendors/{id}/edit', [VendorController::class, 'edit']);
+$router->post('/vendors/{id}/purchase', [VendorController::class, 'purchase']);
+$router->post('/vendors/{id}', [VendorController::class, 'update']);
 $router->get('/vendors/{id}', [VendorController::class, 'show']);
 
 $router->get('/inventory', [InventoryController::class, 'index']);
+$router->get('/inventory/new', [InventoryController::class, 'create']);
+$router->post('/inventory', [InventoryController::class, 'store']);
+$router->get('/inventory/{id}/edit', [InventoryController::class, 'edit']);
+$router->post('/inventory/{id}', [InventoryController::class, 'update']);
 $router->get('/inventory/{id}', [InventoryController::class, 'show']);
 
 $router->get('/reports', [ReportController::class, 'index']);

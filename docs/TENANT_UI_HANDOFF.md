@@ -214,6 +214,103 @@ for run instructions and the DBAL wiring guide.
 
 ---
 
+## 10b. Round 2 fixes (owner feedback)
+
+After the first pass the owner reviewed the running UI and filed a list of issues. All were
+addressed on the same branch:
+
+| # | Issue | Fix |
+|---|-------|-----|
+| 1 | No way to add/edit inventory items | `InventoryController::create/edit/store/update` + `Views/inventory/form.php`; "+ New item" button and per-row Edit on the list |
+| 2 | No way to add/edit vendors | `VendorController::create/edit/store/update` + `Views/vendors/form.php`; "+ New vendor" button and per-row Edit |
+| 3 | POS should not show the catalog | Catalog grid removed from `Views/pos/index.php`; `PosController::index` no longer passes all items |
+| 4 | Instant inventory modal (vendor mall: items not in inventory until sold) | `PosController::quickAdd` (`POST /pos/quick-add`) + modal in the POS view; **vendor-owned by default**, store-owned option |
+| 5 | No register management | `RegisterController` (index/create/edit/store/update/open/close) + `Views/registers/{index,form}.php`; open with float, close with count + variance |
+| 6 | Can't edit business name / currency / timezone | `SettingsController::update` calls `MockRepository::updateTenant`; Settings tenant card is now an editable form |
+| 7 | Left sidebar too fat when open | `--sidebar-w` narrowed `264px → 208px` (collapsed rail unchanged at `68px`) |
+| 8 | Settings theme picker didn't work (topbar did) | Root cause: the layout applies the persisted theme from `localStorage` **before paint**, overriding the session value the form wrote. Fix: the Settings form now writes `localStorage` on submit and reflects the applied value on load. |
+| 9 | Instant inventory is always vendor-owned | Default `owner=vendor`; store-owned is an explicit opt-in |
+| 10 | Store should sell and buy | Store-owned items appear as POS tiles (sell); "Buy from vendor" (`POST /pos/buy`, `POST /vendors/{id}/purchase`) creates a store-owned item and increases the vendor payable |
+
+**Data layer:** `MockRepository` is now **session-backed** (`$_SESSION['nem_data']`, seeded
+from `seed.php` on first use) so create/edit/purchase/register operations actually persist for
+the life of the session. Method signatures are unchanged from what a DBAL-backed repository
+would expose.
+
+**New routes:** `/inventory/new`, `POST /inventory`, `/inventory/{id}/edit`, `POST /inventory/{id}`,
+`/vendors/new`, `POST /vendors`, `/vendors/{id}/edit`, `POST /vendors/{id}`, `POST /vendors/{id}/purchase`,
+`/registers`, `/registers/new`, `POST /registers`, `/registers/{id}/edit`, `POST /registers/{id}`,
+`POST /registers/{id}/open`, `POST /registers/{id}/close`, `POST /pos/quick-add`, `POST /pos/buy`.
+
+**Round 2 progress log:**
+
+- [x] Settings theme picker fixed (localStorage sync)
+- [x] Inventory add/edit
+- [x] Vendors add/edit
+- [x] POS catalog removed
+- [x] Instant inventory modal (vendor-owned default)
+- [x] Register management (create/open/close)
+- [x] Editable tenant settings
+- [x] Sidebar narrowed
+- [x] Store sell + buy-from-vendor
+- [x] Verify all routes + POST endpoints
+- [x] Screenshots (light + dark) refreshed
+- [x] README + handoff updated
+
+---
+
+## 10c. Remaining application work (the real app, beyond this UI)
+
+The Tenant UI is a **front-end slice** running on a mock data layer. The following is the
+remaining work to make Ninja EMP a real application. This is the handoff for the next phase.
+
+### A. Data access layer (DBAL) — ADR-0025
+- Implement `DbalRepository implements Repository` with **PDO + named params**, **bcmath +
+  string money** end-to-end, **savepoints** for nested transactions, and **emulated prepares**
+  (PgBouncer compatibility).
+- One method per `MockRepository` method; keep signatures identical so controllers/views don't change.
+- Bind `Repository → DbalRepository` in `public/index.php`; delete the mock.
+- Read the realtime vendor views: `v_vendor_balance_realtime`, `v_vendor_sales_realtime`,
+  `v_vendor_sales_today`, `v_vendor_payout_available`, `v_vendor_statement`.
+
+### B. Ledger engine — ADR-0020 / ADR-0028 / ADR-0029
+- **Append-only, reversal-not-edit, idempotent** posting. A sale posts a balanced journal entry.
+- **Account determination** via `posting_map` (ADR-0020) — no hard-coded account numbers.
+- **Accrual at sale** → realtime vendor portal (ADR-0028).
+- **Tenders** (ADR-0029): cash / check / card→clearing / gift certificate / customer store
+  credit / vendor payable draw. Wire `PosController::checkout` to post.
+- Vendor payable accrual on sale; payout/aging; commission per `commission_rule`.
+
+### C. Auth & tenancy
+- Real authentication (sessions, password hashing, CSRF), replacing the mock role switcher.
+- **Schema-per-tenant** resolution: map the request host/session to a tenant schema; set
+  `search_path` per connection.
+- RBAC enforcement server-side (the UI already gates routes; the API must too).
+
+### D. API-first surface — OpenAPI 3.1
+- Expose the same operations as JSON endpoints (PSR-7/15 + attribute routing) so the UI and
+  integrations share one contract. Generate/validate against the OpenAPI spec.
+
+### E. Domain modules still to build (server-side)
+- **Leases / rent components / billing** (recurring rent, CAM, late fees).
+- **Consignor agreements / commission rules** (tiered, per-category).
+- **Consignment item intake** (check-in, tagging, photos, price changes).
+- **Payouts** (batch vendor payouts, statements, 1099 prep).
+- **Open items / payment applications** (customer store credit, layaway).
+- **Shifts** (tie registers to shifts; cash counts, over/short posting).
+- **Reports** backed by real queries (sales, aging, payouts, tax, inventory valuation).
+
+### F. Hardening
+- Input validation + error handling; structured logging (PSR-3).
+- Migrations runner; seed/fixtures for dev.
+- Tests (unit for money/ledger; integration for posting; e2e for POS).
+- CI (lint + tests), deploy pipeline.
+
+**Suggested next step:** start with **A (DBAL)** and **B (ledger engine)** — they unblock
+everything else and the UI is already shaped to consume them.
+
+---
+
 ## 11. Key references in this repo
 
 - `HANDOFF.md` — locked technical decisions (PHP 8.5, no frameworks, PSR set, DBAL deferred).

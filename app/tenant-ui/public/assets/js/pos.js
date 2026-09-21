@@ -141,7 +141,7 @@
     renderCart();
   }
 
-  /* ---- Catalog tiles ---------------------------------------------------- */
+  /* ---- Store item tiles ------------------------------------------------- */
   document.querySelectorAll('[data-add-item]').forEach(function (tile) {
     tile.addEventListener('click', function () {
       addItem({
@@ -154,14 +154,16 @@
     });
   });
 
-  /* ---- Catalog filter --------------------------------------------------- */
-  var catSearch = document.getElementById('catalog-search');
-  catSearch.addEventListener('input', function () {
-    var q = catSearch.value.toLowerCase();
-    document.querySelectorAll('[data-add-item]').forEach(function (tile) {
-      tile.style.display = tile.getAttribute('data-search').indexOf(q) !== -1 ? '' : 'none';
+  /* ---- Store item filter ------------------------------------------------ */
+  var storeSearch = document.getElementById('store-search');
+  if (storeSearch) {
+    storeSearch.addEventListener('input', function () {
+      var q = storeSearch.value.toLowerCase();
+      document.querySelectorAll('[data-add-item]').forEach(function (tile) {
+        tile.style.display = tile.getAttribute('data-search').indexOf(q) !== -1 ? '' : 'none';
+      });
     });
-  });
+  }
 
   /* ---- Barcode scan ----------------------------------------------------- */
   var scanInput = document.getElementById('scan');
@@ -199,6 +201,79 @@
   }
   scanInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); doScan(); } });
   document.getElementById('scan-btn').addEventListener('click', doScan);
+
+  /* ---- Instant inventory (quick add) ------------------------------------ */
+  var qaOwner = document.getElementById('qa-owner');
+  var qaVendorField = document.getElementById('qa-vendor-field');
+  function syncQaVendor() { qaVendorField.hidden = qaOwner.value === 'store'; }
+  qaOwner.addEventListener('change', syncQaVendor);
+  syncQaVendor();
+
+  document.getElementById('btn-quick-add').addEventListener('click', function () {
+    document.getElementById('qa-msg').textContent = '';
+    openModal('quick-add-modal');
+    document.getElementById('qa-name').focus();
+  });
+
+  document.getElementById('quick-add-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var msg = document.getElementById('qa-msg');
+    var body = new URLSearchParams(new FormData(e.target)).toString();
+    msg.textContent = 'Adding…';
+    msg.style.color = 'var(--text-muted)';
+    fetch('/pos/quick-add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data.ok) { msg.textContent = data.error || 'Could not add item.'; msg.style.color = 'var(--danger)'; return; }
+        addItem({
+          id: data.item.id, name: data.item.name, sku: data.item.sku,
+          price: data.item.price, vendor: data.item.vendor_id
+        });
+        closeModal('quick-add-modal');
+        e.target.reset();
+        syncQaVendor();
+        scanMsg.textContent = 'Added: ' + data.item.name;
+        scanMsg.style.color = 'var(--success)';
+      })
+      .catch(function () { msg.textContent = 'Request failed.'; msg.style.color = 'var(--danger)'; });
+  });
+
+  /* ---- Buy from vendor -------------------------------------------------- */
+  document.getElementById('btn-buy').addEventListener('click', function () {
+    document.getElementById('buy-msg').textContent = '';
+    openModal('buy-modal');
+    document.getElementById('buy-vendor').focus();
+  });
+
+  document.getElementById('buy-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var msg = document.getElementById('buy-msg');
+    var body = new URLSearchParams(new FormData(e.target)).toString();
+    msg.textContent = 'Recording…';
+    msg.style.color = 'var(--text-muted)';
+    fetch('/pos/buy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data.ok) { msg.textContent = data.error || 'Could not record purchase.'; msg.style.color = 'var(--danger)'; return; }
+        addItem({
+          id: data.item.id, name: data.item.name, sku: data.item.sku,
+          price: data.item.price, vendor: data.item.vendor_id
+        });
+        closeModal('buy-modal');
+        e.target.reset();
+        scanMsg.textContent = 'Purchased: ' + data.item.name;
+        scanMsg.style.color = 'var(--success)';
+      })
+      .catch(function () { msg.textContent = 'Request failed.'; msg.style.color = 'var(--danger)'; });
+  });
 
   /* ---- Clear ------------------------------------------------------------ */
   document.getElementById('clear-cart').addEventListener('click', function () {

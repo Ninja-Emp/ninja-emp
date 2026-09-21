@@ -56,12 +56,39 @@ $permLabels = [
 
   <div class="card">
     <div class="card-head"><div class="h3">Tenant</div></div>
-    <div class="card-body grid" style="gap:var(--space-3)">
-      <div class="row between"><span class="muted">Business name</span><span class="strong"><?= View::e($tenant['name']) ?></span></div>
-      <div class="row between"><span class="muted">Slug</span><span class="mono"><?= View::e($tenant['slug']) ?></span></div>
-      <div class="row between"><span class="muted">Currency</span><span class="strong"><?= View::e($tenant['currency']) ?></span></div>
-      <div class="row between"><span class="muted">Timezone</span><span class="strong"><?= View::e($tenant['timezone']) ?></span></div>
-    </div>
+    <form method="post" action="/settings">
+      <div class="card-body grid" style="gap:var(--space-4)">
+        <div class="field">
+          <label for="name">Business name</label>
+          <input class="input" id="name" name="name" value="<?= View::e($tenant['name']) ?>" required>
+        </div>
+        <div class="grid cols-2" style="gap:var(--space-3)">
+          <div class="field">
+            <label for="currency">Currency</label>
+            <select class="select" id="currency" name="currency">
+              <?php foreach (['USD', 'EUR', 'GBP', 'CAD', 'AUD'] as $c): ?>
+                <option value="<?= View::e($c) ?>" <?= $tenant['currency'] === $c ? 'selected' : '' ?>><?= View::e($c) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="field">
+            <label for="timezone">Timezone</label>
+            <select class="select" id="timezone" name="timezone">
+              <?php foreach (['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London', 'Europe/Berlin', 'UTC'] as $tz): ?>
+                <option value="<?= View::e($tz) ?>" <?= $tenant['timezone'] === $tz ? 'selected' : '' ?>><?= View::e($tz) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+        </div>
+        <div class="row between">
+          <span class="muted">Slug</span><span class="mono"><?= View::e($tenant['slug']) ?></span>
+        </div>
+      </div>
+      <div class="card-foot row between">
+        <span class="text-sm muted">Business name, currency, and timezone.</span>
+        <button class="btn btn-primary" type="submit"><svg aria-hidden="true"><use href="#i-check"></use></svg> Save</button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -99,3 +126,29 @@ $permLabels = [
     </table>
   </div>
 </div>
+
+<script>
+  // Keep localStorage in sync with the settings form so the pre-paint theme
+  // script in the layout (which reads localStorage) agrees with the session.
+  (function () {
+    var form = document.querySelector('form[action="/settings"]');
+    if (!form) return;
+
+    // Reflect the actually-applied theme/mode (localStorage wins at paint time).
+    try {
+      var lt = localStorage.getItem('nem-theme');
+      var lm = localStorage.getItem('nem-mode');
+      if (lt) { var rt = form.querySelector('input[name="theme"][value="' + lt + '"]'); if (rt) rt.checked = true; }
+      if (lm) { var rm = form.querySelector('input[name="mode"][value="' + lm + '"]'); if (rm) rm.checked = true; }
+    } catch (e) {}
+
+    form.addEventListener('submit', function () {
+      try {
+        var t = form.querySelector('input[name="theme"]:checked');
+        var m = form.querySelector('input[name="mode"]:checked');
+        if (t) localStorage.setItem('nem-theme', t.value);
+        if (m) localStorage.setItem('nem-mode', m.value);
+      } catch (e) {}
+    });
+  })();
+</script>

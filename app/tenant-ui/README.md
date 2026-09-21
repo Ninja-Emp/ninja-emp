@@ -39,14 +39,28 @@ Then open <http://localhost:8091>.
 | Module | Route | Notes |
 |--------|-------|-------|
 | Dashboard | `/` | KPIs, 14-day sales trend, booth occupancy, recent sales, low stock |
-| Point of Sale | `/pos` | Barcode scan, split payments, hold/resume, discounts, tax-free toggle |
+| Point of Sale | `/pos` | Barcode scan, **instant inventory**, **buy from vendor**, split payments, hold/resume, discounts, tax-free toggle |
+| Registers | `/registers` | Create registers, open with a float, close with a count + variance |
 | Booths | `/booths` | List + create/edit/delete |
 | Booth Map | `/booths/map` | Interactive 2D floor map (click/keyboard select) |
-| Vendors | `/vendors` | List + per-vendor statement |
-| Inventory | `/inventory` | Search + item detail |
+| Vendors | `/vendors` | List + create/edit + per-vendor statement + **buy from vendor** |
+| Inventory | `/inventory` | Search + create/edit + item detail |
 | Reports | `/reports` | Tender mix, vendor payouts, tax collected |
-| Settings | `/settings` | Appearance (theme/mode), tenant config, role/permission matrix |
+| Settings | `/settings` | Appearance (theme/mode), editable tenant config, role/permission matrix |
 | Login | `/login` | Mock sign-in (role switcher) |
+
+### Vendor-mall model
+
+In a vendor mall, items are generally **not in inventory until they are sold**. The register
+therefore has no catalog grid. Instead:
+
+- **Instant inventory** (`/pos/quick-add`) creates an item on the fly and drops it straight
+  into the cart. Items are **vendor-owned (consignment) by default**; the store can also add
+  its own goods (`owner=store`).
+- **Buy from vendor** (`/pos/buy`, `/vendors/{id}/purchase`) records a store purchase: it
+  creates a **store-owned** item and increases the **vendor payable** by cost × quantity.
+- **Store items** are the store-owned goods the store sells directly; they appear as tiles on
+  the POS left rail for one-tap add.
 
 ### Roles (RBAC)
 
@@ -72,7 +86,12 @@ so adding a theme is a matter of adding one block of tokens.
 - **Themes:** `neutral` (default, indigo accent) and `dark-blue` (secondary).
 - **Modes:** `light` and `dark`.
 - Persisted in `localStorage` (`nem-theme`, `nem-mode`) and mirrored to the session.
-- Switch at runtime from the topbar, or via query string: `?theme=dark-blue&mode=dark`.
+- Switch at runtime from the topbar, from **Settings → Appearance**, or via query string:
+  `?theme=dark-blue&mode=dark`.
+
+> **Precedence note.** The layout applies the persisted theme *before paint* from
+> `localStorage` to avoid a flash. The Settings form therefore writes `localStorage` on
+> submit (and reflects the applied value on load) so the picker and the topbar agree.
 
 The registry lives in `src/Support/Theme.php`; the tokens live in
 `public/assets/css/theme.css`.
@@ -97,7 +116,7 @@ app/tenant-ui/
     Data/                ← MockRepository + seed.php  (the ONLY data-source-aware layer)
     Http/
       Controller.php     ← base controller (render, redirect, require, input)
-      Controllers/       ← Dashboard, Pos, Booth, Vendor, Inventory, Report, Settings, Auth
+      Controllers/       ← Dashboard, Pos, Register, Booth, Vendor, Inventory, Report, Settings, Auth
     Views/
       layout.php         ← app shell (sidebar + topbar + content)
       layout-bare.php    ← login
@@ -150,7 +169,10 @@ Then bind `Repository` → `DbalRepository` in `public/index.php` and delete the
 ## Verification
 
 - All routes return **200** (404 for unknown paths); no PHP warnings/notices.
-- POST endpoints work: `/pos/scan` returns item JSON, `/pos/checkout` returns a receipt.
+- POST endpoints work: `/pos/scan` returns item JSON, `/pos/checkout` returns a receipt,
+  `/pos/quick-add` and `/pos/buy` return the created item JSON.
+- CRUD verified: inventory create/edit, vendor create/edit, register create/open/close,
+  vendor purchase, and tenant settings update all persist (session-backed mock).
 - RBAC gating verified (e.g. `cashier` → 403 on `/reports` and `/settings`).
 - Screenshots captured for every module in **light and dark** mode.
 

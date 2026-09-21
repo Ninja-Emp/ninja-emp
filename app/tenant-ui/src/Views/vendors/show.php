@@ -18,6 +18,7 @@ $cur = $tenant['currency'];
   </div>
   <div class="row gap-2">
     <span class="badge <?= $vendor['status'] === 'active' ? 'badge-success' : 'badge-warning' ?> badge-dot"><?= View::e(ucfirst($vendor['status'])) ?></span>
+    <a class="btn" href="/vendors/<?= View::e($vendor['id']) ?>/edit"><svg aria-hidden="true"><use href="#i-edit"></use></svg> Edit</a>
     <a class="btn" href="/vendors"><svg aria-hidden="true"><use href="#i-arrow-left"></use></svg> Back</a>
   </div>
 </div>
@@ -76,6 +77,41 @@ $cur = $tenant['currency'];
       <?php endif; ?>
     </div>
   </div>
+</div>
+
+<div class="card mt-6">
+  <div class="card-head">
+    <div class="h3">Buy from vendor</div>
+    <span class="text-sm muted">Purchase stock — creates a store-owned item and increases the payable</span>
+  </div>
+  <form method="post" action="/vendors/<?= View::e($vendor['id']) ?>/purchase">
+    <div class="card-body grid cols-2" style="gap:var(--space-4)">
+      <div class="field" style="grid-column:1/-1">
+        <label for="buy-name">Item name</label>
+        <input class="input" id="buy-name" name="name" placeholder="e.g. Assorted soaps (case)" required>
+      </div>
+      <div class="field">
+        <label for="buy-cost">Unit cost</label>
+        <input class="input" id="buy-cost" name="cost" inputmode="decimal" placeholder="0.00" required>
+      </div>
+      <div class="field">
+        <label for="buy-price">Retail price</label>
+        <input class="input" id="buy-price" name="price" inputmode="decimal" placeholder="0.00">
+      </div>
+      <div class="field">
+        <label for="buy-qty">Quantity</label>
+        <input class="input" id="buy-qty" name="qty" type="number" min="1" value="1">
+      </div>
+      <div class="field">
+        <label for="buy-sku">SKU</label>
+        <input class="input" id="buy-sku" name="sku" placeholder="Optional">
+      </div>
+    </div>
+    <div class="card-foot row between">
+      <span class="text-sm muted">The vendor payable increases by cost × quantity.</span>
+      <button class="btn btn-primary" type="submit"><svg aria-hidden="true"><use href="#i-check"></use></svg> Record purchase</button>
+    </div>
+  </form>
 </div>
 
 <div class="card mt-6">

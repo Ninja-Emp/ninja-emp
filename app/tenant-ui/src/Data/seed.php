@@ -52,18 +52,18 @@ return [
 
     // Inventory items. cost = weighted-average cost (string).
     'items' => [
-        ['id' => 'it-1',  'sku' => 'JAM-BLU-L', 'name' => 'Blueberry Jam (large jar)', 'vendor_id' => 'v-2', 'category' => 'Food',      'price' => '15.0000', 'cost' => '6.0000',  'on_hand' => 24, 'reorder' => 10, 'barcode' => '810000000011'],
-        ['id' => 'it-2',  'sku' => 'JAM-STR-S', 'name' => 'Strawberry Preserves',      'vendor_id' => 'v-2', 'category' => 'Food',      'price' => '12.5000', 'cost' => '5.0000',  'on_hand' => 8,  'reorder' => 10, 'barcode' => '810000000028'],
-        ['id' => 'it-3',  'sku' => 'JAM-GRP-S', 'name' => 'Grape Jelly (small jar)',   'vendor_id' => 'v-2', 'category' => 'Food',      'price' => '9.0000',  'cost' => '3.5000',  'on_hand' => 31, 'reorder' => 10, 'barcode' => '810000000035'],
-        ['id' => 'it-4',  'sku' => 'HNY-LOC-L', 'name' => 'Local Honey (large jar)',   'vendor_id' => 'v-2', 'category' => 'Food',      'price' => '16.0000', 'cost' => '7.0000',  'on_hand' => 12, 'reorder' => 8,  'barcode' => '810000000042'],
-        ['id' => 'it-5',  'sku' => 'SOAP-LAV',  'name' => 'Lavender Soap Bar',         'vendor_id' => 'v-3', 'category' => 'Bath',      'price' => '8.0000',  'cost' => '2.5000',  'on_hand' => 46, 'reorder' => 15, 'barcode' => '810000000059'],
-        ['id' => 'it-6',  'sku' => 'SOAP-OAT',  'name' => 'Oatmeal Soap Bar',          'vendor_id' => 'v-3', 'category' => 'Bath',      'price' => '8.0000',  'cost' => '2.5000',  'on_hand' => 5,  'reorder' => 15, 'barcode' => '810000000066'],
-        ['id' => 'it-7',  'sku' => 'QUILT-TW',  'name' => 'Twin Quilt (handmade)',     'vendor_id' => 'v-1', 'category' => 'Home',      'price' => '185.0000','cost' => '70.0000', 'on_hand' => 3,  'reorder' => 2,  'barcode' => '810000000073'],
-        ['id' => 'it-8',  'sku' => 'QUILT-PL',  'name' => 'Throw Pillow (quilted)',    'vendor_id' => 'v-1', 'category' => 'Home',      'price' => '42.0000', 'cost' => '16.0000', 'on_hand' => 11, 'reorder' => 5,  'barcode' => '810000000080'],
-        ['id' => 'it-9',  'sku' => 'FUDGE-BOX','name' => 'Chocolate Fudge (box)',     'vendor_id' => 'v-4', 'category' => 'Food',      'price' => '14.0000', 'cost' => '5.5000',  'on_hand' => 18, 'reorder' => 10, 'barcode' => '810000000097'],
-        ['id' => 'it-10', 'sku' => 'BREAD-SD',  'name' => 'Fresh Sourdough Loaf',      'vendor_id' => 'v-4', 'category' => 'Food',      'price' => '8.0000',  'cost' => '2.7500',  'on_hand' => 2,  'reorder' => 12, 'barcode' => '810000000103'],
-        ['id' => 'it-11', 'sku' => 'KETTLE-L',  'name' => 'Kettle Corn (large bag)',   'vendor_id' => 'v-5', 'category' => 'Food',      'price' => '7.0000',  'cost' => '2.0000',  'on_hand' => 40, 'reorder' => 20, 'barcode' => '810000000110'],
-        ['id' => 'it-12', 'sku' => 'VASE-ANT',  'name' => 'Antique Porcelain Vase',    'vendor_id' => 'v-6', 'category' => 'Antiques',  'price' => '120.0000','cost' => '45.0000', 'on_hand' => 1,  'reorder' => 1,  'barcode' => '810000000127'],
+        ['id' => 'it-1',  'sku' => 'JAM-BLU-L', 'name' => 'Blueberry Jam (large jar)', 'vendor_id' => 'v-2', 'category' => 'Food',      'price' => '15.0000', 'cost' => '6.0000',  'on_hand' => 24, 'reorder' => 10, 'barcode' => '810000000011', 'owner' => 'vendor'],
+        ['id' => 'it-2',  'sku' => 'JAM-STR-S', 'name' => 'Strawberry Preserves',      'vendor_id' => 'v-2', 'category' => 'Food',      'price' => '12.5000', 'cost' => '5.0000',  'on_hand' => 8,  'reorder' => 10, 'barcode' => '810000000028', 'owner' => 'vendor'],
+        ['id' => 'it-3',  'sku' => 'JAM-GRP-S', 'name' => 'Grape Jelly (small jar)',   'vendor_id' => 'v-2', 'category' => 'Food',      'price' => '9.0000',  'cost' => '3.5000',  'on_hand' => 31, 'reorder' => 10, 'barcode' => '810000000035', 'owner' => 'vendor'],
+        ['id' => 'it-4',  'sku' => 'HNY-LOC-L', 'name' => 'Local Honey (large jar)',   'vendor_id' => 'v-2', 'category' => 'Food',      'price' => '16.0000', 'cost' => '7.0000',  'on_hand' => 12, 'reorder' => 8,  'barcode' => '810000000042', 'owner' => 'vendor'],
+        ['id' => 'it-5',  'sku' => 'SOAP-LAV',  'name' => 'Lavender Soap Bar',         'vendor_id' => 'v-3', 'category' => 'Bath',      'price' => '8.0000',  'cost' => '2.5000',  'on_hand' => 46, 'reorder' => 15, 'barcode' => '810000000059', 'owner' => 'vendor'],
+        ['id' => 'it-6',  'sku' => 'SOAP-OAT',  'name' => 'Oatmeal Soap Bar',          'vendor_id' => 'v-3', 'category' => 'Bath',      'price' => '8.0000',  'cost' => '2.5000',  'on_hand' => 5,  'reorder' => 15, 'barcode' => '810000000066', 'owner' => 'vendor'],
+        ['id' => 'it-7',  'sku' => 'QUILT-TW',  'name' => 'Twin Quilt (handmade)',     'vendor_id' => 'v-1', 'category' => 'Home',      'price' => '185.0000','cost' => '70.0000', 'on_hand' => 3,  'reorder' => 2,  'barcode' => '810000000073', 'owner' => 'vendor'],
+        ['id' => 'it-8',  'sku' => 'QUILT-PL',  'name' => 'Throw Pillow (quilted)',    'vendor_id' => 'v-1', 'category' => 'Home',      'price' => '42.0000', 'cost' => '16.0000', 'on_hand' => 11, 'reorder' => 5,  'barcode' => '810000000080', 'owner' => 'vendor'],
+        ['id' => 'it-9',  'sku' => 'FUDGE-BOX','name' => 'Chocolate Fudge (box)',     'vendor_id' => 'v-4', 'category' => 'Food',      'price' => '14.0000', 'cost' => '5.5000',  'on_hand' => 18, 'reorder' => 10, 'barcode' => '810000000097', 'owner' => 'vendor'],
+        ['id' => 'it-10', 'sku' => 'BREAD-SD',  'name' => 'Fresh Sourdough Loaf',      'vendor_id' => 'v-4', 'category' => 'Food',      'price' => '8.0000',  'cost' => '2.7500',  'on_hand' => 2,  'reorder' => 12, 'barcode' => '810000000103', 'owner' => 'vendor'],
+        ['id' => 'it-11', 'sku' => 'KETTLE-L',  'name' => 'Kettle Corn (large bag)',   'vendor_id' => 'v-5', 'category' => 'Food',      'price' => '7.0000',  'cost' => '2.0000',  'on_hand' => 40, 'reorder' => 20, 'barcode' => '810000000110', 'owner' => 'vendor'],
+        ['id' => 'it-12', 'sku' => 'VASE-ANT',  'name' => 'Antique Porcelain Vase',    'vendor_id' => 'v-6', 'category' => 'Antiques',  'price' => '120.0000','cost' => '45.0000', 'on_hand' => 1,  'reorder' => 1,  'barcode' => '810000000127', 'owner' => 'vendor'],
     ],
 
     // Today's sales (already completed). Lines carry the commission split.
@@ -105,8 +105,8 @@ return [
     ],
 
     'registers' => [
-        ['id' => 'reg-1', 'name' => 'Front Register', 'status' => 'open',   'cashier' => 'Sam Ortiz', 'opened' => '09:00', 'drawer' => '200.0000'],
-        ['id' => 'reg-2', 'name' => 'Back Register',  'status' => 'closed', 'cashier' => null,        'opened' => null,    'drawer' => '0.0000'],
+        ['id' => 'reg-1', 'name' => 'Front Register', 'status' => 'open',   'cashier' => 'Sam Ortiz', 'opened' => '09:00', 'drawer' => '200.0000', 'float' => '200.0000', 'counted' => null, 'variance' => null],
+        ['id' => 'reg-2', 'name' => 'Back Register',  'status' => 'closed', 'cashier' => null,        'opened' => null,    'drawer' => '0.0000', 'float' => '0.0000', 'counted' => null, 'variance' => null],
     ],
 
     'tax_rates' => [

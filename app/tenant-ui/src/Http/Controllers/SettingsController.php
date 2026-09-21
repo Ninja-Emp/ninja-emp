@@ -29,6 +29,7 @@ final class SettingsController extends Controller
     {
         $this->require('settings.manage');
 
+        // Appearance.
         $theme = $this->input('theme');
         $mode = $this->input('mode');
         if (Theme::isValidTheme($theme)) {
@@ -37,7 +38,15 @@ final class SettingsController extends Controller
         if (Theme::isValidMode($mode)) {
             $_SESSION['mode'] = $mode;
         }
-        $this->flash('success', 'Preferences saved.');
+
+        // Tenant config.
+        $this->repo->updateTenant([
+            'name'     => $this->input('name'),
+            'currency' => strtoupper($this->input('currency')),
+            'timezone' => $this->input('timezone'),
+        ]);
+
+        $this->flash('success', 'Settings saved.');
         $this->redirect('/settings');
     }
 

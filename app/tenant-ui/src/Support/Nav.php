@@ -27,6 +27,7 @@ final class Nav
                 'label' => 'Operations',
                 'items' => [
                     ['label' => 'Point of Sale', 'path' => '/pos', 'icon' => 'i-pos', 'permission' => 'pos.use'],
+                    ['label' => 'Registers', 'path' => '/registers', 'icon' => 'i-wallet', 'permission' => 'pos.use'],
                     ['label' => 'Booths', 'path' => '/booths', 'icon' => 'i-booth', 'permission' => 'booths.manage'],
                     ['label' => 'Booth Map', 'path' => '/booths/map', 'icon' => 'i-map', 'permission' => 'booths.manage'],
                     ['label' => 'Inventory', 'path' => '/inventory', 'icon' => 'i-inventory', 'permission' => 'inventory.manage'],

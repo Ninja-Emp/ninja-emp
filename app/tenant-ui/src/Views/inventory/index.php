@@ -18,6 +18,7 @@ $cur = $tenant['currency'];
     <?php if ($lowStockCount > 0): ?>
       <span class="badge badge-danger"><?= View::e((string) $lowStockCount) ?> low</span>
     <?php endif; ?>
+    <a class="btn btn-primary" href="/inventory/new"><svg aria-hidden="true"><use href="#i-plus"></use></svg> New item</a>
   </div>
 </div>
 
@@ -38,7 +39,7 @@ $cur = $tenant['currency'];
     <?php else: ?>
       <table class="table">
         <thead>
-          <tr><th>Item</th><th>Category</th><th>Vendor</th><th class="num">Price</th><th class="num">Cost</th><th class="num">On hand</th><th>Stock</th></tr>
+          <tr><th>Item</th><th>Category</th><th>Owner</th><th>Vendor</th><th class="num">Price</th><th class="num">Cost</th><th class="num">On hand</th><th>Stock</th><th></th></tr>
         </thead>
         <tbody>
           <?php foreach ($items as $it): ?>
@@ -49,6 +50,13 @@ $cur = $tenant['currency'];
                 <div class="text-xs subtle mono"><?= View::e($it['sku']) ?> · <?= View::e($it['barcode']) ?></div>
               </td>
               <td><span class="badge"><?= View::e($it['category']) ?></span></td>
+              <td>
+                <?php if (($it['owner'] ?? 'vendor') === 'store'): ?>
+                  <span class="badge badge-accent">Store</span>
+                <?php else: ?>
+                  <span class="badge">Vendor</span>
+                <?php endif; ?>
+              </td>
               <td class="muted"><?= View::e($vendorNames[$it['vendor_id']] ?? '—') ?></td>
               <td class="num tnum"><?= View::e(Money::format($it['price'], $cur)) ?></td>
               <td class="num tnum muted"><?= View::e(Money::format($it['cost'], $cur)) ?></td>
@@ -59,6 +67,9 @@ $cur = $tenant['currency'];
                 <?php else: ?>
                   <span class="badge badge-success badge-dot">OK</span>
                 <?php endif; ?>
+              </td>
+              <td class="num">
+                <a class="btn btn-sm btn-ghost" href="/inventory/<?= View::e($it['id']) ?>/edit"><svg aria-hidden="true"><use href="#i-edit"></use></svg> Edit</a>
               </td>
             </tr>
           <?php endforeach; ?>

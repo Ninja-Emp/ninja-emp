@@ -1,20 +1,26 @@
-# Tenant UI — build todo
+# Tenant UI — Round 2 fixes
 
-- [x] Handoff doc pushed to GitHub (docs/TENANT_UI_HANDOFF.md)
-- [x] Install PHP 8.2 (+ bcmath)
-- [x] Support classes (View, Router, Auth, Theme, Money, Flash, Nav)
-- [x] Data: MockRepository + seed
-- [x] Scaffold: front controller (public/index.php) + autoloader + router.php
-- [x] Design system: theme.css (neutral/dark/dark-blue) + app.css
-- [x] App shell: layout + sidebar + topbar + theme switch + search
-- [x] Dashboard
-- [x] POS (barcode, split pay, hold, discount, tax-free)
-- [x] Booths CRUD + 2D map island
-- [x] Vendors
-- [x] Inventory
-- [x] Reports
-- [x] Settings
-- [x] Verify (all routes 200, no warnings) + RBAC gating
-- [x] Screenshots (light + dark)
-- [x] README
-- [x] Push + PR
+## Fixes
+- [x] Fix Settings theme options (theme picker in /settings doesn't apply)
+- [x] Inventory: add/edit item forms + POST handlers
+- [x] Vendors: add/edit vendor forms + POST handlers
+- [x] POS: remove catalog grid
+- [x] POS: instant inventory modal (always vendor-owned) + store sell/buy
+- [x] Registers: management module (create/open/close)
+- [x] Settings: editable business name, currency, timezone
+- [x] Sidebar: narrow expanded width (keep collapsed rail)
+
+## Store sell/buy
+- [x] Store can sell items (store-owned inventory)
+- [x] Store can buy items from vendors (purchase from vendor)
+
+## Verify + ship
+- [x] Verify all routes + POST endpoints
+- [ ] Screenshots (light + dark)
+- [ ] Update README + handoff doc
+- [ ] Push + update PR #2
+
+## Handoff
+- [ ] Write handoff doc for remaining app work (DBAL, auth, ledger, etc.)
+- [ ] Push handoff doc
+- [ ] Start on handoff items
