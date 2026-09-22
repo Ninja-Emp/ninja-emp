@@ -258,7 +258,12 @@ BEGIN
    WHERE id = v_sv.id;
 
   -- Keep the open item in step so the subledger still ties to the control.
+  -- The reduction is recorded as an application (F5/PA-4): every change to
+  -- open_amount must be visible in the activity ledger.
   IF v_sv.open_item_id IS NOT NULL THEN
+    INSERT INTO payment_application (open_item_id, applied_amount, currency, applied_date,
+                                     journal_entry_id, application_kind)
+    VALUES (v_sv.open_item_id, p_amount, v_sv.currency, p_entry_date, p_entry_id, 'apply');
     UPDATE open_item
        SET open_amount = open_amount - p_amount,
            status = CASE WHEN open_amount - p_amount = 0 THEN 'settled' ELSE 'partial' END
@@ -290,6 +295,15 @@ DECLARE
   v_entry   uuid;
   v_key     text;
   r         record;
+  -- Open items to relieve, collected in the loop and applied once the entry
+  -- exists (so each application can link to it).
+  v_oi_ids  uuid[]  := '{}';
+  v_oi_amts numeric[] := '{}';
+  v_oi_ccy  text[]  := '{}';
+  v_oi      uuid;
+  v_amt     numeric;
+  v_ccy     text;
+  i         int;
 BEGIN
   SELECT breakage_after_months INTO v_months FROM tenant_config LIMIT 1;
 
@@ -327,9 +341,15 @@ BEGIN
 
     UPDATE stored_value SET balance = 0, status = 'broken', last_activity_at = p_as_of
      WHERE id = r.id;
-    IF (SELECT open_item_id FROM stored_value WHERE id = r.id) IS NOT NULL THEN
-      UPDATE open_item SET open_amount = 0, status = 'settled'
-       WHERE id = (SELECT open_item_id FROM stored_value WHERE id = r.id);
+    -- Collect the open item to relieve; it is applied after the entry exists.
+    SELECT sv.open_item_id, oi.open_amount, oi.currency
+      INTO v_oi, v_amt, v_ccy
+      FROM stored_value sv JOIN open_item oi ON oi.id = sv.open_item_id
+     WHERE sv.id = r.id;
+    IF v_oi IS NOT NULL THEN
+      v_oi_ids  := v_oi_ids  || v_oi;
+      v_oi_amts := v_oi_amts || v_amt;
+      v_oi_ccy  := v_oi_ccy  || v_ccy;
     END IF;
     INSERT INTO stored_value_activity (stored_value_id, activity_kind, activity_date,
                                        amount, balance_after, memo)
@@ -344,6 +364,17 @@ BEGIN
 
   v_entry := post_journal_entry(p_as_of, 'Stored value breakage', 'breakage',
                                 p_as_of::text, v_key, v_lines);
+
+  -- Record the activity (F5/PA-4) and relieve the open items.
+  IF array_length(v_oi_ids, 1) IS NOT NULL THEN
+    FOR i IN 1 .. array_length(v_oi_ids, 1) LOOP
+      INSERT INTO payment_application (open_item_id, applied_amount, currency, applied_date,
+                                       journal_entry_id, application_kind)
+      VALUES (v_oi_ids[i], v_oi_amts[i], v_oi_ccy[i], p_as_of, v_entry, 'apply');
+      UPDATE open_item SET open_amount = 0, status = 'settled' WHERE id = v_oi_ids[i];
+    END LOOP;
+  END IF;
+
   RETURN v_entry;
 END; $$;
 COMMENT ON FUNCTION recognize_breakage IS

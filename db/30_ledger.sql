@@ -123,12 +123,16 @@ CREATE TABLE journal_entry (
   source_ref      text,
   idempotency_key text,
   reversal_of_id  uuid REFERENCES journal_entry(id) ON DELETE RESTRICT,
+  -- B1/JI-3: tamper-evident hash chain. entry_hash = SHA-256 over this entry's
+  -- immutable header content plus its predecessor's hash; prev_hash links back.
+  prev_hash       text,
+  entry_hash      text,
   created_by      uuid,
   created_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (tenant_id, entry_no),
   UNIQUE (tenant_id, idempotency_key)
 );
-COMMENT ON TABLE journal_entry IS 'Append-only journal header. Idempotent via idempotency_key. Reversal links via reversal_of_id.';
+COMMENT ON TABLE journal_entry IS 'Append-only journal header. Idempotent via idempotency_key. Reversal links via reversal_of_id. Hash-chained (JI-3).';
 
 CREATE INDEX ix_journal_entry_date ON journal_entry(entry_date);
 CREATE INDEX ix_journal_entry_source ON journal_entry(source, source_ref);
@@ -162,7 +166,10 @@ CREATE TABLE journal_line (
   CHECK ( (base_debit > 0 AND base_credit = 0) OR (base_credit > 0 AND base_debit = 0) ),
   -- Subledger tagging is all-or-nothing: a party tag requires a subledger type.
   CHECK ( (party_id IS NULL AND subledger_type_code IS NULL)
-       OR (party_id IS NOT NULL AND subledger_type_code IS NOT NULL) )
+       OR (party_id IS NOT NULL AND subledger_type_code IS NOT NULL) ),
+  -- B2/MO-1: no sub-cent amount may be posted (scale follows the currency).
+  CHECK (kernel.money_scale_ok(debit, currency)),
+  CHECK (kernel.money_scale_ok(credit, currency))
 );
 COMMENT ON TABLE journal_line IS 'Append-only journal lines. Debit XOR credit. party_id+subledger_type_code tag subledger lines.';
 
@@ -182,6 +189,84 @@ CREATE TRIGGER trg_journal_entry_append_only
 CREATE TRIGGER trg_journal_line_append_only
   BEFORE UPDATE OR DELETE ON journal_line
   FOR EACH ROW EXECUTE FUNCTION kernel.forbid_mutation();
+
+-- (1b) HASH CHAIN (B1/JI-3): each entry is chained to its predecessor so any
+--      later edit to history is detectable. The digest covers the immutable
+--      header content; the BEFORE INSERT trigger fills prev_hash/entry_hash.
+CREATE OR REPLACE FUNCTION journal_entry_digest(
+  p_prev            text,
+  p_entry_no        bigint,
+  p_entry_date      date,
+  p_memo            text,
+  p_source          text,
+  p_source_ref      text,
+  p_idempotency_key text,
+  p_reversal_of_id  uuid
+) RETURNS text
+LANGUAGE sql IMMUTABLE AS $$
+  SELECT encode(kernel.digest(
+    COALESCE(p_prev,'')            || E'\x1f' || p_entry_no::text        || E'\x1f' ||
+    p_entry_date::text             || E'\x1f' || COALESCE(p_memo,'')     || E'\x1f' ||
+    p_source                       || E'\x1f' || COALESCE(p_source_ref,'') || E'\x1f' ||
+    COALESCE(p_idempotency_key,'') || E'\x1f' || COALESCE(p_reversal_of_id::text,'')
+  , 'sha256'), 'hex');
+$$;
+COMMENT ON FUNCTION journal_entry_digest IS
+  'SHA-256 over an entry''s immutable header content plus its predecessor hash (JI-3).';
+
+CREATE OR REPLACE FUNCTION journal_entry_hash_chain() RETURNS trigger
+LANGUAGE plpgsql AS $$
+DECLARE v_prev text;
+BEGIN
+  SELECT entry_hash INTO v_prev
+    FROM journal_entry
+   WHERE tenant_id = NEW.tenant_id
+   ORDER BY entry_no DESC
+   LIMIT 1;
+  NEW.prev_hash  := v_prev;
+  NEW.entry_hash := journal_entry_digest(v_prev, NEW.entry_no, NEW.entry_date, NEW.memo,
+                                         NEW.source, NEW.source_ref, NEW.idempotency_key, NEW.reversal_of_id);
+  RETURN NEW;
+END; $$;
+COMMENT ON FUNCTION journal_entry_hash_chain IS
+  'BEFORE INSERT: chains each entry to its predecessor (JI-3).';
+
+CREATE TRIGGER trg_journal_entry_hash_chain
+  BEFORE INSERT ON journal_entry
+  FOR EACH ROW EXECUTE FUNCTION journal_entry_hash_chain();
+
+-- One entry per hash; one successor per prev_hash; exactly one genesis.
+CREATE UNIQUE INDEX ux_journal_entry_hash
+  ON journal_entry (tenant_id, entry_hash);
+CREATE UNIQUE INDEX ux_journal_entry_prev_hash
+  ON journal_entry (tenant_id, prev_hash) WHERE prev_hash IS NOT NULL;
+CREATE UNIQUE INDEX ux_journal_entry_genesis
+  ON journal_entry (tenant_id) WHERE prev_hash IS NULL;
+
+CREATE OR REPLACE FUNCTION verify_journal_chain()
+RETURNS TABLE (entry_no bigint, entry_id uuid, problem text)
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+  r        record;
+  v_prev   text := NULL;
+  v_expect text;
+BEGIN
+  FOR r IN SELECT * FROM journal_entry ORDER BY entry_no LOOP
+    v_expect := journal_entry_digest(v_prev, r.entry_no, r.entry_date, r.memo,
+                                     r.source, r.source_ref, r.idempotency_key, r.reversal_of_id);
+    IF r.prev_hash IS DISTINCT FROM v_prev THEN
+      entry_no := r.entry_no; entry_id := r.id; problem := 'prev_hash does not match predecessor';
+      RETURN NEXT;
+    END IF;
+    IF r.entry_hash IS DISTINCT FROM v_expect THEN
+      entry_no := r.entry_no; entry_id := r.id; problem := 'entry_hash does not match content';
+      RETURN NEXT;
+    END IF;
+    v_prev := r.entry_hash;
+  END LOOP;
+END; $$;
+COMMENT ON FUNCTION verify_journal_chain IS
+  'Returns one row per broken link in the journal hash chain. Must return zero rows.';
 
 -- (2) BALANCED ENTRY: deferred constraint trigger — Σ debits = Σ credits per entry.
 --     Deferred to COMMIT so multi-line inserts within a transaction are allowed.
@@ -373,6 +458,10 @@ END; $$;
 COMMENT ON FUNCTION post_journal_entry IS 'Idempotent posting. Same idempotency_key returns the same entry id.';
 
 -- Reversal: post a mirror entry (debits<->credits) linked to the original.
+-- RV-4: reversal is a DOCUMENT STATUS. A reversed entry cannot be reversed
+-- again, and a reversal is itself terminal.
+-- RV-5: the mirror restores the GL control; unapply_for_entry restores the
+-- open items the original settled (defined in 45_openitem.sql).
 CREATE OR REPLACE FUNCTION reverse_journal_entry(
   p_entry_id        uuid,
   p_reversal_date   date,
@@ -391,16 +480,26 @@ BEGIN
     IF v_new IS NOT NULL THEN RETURN v_new; END IF;
   END IF;
 
+  IF NOT EXISTS (SELECT 1 FROM journal_entry WHERE id = p_entry_id) THEN
+    RAISE EXCEPTION 'Journal entry % not found', p_entry_id USING ERRCODE='23503';
+  END IF;
+
+  -- RV-4: reversal is a document status. A reversed entry cannot be reversed
+  -- again, and a reversal is itself terminal.
+  IF EXISTS (SELECT 1 FROM journal_entry WHERE reversal_of_id = p_entry_id) THEN
+    RAISE EXCEPTION 'Entry % has already been reversed; a reversed entry cannot be reversed again',
+      p_entry_id USING ERRCODE='23514';
+  END IF;
+  IF EXISTS (SELECT 1 FROM journal_entry WHERE id = p_entry_id AND reversal_of_id IS NOT NULL) THEN
+    RAISE EXCEPTION 'Entry % is itself a reversal; reversals are terminal', p_entry_id USING ERRCODE='23514';
+  END IF;
+
   INSERT INTO journal_entry (entry_date, memo, source, source_ref, idempotency_key, reversal_of_id, created_by)
   SELECT p_reversal_date,
          COALESCE(p_memo, 'Reversal of entry ' || je.entry_no),
          'reversal', je.id::text, p_idempotency_key, je.id, kernel.current_actor()
     FROM journal_entry je WHERE je.id = p_entry_id
   RETURNING id INTO v_new;
-
-  IF v_new IS NULL THEN
-    RAISE EXCEPTION 'Journal entry % not found', p_entry_id USING ERRCODE='23503';
-  END IF;
 
   FOR v_line IN SELECT * FROM journal_line WHERE journal_entry_id = p_entry_id ORDER BY line_no LOOP
     v_no := v_no + 1;
@@ -417,9 +516,13 @@ BEGIN
     );
   END LOOP;
 
+  -- F1: the mirror restores the GL control; this restores the open items.
+  PERFORM unapply_for_entry(p_entry_id, v_new);
+
   RETURN v_new;
 END; $$;
-COMMENT ON FUNCTION reverse_journal_entry IS 'Posts a mirror entry linked via reversal_of_id. Never edits the original.';
+COMMENT ON FUNCTION reverse_journal_entry IS
+  'Posts a mirror entry linked via reversal_of_id, un-applies any settlement, and refuses to re-reverse.';
 
 -- Trial balance — must always net to zero.
 CREATE OR REPLACE FUNCTION trial_balance(p_as_of date DEFAULT current_date)

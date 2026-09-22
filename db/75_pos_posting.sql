@@ -269,49 +269,25 @@ BEGIN
   -- The refund cancels the obligation to the consignor, so the matching OPEN
   -- ITEMS must be relieved too — otherwise the open-item layer would still show
   -- money owed that the GL control account no longer carries (ADR-0023).
+  -- Uses the ONE allocator (AL-1): invoices only, no silent remainder.
   -- Idempotent: skip if this entry already produced applications.
   IF v_cons > 0
      AND NOT EXISTS (SELECT 1 FROM payment_application WHERE journal_entry_id = v_entry) THEN
-    DECLARE
-      v_party     record;
-      v_remaining kernel.money_amount;
-      v_item      record;
-      v_apply     kernel.money_amount;
-    BEGIN
-      FOR v_party IN
-        SELECT consignor_party_id, sum(net_to_consignor) AS net
-          FROM sale_line
-         WHERE sale_id = p_refund_sale_id AND line_kind = 'consignment'
-         GROUP BY consignor_party_id
-      LOOP
-        v_remaining := v_party.net;
-        FOR v_item IN
-          SELECT * FROM open_item
-           WHERE party_id = v_party.consignor_party_id
-             AND subledger_type_code = 'consignor_payable'
-             AND status IN ('open','partial')
-             AND deleted_at IS NULL
-           ORDER BY COALESCE(due_date, issue_date), issue_date, id
-           FOR UPDATE
-        LOOP
-          EXIT WHEN v_remaining <= 0;
-          v_apply := LEAST(v_remaining, v_item.open_amount);
-          IF v_apply <= 0 THEN CONTINUE; END IF;
-          INSERT INTO payment_application (open_item_id, applied_amount, currency, applied_date, journal_entry_id)
-          VALUES (v_item.id, v_apply, v_ccy, p_entry_date, v_entry);
-          UPDATE open_item
-             SET open_amount = open_amount - v_apply,
-                 status = CASE WHEN open_amount - v_apply = 0 THEN 'settled' ELSE 'partial' END
-           WHERE id = v_item.id;
-          v_remaining := v_remaining - v_apply;
-        END LOOP;
-      END LOOP;
-    END;
+    FOR v_t IN
+      SELECT consignor_party_id, sum(net_to_consignor) AS net
+        FROM sale_line
+       WHERE sale_id = p_refund_sale_id AND line_kind = 'consignment'
+       GROUP BY consignor_party_id
+    LOOP
+      PERFORM allocate_payment(v_t.consignor_party_id, 'consignor_payable',
+                               v_t.net, p_entry_date, v_entry);
+    END LOOP;
   END IF;
 
   RETURN v_entry;
 END $$;
-COMMENT ON FUNCTION post_refund IS 'Idempotent refund posting (reversal-not-edit; reverses consignor accrual and relieves open items).';
+COMMENT ON FUNCTION post_refund IS
+  'Idempotent refund posting (reversal-not-edit; reverses consignor accrual and relieves open items via allocate_payment).';
 
 -- ----------------------------------------------------------------------------
 -- post_shift_close — count the drawer and book any over/short.

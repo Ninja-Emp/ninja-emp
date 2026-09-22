@@ -13,58 +13,45 @@ until its invariants are written down and agreed.
 - [x] Establish GREEN baseline: 222/222 assertions
 
 ## 1. Invariants (write first, code second)
-- [x] Write `docs/SETTLEMENT_INVARIANTS.md` — the exact, testable invariants for
-      the settlement layer (open items, payment application, reversal, allocation)
-- [x] Write ADR-0039 in `docs/DECISIONS.md` — the decisions that close F1–F6
+- [x] Write `docs/SETTLEMENT_INVARIANTS.md`
+- [x] Write ADR-0039 in `docs/DECISIONS.md`
 
-## 2. Fix F1 (CRITICAL) — reversal must un-apply settlement
-- [ ] Invariant: reversing a payment journal restores open_item.open_amount + status
-- [ ] Invariant: reversal is a document status, not a silent ledger mirror
-- [ ] Implement: reversal-aware un-apply (via reversal-as-status, see B3)
-- [ ] Regression test
+## 1b. Git reconciliation + design-docs push
+- [x] Reconcile HEAD to origin/main (9b35bfd); working tree matched origin
+- [x] Commit + push design docs (89b8b87)
 
-## 3. Fix F5 — payment_application append-only + tie-out invariant
-- [ ] Invariant: payment_application is append-only (no UPDATE/DELETE)
-- [ ] Invariant: sum(applied) per open_item == original - open (signed)
-- [ ] Implement: forbid_mutation trigger + reconciliation check
-- [ ] Regression test
+## 2. Migration `db/migrations/0007_settlement_integrity.sql`
+- [x] F5: payment_application append-only + activity ledger (application_kind)
+- [x] F3/AL-1: one allocator `allocate_payment()`
+- [x] F1/PA-5/RV-5: `unapply_for_entry()` + reversal calls it
+- [x] F2/AL-4: directed payment (p_open_item_id)
+- [x] F4/AL-5: no silent remainder (raise default; on_account opt-in)
+- [x] F6/CA-4: write_off FOR UPDATE + records application
+- [x] F5-adjacent: redeem_stored_value + recognize_breakage record applications
+- [x] F6/CA-2: open_item_control_check signed (no abs)
+- [x] PA-4: `open_item_application_check()`
+- [x] B1/JI-3: hash chain (prev_hash/entry_hash + trigger + verify)
+- [x] B2/MO-1: scale CHECK (no sub-cent posting)
+- [x] B3/RV-4: reversal-as-document-status (cannot re-reverse)
+- [x] Applied to live DB; in-transaction VERIFY passed
+- [x] F3 GAP: `post_refund` rewritten to call `allocate_payment()`
+- [x] PA-4 backfill (PART 2b) reconciles legacy open items
 
-## 4. Fix F3 — one allocator, not four
-- [ ] Invariant: every allocator filters item_kind='invoice'
-- [ ] Implement: single `allocate_payment()` used by apply_payment / payout / refund
-- [ ] Regression test
+## 3. Write the regression suite
+- [x] `db/tests/settlement.sql` — assertions for OI/PA/AL/RV/CA/MO/JI
+- [x] Wire `settlement` into `scripts/run_tests.sh` DEFAULT_SUITES
 
-## 5. Fix F2 — directed payment (pay a specific invoice)
-- [ ] Invariant: caller may target a specific open_item; FIFO is the default
-- [ ] Implement: optional p_open_item_id on apply_payment
-- [ ] Regression test
+## 4. Mirror the fix into base schema files (fresh provision correct)
+- [x] db/00_kernel.sql (money_scale_ok)
+- [x] db/45_openitem.sql (on_account, activity ledger, allocator, unapply, checks)
+- [x] db/30_ledger.sql (reversal rewrite, hash chain, scale checks)
+- [x] db/65_consignment_posting.sql (post_consignor_payout)
+- [x] db/75_pos_posting.sql (post_refund)
+- [x] db/78_stored_value.sql (redeem/breakage record applications)
+- [x] db/85_close.sql (write_off FOR UPDATE + application)
 
-## 6. Fix F4 — no silent cash drop
-- [ ] Invariant: unapplied remainder is either on-account or raises
-- [ ] Implement: on-account open item (item_kind='on_account') OR explicit raise
-- [ ] Regression test
-
-## 7. Fix F6 — write-off race + sign-masking
-- [ ] Invariant: write_off locks the row (FOR UPDATE)
-- [ ] Invariant: control check compares signed sums, no abs()
-- [ ] Implement + regression test
-
-## 8. Port B1 — hash-chained journal
-- [ ] Invariant: each entry's entry_hash chains prev_hash; tamper is detectable
-- [ ] Implement: prev_hash/entry_hash + unique indexes + verify function
-- [ ] Regression test
-
-## 9. Port B2 — scale CHECK (no sub-cent posting)
-- [ ] Invariant: no amount with scale > currency scale can be posted
-- [ ] Implement: CHECK on journal_line + open_item + payment_application
-- [ ] Regression test
-
-## 10. Port B3 — reversal-as-document-status
-- [ ] Invariant: a reversed document cannot be re-reversed; status is authoritative
-- [ ] Implement: status + reversal_journal_id + CHECK
-- [ ] Regression test
-
-## 11. Verify + deliver
-- [ ] Full suite GREEN (222 + new assertions)
-- [ ] Update DB_AUDIT.md / DECISIONS.md / README.md
-- [ ] Commit
+## 5. Verify
+- [x] Re-provision from base files (fresh build correct)
+- [x] Run migrate.sh (idempotent no-op on fresh build)
+- [x] settlement.sql GREEN; full suite GREEN (241 = 222 + 19)
+- [x] Commit + push code

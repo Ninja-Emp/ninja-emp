@@ -436,7 +436,10 @@ DECLARE
   v_expense uuid;
   v_role    text;
 BEGIN
-  SELECT * INTO v_item FROM open_item WHERE id = p_open_item_id;
+  -- Lock the row (F6/CA-4): without FOR UPDATE a concurrent settlement could
+  -- change open_amount between the read and the write, and the write-off would
+  -- then over- or under-relieve the item.
+  SELECT * INTO v_item FROM open_item WHERE id = p_open_item_id FOR UPDATE;
   IF v_item.id IS NULL THEN
     RAISE EXCEPTION 'No open item %', p_open_item_id USING ERRCODE='23514';
   END IF;
@@ -471,13 +474,19 @@ BEGIN
     )
   );
 
-  -- Relieve the open item to match the GL movement.
-  UPDATE open_item
-     SET open_amount = open_amount - v_amt,
-         status = CASE WHEN open_amount - v_amt = 0 THEN 'written_off' ELSE 'partial' END
-   WHERE id = v_item.id;
+  -- Relieve the open item to match the GL movement, recording the activity
+  -- (F5/PA-4) so original - open still equals the net of applications.
+  IF NOT EXISTS (SELECT 1 FROM payment_application WHERE journal_entry_id = v_entry) THEN
+    INSERT INTO payment_application (open_item_id, applied_amount, currency, applied_date,
+                                     journal_entry_id, application_kind)
+    VALUES (v_item.id, v_amt, v_item.currency, p_entry_date, v_entry, 'apply');
+    UPDATE open_item
+       SET open_amount = open_amount - v_amt,
+           status = CASE WHEN open_amount - v_amt = 0 THEN 'written_off' ELSE 'partial' END
+     WHERE id = v_item.id;
+  END IF;
 
   RETURN v_entry;
 END; $$;
 COMMENT ON FUNCTION write_off_open_item IS
-  'Writes off an uncollectible open item: debit bad debt expense, credit the control, relieve the item.';
+  'Writes off an uncollectible open item (row locked), recording the activity so PA-4 holds.';

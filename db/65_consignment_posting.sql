@@ -143,37 +143,15 @@ BEGIN
   UPDATE consignor_payout SET journal_entry_id = v_entry WHERE id = p_payout_id;
   UPDATE consignor_settlement SET status = 'paid' WHERE id = v_pay.settlement_id;
 
-  -- Settle the consignor's open items FIFO (ADR-0023) so open items stay tied
-  -- to the control account. Skip if already applied (idempotent).
+  -- Settle the consignor's open items via the ONE allocator (AL-1) so open
+  -- items stay tied to the control account. A remainder now RAISES (F4) rather
+  -- than being silently dropped. Skip if already applied (idempotent).
   IF NOT EXISTS (SELECT 1 FROM payment_application WHERE journal_entry_id = v_entry) THEN
-    DECLARE
-      v_remaining kernel.money_amount := v_pay.payout_amount;
-      v_item      record;
-      v_apply     kernel.money_amount;
-    BEGIN
-      FOR v_item IN
-        SELECT * FROM open_item
-         WHERE party_id = v_set.consignor_party_id
-           AND subledger_type_code = 'consignor_payable'
-           AND status IN ('open','partial')
-           AND deleted_at IS NULL
-         ORDER BY COALESCE(due_date, issue_date), issue_date, id
-         FOR UPDATE
-      LOOP
-        EXIT WHEN v_remaining <= 0;
-        v_apply := LEAST(v_remaining, v_item.open_amount);
-        IF v_apply <= 0 THEN CONTINUE; END IF;
-        INSERT INTO payment_application (open_item_id, applied_amount, currency, applied_date, journal_entry_id)
-        VALUES (v_item.id, v_apply, v_pay.currency, p_entry_date, v_entry);
-        UPDATE open_item
-           SET open_amount = open_amount - v_apply,
-               status = CASE WHEN open_amount - v_apply = 0 THEN 'settled' ELSE 'partial' END
-         WHERE id = v_item.id;
-        v_remaining := v_remaining - v_apply;
-      END LOOP;
-    END;
+    PERFORM allocate_payment(v_set.consignor_party_id, 'consignor_payable',
+                             v_pay.payout_amount, p_entry_date, v_entry);
   END IF;
 
   RETURN v_entry;
 END; $$;
-COMMENT ON FUNCTION post_consignor_payout IS 'Idempotent consignor payout: payable debit / cash credit; marks settlement paid.';
+COMMENT ON FUNCTION post_consignor_payout IS
+  'Idempotent consignor payout: payable debit / cash credit; allocates via allocate_payment (raises on remainder).';

@@ -130,6 +130,18 @@ CREATE TABLE kernel.currency (
 );
 COMMENT ON TABLE kernel.currency IS 'ISO-4217 currency reference. minor_unit = display scale.';
 
+-- money_scale_ok(): true when an amount has no digits beyond the currency's
+-- scale. A CHECK constraint cannot contain a subquery, so the scale is reached
+-- through this function (MO-1). STABLE, not IMMUTABLE: it reads kernel.currency,
+-- and claiming immutability for a table read is a lie that bites at dump/restore.
+CREATE OR REPLACE FUNCTION kernel.money_scale_ok(p_amount numeric, p_currency char(3))
+RETURNS boolean
+LANGUAGE sql STABLE AS $$
+  SELECT p_amount = round(p_amount, COALESCE((SELECT minor_unit FROM kernel.currency WHERE code = p_currency), 2))
+$$;
+COMMENT ON FUNCTION kernel.money_scale_ok IS
+  'True when p_amount has no digits beyond the currency scale. Used by scale CHECKs (MO-1).';
+
 CREATE TABLE kernel.account_type (
   code          text PRIMARY KEY,          -- asset | liability | equity | revenue | expense
   name          text NOT NULL,

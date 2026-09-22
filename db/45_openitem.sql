@@ -30,6 +30,9 @@ CREATE TABLE open_item (
   -- 'invoice'     the party owes this amount (AR) or the store owes it (AP).
   -- 'credit_memo' the direction is reversed: an AR credit memo is money the
   --               store owes back to the customer.
+  -- 'on_account'  an overpayment the store holds for the party: a credit that
+  --               is not tied to any invoice. Modelled as its own kind so it is
+  --               visible in aging and never mistaken for an invoice.
   --
   -- Amounts stay NON-NEGATIVE on both. Modelling a credit as a negative
   -- invoice looks tempting and is wrong: it breaks the >= 0 constraints that
@@ -42,7 +45,7 @@ CREATE TABLE open_item (
   -- owes the difference back. Before this, that path violated
   -- open_item_open_amount_check and the credit simply could not be recorded.
   item_kind           text NOT NULL DEFAULT 'invoice'
-                        CHECK (item_kind IN ('invoice','credit_memo')),
+                        CHECK (item_kind IN ('invoice','credit_memo','on_account')),
 
   original_amount     kernel.money_amount NOT NULL CHECK (original_amount >= 0),
   open_amount         kernel.money_amount NOT NULL CHECK (open_amount >= 0),
@@ -72,7 +75,15 @@ CREATE TRIGGER trg_open_item_audit
   BEFORE UPDATE ON open_item FOR EACH ROW EXECUTE FUNCTION kernel.touch_audit();
 
 -- ----------------------------------------------------------------------------
--- payment_application — matches a cash settlement to an open item (many-to-many).
+-- payment_application — the open-item ACTIVITY LEDGER (many-to-many).
+--
+-- Every reduction of open_amount is recorded here, whatever caused it: a cash
+-- settlement, a write-off, a stored-value redemption, a breakage recognition.
+-- A reversal records an 'unapply' row rather than mutating history. That makes
+-- PA-4 universally true: original - open = sum of signed applications.
+--
+-- The table is APPEND-ONLY (PA-2). It has no audit trigger because a table that
+-- cannot be updated has nothing to audit on update.
 -- ----------------------------------------------------------------------------
 CREATE TABLE payment_application (
   id               uuid PRIMARY KEY DEFAULT uuidv7(),
@@ -82,19 +93,30 @@ CREATE TABLE payment_application (
   currency         kernel.currency_code NOT NULL DEFAULT 'USD',
   applied_date     date NOT NULL,
   journal_entry_id uuid REFERENCES journal_entry(id) ON DELETE RESTRICT,
+  -- apply = reduces the open item; unapply = restores it (a reversed settlement).
+  application_kind text NOT NULL DEFAULT 'apply'
+                     CHECK (application_kind IN ('apply','unapply')),
+  -- For an unapply row, the application it undoes.
+  reverses_application_id uuid REFERENCES payment_application(id) ON DELETE RESTRICT,
   created_at       timestamptz NOT NULL DEFAULT now(),
   created_by       uuid DEFAULT kernel.current_actor(),
   updated_at       timestamptz NOT NULL DEFAULT now(),
   updated_by       uuid DEFAULT kernel.current_actor(),
-  version          integer NOT NULL DEFAULT 1
+  version          integer NOT NULL DEFAULT 1,
+  CHECK (kernel.money_scale_ok(applied_amount, currency))
 );
-COMMENT ON TABLE payment_application IS 'Allocation of a cash settlement to an open item (ADR-0023).';
+COMMENT ON TABLE payment_application IS 'Open-item activity ledger: every reduction of open_amount, append-only (ADR-0023).';
+COMMENT ON COLUMN payment_application.application_kind IS
+  'apply = reduces the open item; unapply = restores it (a reversed settlement). Signed sum drives PA-4.';
+COMMENT ON COLUMN payment_application.reverses_application_id IS
+  'For an unapply row, the application it undoes.';
 
 CREATE INDEX ix_payment_application_item ON payment_application(open_item_id);
 CREATE INDEX ix_payment_application_je   ON payment_application(journal_entry_id);
 
-CREATE TRIGGER trg_payment_application_audit
-  BEFORE UPDATE ON payment_application FOR EACH ROW EXECUTE FUNCTION kernel.touch_audit();
+CREATE TRIGGER trg_payment_application_append_only
+  BEFORE UPDATE OR DELETE ON payment_application
+  FOR EACH ROW EXECUTE FUNCTION kernel.forbid_mutation();
 
 -- ----------------------------------------------------------------------------
 -- open_item — helper to create an open item (used by domain posting functions).
@@ -150,10 +172,10 @@ COMMENT ON FUNCTION open_item_create IS
 CREATE OR REPLACE FUNCTION open_item_signed(p_kind text, p_amount kernel.money_amount)
 RETURNS kernel.money_amount
 LANGUAGE sql IMMUTABLE AS $$
-  SELECT CASE WHEN p_kind = 'credit_memo' THEN -p_amount ELSE p_amount END;
+  SELECT CASE WHEN p_kind IN ('credit_memo','on_account') THEN -p_amount ELSE p_amount END;
 $$;
 COMMENT ON FUNCTION open_item_signed IS
-  'Signed contribution of an open item to its subledger balance: credit memos are negative.';
+  'Signed contribution of an open item to its subledger balance: credit memos and on-account credits are negative.';
 
 -- ----------------------------------------------------------------------------
 -- subledger_control_role — maps a subledger type to its control posting role.
@@ -174,7 +196,108 @@ $$;
 COMMENT ON FUNCTION subledger_control_role IS 'Maps a subledger type to its GL control posting role (ADR-0020).';
 
 -- ----------------------------------------------------------------------------
--- apply_payment — settle a party's open items FIFO and post the cash entry.
+-- allocate_payment — THE ONE ALLOCATOR (AL-1).
+--
+-- The only function that turns a cash amount into applications. apply_payment,
+-- post_consignor_payout and post_refund all call it. It filters to invoices,
+-- locks rows, supports a directed target, and never drops a remainder silently.
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION allocate_payment(
+  p_party_id       uuid,
+  p_subledger_type text,
+  p_amount         kernel.money_amount,
+  p_entry_date     date,
+  p_journal_entry  uuid,
+  p_open_item_id   uuid    DEFAULT NULL,
+  p_on_account     boolean DEFAULT false
+) RETURNS kernel.money_amount
+LANGUAGE plpgsql AS $$
+DECLARE
+  v_remaining kernel.money_amount := p_amount;
+  v_item      record;
+  v_apply     kernel.money_amount;
+  v_ccy       kernel.currency_code;
+BEGIN
+  IF p_amount <= 0 THEN
+    RAISE EXCEPTION 'Allocation amount must be positive, got %', p_amount USING ERRCODE='23514';
+  END IF;
+
+  v_ccy := (SELECT functional_currency FROM tenant_config LIMIT 1);
+
+  -- AL-4: a directed target is consumed first.
+  IF p_open_item_id IS NOT NULL THEN
+    SELECT * INTO v_item FROM open_item
+     WHERE id = p_open_item_id
+       AND party_id = p_party_id
+       AND subledger_type_code = p_subledger_type
+       AND item_kind = 'invoice'
+       AND status IN ('open','partial')
+       AND deleted_at IS NULL
+     FOR UPDATE;
+    IF v_item.id IS NULL THEN
+      RAISE EXCEPTION 'Directed open item % is not an open invoice for party % subledger %',
+        p_open_item_id, p_party_id, p_subledger_type USING ERRCODE='23514';
+    END IF;
+    v_apply := LEAST(v_remaining, v_item.open_amount);
+    IF v_apply > 0 THEN
+      INSERT INTO payment_application (open_item_id, applied_amount, currency, applied_date, journal_entry_id, application_kind)
+      VALUES (v_item.id, v_apply, v_ccy, p_entry_date, p_journal_entry, 'apply');
+      UPDATE open_item
+         SET open_amount = open_amount - v_apply,
+             status = CASE WHEN open_amount - v_apply = 0 THEN 'settled' ELSE 'partial' END
+       WHERE id = v_item.id;
+      v_remaining := v_remaining - v_apply;
+    END IF;
+  END IF;
+
+  -- AL-2, AL-3, AL-6: invoices only, oldest first, locked.
+  FOR v_item IN
+    SELECT * FROM open_item
+     WHERE party_id = p_party_id
+       AND subledger_type_code = p_subledger_type
+       AND status IN ('open','partial')
+       AND item_kind = 'invoice'
+       AND deleted_at IS NULL
+       AND (p_open_item_id IS NULL OR id <> p_open_item_id)
+     ORDER BY COALESCE(due_date, issue_date), issue_date, id
+     FOR UPDATE
+  LOOP
+    EXIT WHEN v_remaining <= 0;
+    v_apply := LEAST(v_remaining, v_item.open_amount);
+    IF v_apply <= 0 THEN CONTINUE; END IF;
+    INSERT INTO payment_application (open_item_id, applied_amount, currency, applied_date, journal_entry_id, application_kind)
+    VALUES (v_item.id, v_apply, v_ccy, p_entry_date, p_journal_entry, 'apply');
+    UPDATE open_item
+       SET open_amount = open_amount - v_apply,
+           status = CASE WHEN open_amount - v_apply = 0 THEN 'settled' ELSE 'partial' END
+     WHERE id = v_item.id;
+    v_remaining := v_remaining - v_apply;
+  END LOOP;
+
+  -- AL-5: no silent remainder. Either record an on-account credit or raise.
+  IF v_remaining > 0 THEN
+    IF p_on_account THEN
+      INSERT INTO open_item (
+        subledger_type_code, party_id, source, source_ref, document_no, item_kind,
+        original_amount, open_amount, currency, issue_date, due_date, journal_entry_id
+      ) VALUES (
+        p_subledger_type, p_party_id, 'on_account', p_journal_entry::text, NULL, 'on_account',
+        v_remaining, v_remaining, v_ccy, p_entry_date, NULL, p_journal_entry
+      );
+      v_remaining := 0;
+    ELSE
+      RAISE EXCEPTION 'Allocation of % exceeds open invoices for party % subledger % (unapplied %)',
+        p_amount, p_party_id, p_subledger_type, v_remaining USING ERRCODE='23514';
+    END IF;
+  END IF;
+
+  RETURN v_remaining;
+END; $$;
+COMMENT ON FUNCTION allocate_payment IS
+  'The single allocator (AL-1): invoices only, FIFO or directed, locked, never drops a remainder.';
+
+-- ----------------------------------------------------------------------------
+-- apply_payment — settle a party's open items and post the cash entry.
 -- For debit-normal subledgers (ar) the store RECEIVES cash: debit cash /
 -- credit control. For credit-normal subledgers (ap, vendor_payable,
 -- consignor_payable) the store PAYS cash: debit control / credit cash.
@@ -185,31 +308,28 @@ CREATE OR REPLACE FUNCTION apply_payment(
   p_subledger_type  text,
   p_amount          kernel.money_amount,
   p_entry_date      date,
-  p_idempotency_key text
+  p_idempotency_key text,
+  p_open_item_id    uuid    DEFAULT NULL,
+  p_on_account      boolean DEFAULT false
 ) RETURNS uuid
 LANGUAGE plpgsql AS $$
 DECLARE
-  v_receipt   boolean;   -- true = store receives cash (AR), false = store pays (AP-like)
-  v_control   uuid;
-  v_cash      uuid;
-  v_ccy       kernel.currency_code;
-  v_entry     uuid;
-  v_remaining kernel.money_amount := p_amount;
-  v_item      record;
-  v_apply     kernel.money_amount;
-  v_lines     jsonb;
+  v_receipt boolean;
+  v_control uuid;
+  v_cash    uuid;
+  v_ccy     kernel.currency_code;
+  v_entry   uuid;
+  v_lines   jsonb;
 BEGIN
   IF p_amount <= 0 THEN
     RAISE EXCEPTION 'Payment amount must be positive' USING ERRCODE='23514';
   END IF;
 
-  -- Direction: AR is debit-normal (we receive); all payable-like subledgers are credit-normal (we pay).
   v_receipt := p_subledger_type = 'ar';
   v_control := posting_account(subledger_control_role(p_subledger_type));
   v_cash    := posting_account('cash');
   v_ccy     := (SELECT functional_currency FROM tenant_config LIMIT 1);
 
-  -- Post the cash entry first (idempotent).
   IF v_receipt THEN
     v_lines := jsonb_build_array(
       jsonb_build_object('account_id', v_cash, 'debit', p_amount, 'currency', v_ccy, 'memo', 'Payment received'),
@@ -229,49 +349,72 @@ BEGIN
     'payment', p_party_id::text, p_idempotency_key, v_lines
   );
 
-  -- If this idempotency key was already applied, do not double-allocate.
-  IF EXISTS (SELECT 1 FROM payment_application WHERE journal_entry_id = v_entry) THEN
+  -- Idempotent: if this entry already produced settlement activity, stop.
+  IF EXISTS (SELECT 1 FROM payment_application WHERE journal_entry_id = v_entry)
+     OR EXISTS (SELECT 1 FROM open_item WHERE journal_entry_id = v_entry AND item_kind = 'on_account') THEN
     RETURN v_entry;
   END IF;
 
-  -- Allocate FIFO across the party's open items.
-  FOR v_item IN
-    SELECT * FROM open_item
-     WHERE party_id = p_party_id
-       AND subledger_type_code = p_subledger_type
-       AND status IN ('open','partial')
-       -- Credit memos are not payable. Cash settles what is OWED; an open
-       -- credit is netted at invoicing time, not paid off with more cash.
-       -- Including them here would let a payment "settle" a credit and then
-       -- fail with an unapplied remainder on the invoice it should have paid.
-       AND item_kind = 'invoice'
-       AND deleted_at IS NULL
-     ORDER BY COALESCE(due_date, issue_date), issue_date, id
-     FOR UPDATE
-  LOOP
-    EXIT WHEN v_remaining <= 0;
-    v_apply := LEAST(v_remaining, v_item.open_amount);
-    IF v_apply <= 0 THEN CONTINUE; END IF;
-
-    INSERT INTO payment_application (open_item_id, applied_amount, currency, applied_date, journal_entry_id)
-    VALUES (v_item.id, v_apply, v_ccy, p_entry_date, v_entry);
-
-    UPDATE open_item
-       SET open_amount = open_amount - v_apply,
-           status = CASE WHEN open_amount - v_apply = 0 THEN 'settled' ELSE 'partial' END
-     WHERE id = v_item.id;
-
-    v_remaining := v_remaining - v_apply;
-  END LOOP;
-
-  IF v_remaining > 0 THEN
-    RAISE EXCEPTION 'Payment of % exceeds open items for party % subledger % (unapplied %)',
-      p_amount, p_party_id, p_subledger_type, v_remaining USING ERRCODE='23514';
-  END IF;
-
+  PERFORM allocate_payment(p_party_id, p_subledger_type, p_amount, p_entry_date, v_entry,
+                           p_open_item_id, p_on_account);
   RETURN v_entry;
 END; $$;
-COMMENT ON FUNCTION apply_payment IS 'Idempotent payment: posts cash entry and allocates FIFO across open items (ADR-0023).';
+COMMENT ON FUNCTION apply_payment IS
+  'Idempotent payment: posts cash entry and allocates via allocate_payment (directed or FIFO).';
+
+-- ----------------------------------------------------------------------------
+-- unapply_for_entry — restore the open items a settlement entry settled (PA-5).
+-- Called by reverse_journal_entry. Records an 'unapply' activity row rather
+-- than mutating history, so PA-4 keeps holding.
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION unapply_for_entry(p_entry_id uuid, p_reversal_entry uuid)
+RETURNS void
+LANGUAGE plpgsql AS $$
+DECLARE
+  v_app record;
+  v_oa  record;
+BEGIN
+  FOR v_app IN
+    SELECT * FROM payment_application
+     WHERE journal_entry_id = p_entry_id AND application_kind = 'apply'
+     ORDER BY id
+     FOR UPDATE
+  LOOP
+    UPDATE open_item
+       SET open_amount = open_amount + v_app.applied_amount,
+           status = CASE
+                      WHEN open_amount + v_app.applied_amount = original_amount THEN 'open'
+                      WHEN open_amount + v_app.applied_amount = 0 THEN 'settled'
+                      ELSE 'partial'
+                    END
+     WHERE id = v_app.open_item_id;
+
+    INSERT INTO payment_application (
+      open_item_id, applied_amount, currency, applied_date, journal_entry_id,
+      application_kind, reverses_application_id
+    ) VALUES (
+      v_app.open_item_id, v_app.applied_amount, v_app.currency, v_app.applied_date,
+      p_reversal_entry, 'unapply', v_app.id
+    );
+  END LOOP;
+
+  FOR v_oa IN
+    SELECT * FROM open_item
+     WHERE journal_entry_id = p_entry_id
+       AND item_kind = 'on_account'
+       AND status IN ('open','partial')
+     FOR UPDATE
+  LOOP
+    INSERT INTO payment_application (
+      open_item_id, applied_amount, currency, applied_date, journal_entry_id, application_kind
+    ) VALUES (
+      v_oa.id, v_oa.open_amount, v_oa.currency, p_reversal_entry, p_reversal_entry, 'apply'
+    );
+    UPDATE open_item SET open_amount = 0, status = 'void' WHERE id = v_oa.id;
+  END LOOP;
+END; $$;
+COMMENT ON FUNCTION unapply_for_entry IS
+  'Restores the open items a settlement entry settled and records the un-application (PA-5).';
 
 -- ----------------------------------------------------------------------------
 -- Views: open items, aging.
@@ -328,10 +471,14 @@ LANGUAGE sql STABLE AS $$
      GROUP BY subledger_type_code
   ),
   ctl AS (
+    -- SIGNED on both sides. abs() would mask a genuine sign error (a credit
+    -- posted as a debit) as a match; a normal-balance-signed sum does not.
     SELECT a.control_subledger_type_code AS st,
-           abs(sum(jl.base_debit - jl.base_credit)) AS total
+           sum(CASE WHEN at.normal_balance = 'D' THEN jl.base_debit - jl.base_credit
+                    ELSE jl.base_credit - jl.base_debit END) AS total
       FROM journal_line jl
       JOIN account a ON a.id = jl.account_id
+      JOIN kernel.account_type at ON at.code = a.account_type_code
      WHERE a.is_control
      GROUP BY a.control_subledger_type_code
   )
@@ -361,4 +508,35 @@ LANGUAGE sql STABLE AS $$
            SELECT code FROM kernel.subledger_type WHERE uses_open_items)
    ORDER BY 1;
 $$;
-COMMENT ON FUNCTION open_item_control_check IS 'Invariant: Σ open items must equal the GL control balance per subledger type (difference = 0).';
+COMMENT ON FUNCTION open_item_control_check IS
+  'Invariant: signed sum of open items must equal the normal-balance-signed GL control balance (difference = 0).';
+
+-- ----------------------------------------------------------------------------
+-- INVARIANT PA-4: original - open must equal the net of applications.
+-- Returns offenders; must return zero rows.
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION open_item_application_check()
+RETURNS TABLE (
+  open_item_id    uuid,
+  document_no     text,
+  original_amount numeric,
+  open_amount     numeric,
+  applied_net     numeric,
+  difference      numeric
+)
+LANGUAGE sql STABLE AS $$
+  SELECT oi.id, oi.document_no, oi.original_amount, oi.open_amount,
+         COALESCE(app.net, 0),
+         (oi.original_amount - oi.open_amount) - COALESCE(app.net, 0)
+    FROM open_item oi
+    LEFT JOIN (
+      SELECT open_item_id,
+             sum(CASE WHEN application_kind = 'apply' THEN applied_amount ELSE -applied_amount END) AS net
+        FROM payment_application
+       GROUP BY open_item_id
+    ) app ON app.open_item_id = oi.id
+   WHERE (oi.original_amount - oi.open_amount) <> COALESCE(app.net, 0)
+   ORDER BY oi.id;
+$$;
+COMMENT ON FUNCTION open_item_application_check IS
+  'Invariant PA-4: original - open must equal the net of applications. Must return zero rows.';
