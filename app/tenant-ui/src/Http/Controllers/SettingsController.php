@@ -66,6 +66,7 @@ final class SettingsController extends Controller
      */
     private function permissionMatrix(): array
     {
+        /** @var list<string> $permissions */
         $permissions = [
             'dashboard.view', 'pos.use', 'booths.manage', 'vendors.manage',
             'inventory.manage', 'reports.view', 'settings.manage', 'accounting.view',

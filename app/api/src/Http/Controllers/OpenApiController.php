@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace NinjaEmp\Api\Http\Controllers;
 
+use NinjaEMP\Db\Sql\Value;
 use NinjaEMP\Http\Message\Response;
 use NinjaEMP\Http\Routing\Route;
 use NinjaEMP\OpenApi\ApiSchema;
@@ -11,7 +12,6 @@ use NinjaEMP\OpenApi\Components;
 use NinjaEMP\OpenApi\OpenApiDocument;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
-use NinjaEMP\Db\Sql\Value;
 
 /**
  * Serves the generated OpenAPI 3.1 contract and a minimal HTML explorer.

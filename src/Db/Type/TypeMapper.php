@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Db\Type;
 
-use NinjaEMP\Db\Sql\Value;
-
 use DateTimeImmutable;
 use DateTimeZone;
+use NinjaEMP\Db\Sql\Value;
 use NinjaEMP\Money\Currency;
 use NinjaEMP\Money\Money;
 
@@ -30,6 +29,9 @@ final class TypeMapper
      * @param list<string> $timeColumns columns holding timestamptz/date
      *
      * @return array<string, mixed>
+     *
+     * @SuppressWarnings("CyclomaticComplexity") one branch per column family
+     *   (money/json/bool/int/time); the mapping is a flat dispatch, not nesting.
      */
     public function map(
         array $raw,

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Http\Controllers;
 
-use NinjaEmp\TenantUi\Http\Controller;
 use NinjaEMP\Db\Sql\Value;
+use NinjaEmp\TenantUi\Http\Controller;
 
 /**
  * Point of Sale — the priority surface.
@@ -85,6 +85,7 @@ final class PosController extends Controller
      * Instant inventory: create an item at the register and return it so it can
      * be added to the cart. Vendor-owned by default (consignment); the store can
      * also quick-add its own goods with owner=store.
+     *
      * @param array<string,mixed> $params
      */
     /**

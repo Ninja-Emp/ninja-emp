@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Http\Controllers;
 
-use NinjaEmp\TenantUi\Http\Controller;
 use NinjaEMP\Db\Sql\Value;
+use NinjaEmp\TenantUi\Http\Controller;
 
 /**
  * Reports — sales, vendor payouts, tax, inventory valuation.
@@ -26,8 +26,15 @@ final class ReportController extends Controller
         $tenderMix = [];
 
         foreach ($sales as $sale) {
-            foreach ($sale['tenders'] as $t) {
-                $tenderMix[$t] = ($tenderMix[$t] ?? 0) + 1;
+            $tenders = $sale['tenders'] ?? null;
+
+            if (!\is_array($tenders)) {
+                continue;
+            }
+
+            foreach ($tenders as $t) {
+                $key = Value::str($t);
+                $tenderMix[$key] = ($tenderMix[$key] ?? 0) + 1;
             }
         }
 

@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Domain\StoredValue;
 
-use NinjaEMP\Db\Sql\Value;
-
 use InvalidArgumentException;
 use NinjaEMP\Db\Connection;
+use NinjaEMP\Db\Sql\Value;
 use NinjaEMP\Money\Currency;
 use NinjaEMP\Money\Money;
 
@@ -163,9 +162,10 @@ final class StoredValueService
             'SELECT COALESCE(sum(balance), 0)
                FROM stored_value
               WHERE instrument_kind = :kind
+                AND currency = :currency
                 AND status = \'active\'
                 AND deleted_at IS NULL',
-            ['kind' => $instrumentKind],
+            ['kind' => $instrumentKind, 'currency' => $currency],
         );
     }
 

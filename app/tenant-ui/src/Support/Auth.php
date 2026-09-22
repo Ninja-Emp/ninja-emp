@@ -55,6 +55,7 @@ final class Auth
         ];
     }
 
+    /** @return array{id:string,name:string,role:string,initials:string}|null */
     public function user(): ?array
     {
         return $this->user;
@@ -77,7 +78,7 @@ final class Auth
 
     public function loginAs(string $role): void
     {
-        if (!isset(self::MATRIX[$role])) {
+        if (!self::isRole($role)) {
             return;
         }
         $this->user = [
@@ -100,6 +101,11 @@ final class Auth
         ];
     }
 
+    private static function isRole(string $role): bool
+    {
+        return isset(self::MATRIX[$role]);
+    }
+
     public function can(string $permission): bool
     {
         return \in_array($permission, self::MATRIX[$this->role()] ?? [], true);
@@ -111,6 +117,7 @@ final class Auth
         return self::MATRIX[$this->role()] ?? [];
     }
 
+    /** @return array<string,string> */
     public static function roles(): array
     {
         return self::ROLE_LABELS;

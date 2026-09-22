@@ -38,7 +38,6 @@ use NinjaEMP\Http\Middleware\TenantMiddleware;
 use NinjaEMP\Http\Routing\RouteCollection;
 use NinjaEMP\Http\Routing\Router;
 use NinjaEMP\Tenancy\InMemoryTenantRegistry;
-use NinjaEMP\Tenancy\TenantContextHolder;
 use NinjaEMP\Tenancy\TenantRecord;
 use NinjaEMP\Tenancy\TenantResolver;
 use Psr\Log\LoggerInterface;
@@ -81,8 +80,8 @@ if (is_string($dsn) && $dsn !== '') {
     $dbPassword = getenv('NINJA_EMP_DB_PASSWORD');
     $connectionFactory = Container::connectionFactory(
         $dsn,
-        \is_string($dbUser) && $dbUser !== '' ? $dbUser : 'ninja_emp',
-        \is_string($dbPassword) ? $dbPassword : '',
+        is_string($dbUser) && $dbUser !== '' ? $dbUser : 'ninja_emp',
+        is_string($dbPassword) ? $dbPassword : '',
     );
 }
 
@@ -146,4 +145,4 @@ $kernel->pipeAfterRouting(new CsrfMiddleware(new Csrf()));
 // ---- Handle + emit --------------------------------------------------------
 $request = ServerRequest::fromGlobals();
 $response = $kernel->handle($request);
-new Emitter()->emit($response);
+(new Emitter())->emit($response);

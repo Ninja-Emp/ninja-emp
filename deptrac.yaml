@@ -1,0 +1,132 @@
+deptrac:
+  paths:
+    - ./src
+    - ./app
+  exclude_files:
+    - '#.*Test\.php$#'
+  layers:
+    # --- vendored PSR interfaces (depend on nothing) ------------------------
+    - name: Psr
+      collectors:
+        - type: classNameRegex
+          value: '#^Psr\\#i'
+    # --- library layers (namespace-anchored so app/ never collides) ---------
+    - name: Money
+      collectors:
+        - type: classNameRegex
+          value: '#^NinjaEMP\\Money\\#i'
+    - name: Db
+      collectors:
+        - type: classNameRegex
+          value: '#^NinjaEMP\\Db\\#i'
+    - name: Ledger
+      collectors:
+        - type: classNameRegex
+          value: '#^NinjaEMP\\Ledger\\#i'
+    - name: Domain
+      collectors:
+        - type: classNameRegex
+          value: '#^NinjaEMP\\Domain\\#i'
+    - name: Repository
+      collectors:
+        - type: classNameRegex
+          value: '#^NinjaEMP\\Repository\\#i'
+    - name: Auth
+      collectors:
+        - type: classNameRegex
+          value: '#^NinjaEMP\\Auth\\#i'
+    - name: Tenancy
+      collectors:
+        - type: classNameRegex
+          value: '#^NinjaEMP\\Tenancy\\#i'
+    - name: Support
+      collectors:
+        - type: classNameRegex
+          value: '#^NinjaEMP\\Support\\#i'
+    - name: Http
+      collectors:
+        - type: classNameRegex
+          value: '#^NinjaEMP\\Http\\#i'
+    - name: OpenApi
+      collectors:
+        - type: classNameRegex
+          value: '#^NinjaEMP\\OpenApi\\#i'
+    # --- applications (may depend on the library, never the reverse) --------
+    - name: ApiApp
+      collectors:
+        - type: classNameRegex
+          value: '#^NinjaEmp\\Api\\#i'
+    - name: TenantUiApp
+      collectors:
+        - type: classNameRegex
+          value: '#^NinjaEmp\\TenantUi\\#i'
+
+  ruleset:
+    Psr: ~
+    # Money is a pure value layer. It uses the Db\Sql\Value narrowing helper
+    # (a total-cast utility); that single edge is the only allowed Db coupling.
+    Money:
+      - Db
+      - Psr
+    Db:
+      - Money
+      - Psr
+    Ledger:
+      - Db
+      - Money
+      - Psr
+    Domain:
+      - Db
+      - Money
+      - Psr
+    Repository:
+      - Db
+      - Domain
+      - Money
+      - Psr
+    Auth:
+      - Db
+      - Psr
+    Tenancy:
+      - Db
+      - Psr
+    Support:
+      - Psr
+    Http:
+      - Auth
+      - Db
+      - Domain
+      - Ledger
+      - Money
+      - Psr
+      - Repository
+      - Support
+      - Tenancy
+    OpenApi:
+      - Db
+      - Http
+      - Psr
+    ApiApp:
+      - Auth
+      - Db
+      - Domain
+      - Http
+      - Ledger
+      - Money
+      - OpenApi
+      - Psr
+      - Repository
+      - Support
+      - Tenancy
+    TenantUiApp:
+      - Auth
+      - Db
+      - Domain
+      - Http
+      - Ledger
+      - Money
+      - OpenApi
+      - Psr
+      - Repository
+      - Support
+      - Tenancy

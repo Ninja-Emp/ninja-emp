@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Db;
 
-use NinjaEMP\Db\Sql\Value;
-
 use NinjaEMP\Db\Exception\AppendOnlyViolationException;
 use NinjaEMP\Db\Exception\ConflictException;
 use NinjaEMP\Db\Exception\ConstraintViolationException;
@@ -13,6 +11,7 @@ use NinjaEMP\Db\Exception\DatabaseException;
 use NinjaEMP\Db\Exception\LedgerBalanceException;
 use NinjaEMP\Db\Exception\ReferenceException;
 use NinjaEMP\Db\Exception\RetryableException;
+use NinjaEMP\Db\Sql\Value;
 use PDOException;
 
 /**

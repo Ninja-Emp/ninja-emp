@@ -11,6 +11,7 @@ declare(strict_types=1);
  * PSR-7/15 + attribute-routing shape so the swap is mechanical.
  */
 
+use NinjaEMP\Db\Sql\Value;
 use NinjaEmp\TenantUi\Data\MockRepository;
 use NinjaEmp\TenantUi\Http\Controllers\AuthController;
 use NinjaEmp\TenantUi\Http\Controllers\BoothController;
@@ -26,7 +27,6 @@ use NinjaEmp\TenantUi\Support\Flash;
 use NinjaEmp\TenantUi\Support\Router;
 use NinjaEmp\TenantUi\Support\Theme;
 use NinjaEmp\TenantUi\Support\View;
-use NinjaEMP\Db\Sql\Value;
 
 $root = dirname(__DIR__);
 
@@ -158,4 +158,4 @@ if ($match === null) {
 
 [$class, $action] = $match['handler'];
 $controller = new $class($repo, $auth, $view);
-(new \ReflectionMethod($controller, $action))->invoke($controller, $match['params']);
+(new ReflectionMethod($controller, $action))->invoke($controller, $match['params']);

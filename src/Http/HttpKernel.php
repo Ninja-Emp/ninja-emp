@@ -12,6 +12,7 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use ReflectionMethod;
 use RuntimeException;
 
 /**
@@ -79,8 +80,11 @@ final class HttpKernel
     private function terminal(): RequestHandlerInterface
     {
         return new class ($this->resolver) implements RequestHandlerInterface {
-            public function __construct(private readonly ControllerResolver $resolver)
+            private ControllerResolver $resolver;
+
+            public function __construct(ControllerResolver $resolver)
             {
+                $this->resolver = $resolver;
             }
 
             public function handle(ServerRequestInterface $request): ResponseInterface
@@ -108,7 +112,7 @@ final class HttpKernel
                     ));
                 }
 
-                $response = (new \ReflectionMethod($controller, $action))->invoke($controller, $request, $match->params);
+                $response = (new ReflectionMethod($controller, $action))->invoke($controller, $request, $match->params);
 
                 if (!$response instanceof ResponseInterface) {
                     throw new RuntimeException(\sprintf(

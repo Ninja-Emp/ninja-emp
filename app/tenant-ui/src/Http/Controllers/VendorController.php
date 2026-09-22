@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Http\Controllers;
 
-use NinjaEmp\TenantUi\Http\Controller;
 use NinjaEMP\Db\Sql\Value;
+use NinjaEmp\TenantUi\Http\Controller;
 
 /**
  * Vendors / consignors — list, detail with balances, create/edit, and
@@ -28,8 +28,10 @@ final class VendorController extends Controller
         $booths = [];
 
         foreach ($spaces as $s) {
-            if ($s['vendor_id']) {
-                $booths[$s['vendor_id']][] = $s['code'];
+            $vendorId = Value::str($s['vendor_id']);
+
+            if ($vendorId !== '') {
+                $booths[$vendorId][] = Value::str($s['code']);
             }
         }
 
@@ -47,7 +49,7 @@ final class VendorController extends Controller
     public function show(array $params): void
     {
         $this->require('vendors.manage');
-        $vendor = $this->repo->vendor($params['id'] ?? '');
+        $vendor = $this->repo->vendor(Value::str($params['id'] ?? ''));
 
         if ($vendor === null) {
             http_response_code(404);
@@ -69,17 +71,27 @@ final class VendorController extends Controller
         $statement = [];
 
         foreach ($this->repo->sales() as $sale) {
-            foreach ($sale['lines'] as $line) {
-                $item = $this->repo->item($line['item_id']);
+            $lines = $sale['lines'] ?? null;
 
-                if ($item && $item['vendor_id'] === $vendor['id']) {
+            if (!\is_array($lines)) {
+                continue;
+            }
+
+            foreach ($lines as $line) {
+                if (!\is_array($line)) {
+                    continue;
+                }
+
+                $item = $this->repo->item(Value::str($line['item_id'] ?? ''));
+
+                if ($item !== null && $item['vendor_id'] === $vendor['id']) {
                     $statement[] = [
-                        'no'         => $sale['no'],
-                        'time'       => $sale['time'],
-                        'item'       => $line['name'],
-                        'gross'      => $line['price'],
-                        'commission' => $line['commission'],
-                        'net'        => $line['net'],
+                        'no'         => Value::str($sale['no'] ?? ''),
+                        'time'       => Value::str($sale['time'] ?? ''),
+                        'item'       => Value::str($line['name'] ?? ''),
+                        'gross'      => Value::str($line['price'] ?? ''),
+                        'commission' => Value::str($line['commission'] ?? ''),
+                        'net'        => Value::str($line['net'] ?? ''),
                     ];
                 }
             }
@@ -112,7 +124,7 @@ final class VendorController extends Controller
     public function edit(array $params): void
     {
         $this->require('vendors.manage');
-        $vendor = $this->repo->vendor($params['id'] ?? '');
+        $vendor = $this->repo->vendor(Value::str($params['id'] ?? ''));
 
         if ($vendor === null) {
             http_response_code(404);
@@ -121,7 +133,7 @@ final class VendorController extends Controller
             return;
         }
         $this->render('vendors/form', [
-            'title'  => 'Edit ' . $vendor['name'],
+            'title'  => 'Edit ' . Value::str($vendor['name']),
             'vendor' => $vendor,
         ]);
     }
@@ -143,7 +155,7 @@ final class VendorController extends Controller
     public function update(array $params): void
     {
         $this->require('vendors.manage');
-        $id = $params['id'] ?? '';
+        $id = Value::str($params['id'] ?? '');
         $this->repo->saveVendor($id, $this->fields());
         $this->flash('success', 'Vendor updated.');
         $this->redirect('/vendors/' . $id);
@@ -156,7 +168,7 @@ final class VendorController extends Controller
     public function purchase(array $params): void
     {
         $this->require('vendors.manage');
-        $vendorId = $params['id'] ?? '';
+        $vendorId = Value::str($params['id'] ?? '');
 
         if ($this->repo->vendor($vendorId) === null) {
             http_response_code(404);
@@ -177,7 +189,11 @@ final class VendorController extends Controller
         $this->redirect('/vendors/' . $vendorId);
     }
 
-    /** Normalise the vendor form into repository fields. */
+    /**
+     * Normalise the vendor form into repository fields.
+     *
+     * @return array<string,mixed>
+     */
     private function fields(): array
     {
         return [

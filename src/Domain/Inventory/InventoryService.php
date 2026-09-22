@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Domain\Inventory;
 
-use NinjaEMP\Db\Sql\Value;
-
 use InvalidArgumentException;
 use NinjaEMP\Db\Connection;
+use NinjaEMP\Db\Sql\Value;
 use NinjaEMP\Money\Currency;
 use NinjaEMP\Money\Money;
 use RuntimeException;

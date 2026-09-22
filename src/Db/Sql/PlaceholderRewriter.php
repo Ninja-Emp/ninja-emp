@@ -24,6 +24,11 @@ final class PlaceholderRewriter
      * @param array<string, mixed> $params named parameters as supplied by the caller
      *
      * @return array{sql: string, params: list<mixed>} positional SQL + ordered bind values
+     *
+     * @SuppressWarnings("CyclomaticComplexity") hand-written SQL tokenizer: one
+     *   branch per lexical state (quotes, dollar-quotes, comments, casts, params).
+     * @SuppressWarnings("NPathComplexity") same reason — the branch count is the
+     *   grammar, not accidental complexity.
      */
     public function rewrite(string $sql, array $params): array
     {
@@ -51,10 +56,14 @@ final class PlaceholderRewriter
             }
 
             // --- dollar-quoted string ($tag$ … $tag$) -------------------------
-            if ($char === '$' && ($tag = $this->dollarTagAt($sql, $i)) !== null) {
-                [$literal, $i] = $this->consumeDollarQuoted($sql, $i, $tag);
-                $out .= $literal;
-                continue;
+            if ($char === '$') {
+                $tag = $this->dollarTagAt($sql, $i);
+
+                if ($tag !== null) {
+                    [$literal, $i] = $this->consumeDollarQuoted($sql, $i, $tag);
+                    $out .= $literal;
+                    continue;
+                }
             }
 
             // --- line comment (-- …) ------------------------------------------

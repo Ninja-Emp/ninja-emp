@@ -47,7 +47,7 @@
         "cs:fix": "php-cs-fixer fix",
         "stan": "phpstan analyse --no-progress --memory-limit=1G",
         "phpmd": "phpmd src text phpmd.xml",
-        "deptrac": "deptrac analyse --no-progress",
+        "deptrac": "deptrac analyse --no-progress --fail-on-uncovered",
         "test": "php tests/run.php",
         "test:unit": "phpunit --testsuite unit",
         "infect": "infection --threads=max",

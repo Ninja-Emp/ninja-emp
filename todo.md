@@ -55,3 +55,33 @@ until its invariants are written down and agreed.
 - [x] Run migrate.sh (idempotent no-op on fresh build)
 - [x] settlement.sql GREEN; full suite GREEN (241 = 222 + 19)
 - [x] Commit + push code
+
+---
+
+# Quality Gate (Part 6, Step 9) — Task A
+
+> Continuation handoff: `HANDOFF_QUALITY_GATE.md`. Definition of Done: `HANDOFF.md` §4.
+
+## 6. PHPStan level 10
+- [x] src/ library: 0 errors
+- [x] app/ logic: fix remaining errors (controllers/support)
+- [x] Decide Views/ scope (exclude app/tenant-ui/src/Views)
+- [x] src + app: 0 errors
+
+## 7. Author missing tool configs
+- [x] phpmd.xml
+- [x] deptrac.yaml
+- [x] phpunit.xml (bridge to custom harness)
+- [x] infection.json5 (MSI >= 80%)
+- [x] .github/workflows/ci.yml
+
+## 8. Run every tool to GREEN
+- [x] php-cs-fixer
+- [x] phpstan
+- [x] phpmd
+- [x] deptrac
+- [x] unit tests (876 assertions)
+- [ ] infection (MSI >= 80%) — currently 66.96% scoped; hardening in progress
+
+## 9. Commit + push final A
+- [ ] Commit and push

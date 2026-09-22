@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Ledger;
 
-use NinjaEMP\Db\Sql\Value;
-
 use InvalidArgumentException;
+use NinjaEMP\Db\Sql\Value;
 use NinjaEMP\Money\Money;
 
 /**

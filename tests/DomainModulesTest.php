@@ -49,13 +49,13 @@ return static function (TestHarness $t): void {
     // A balanced drawer posts nothing (post_shift_close returns NULL).
     $conn2 = new FakeConnection();
     $conn2->on('post_shift_close', static fn () => null);
-    $t->assertSame(null, new ShiftService($conn2)->closeShift('shift-2', '100.00'), 'balanced drawer posts nothing');
+    $t->assertSame(null, (new ShiftService($conn2))->closeShift('shift-2', '100.00'), 'balanced drawer posts nothing');
 
     // previewClose computes expected = float + cash-in, over/short = counted - expected.
     $conn3 = new FakeConnection();
     $conn3->on('SELECT opening_float', static fn () => [['opening_float' => '200.0000', 'currency' => 'USD']]);
     $conn3->on('SELECT COALESCE(sum(pt.amount)', static fn () => '150.0000');
-    $preview = new ShiftService($conn3)->previewClose('shift-1', '360.00');
+    $preview = (new ShiftService($conn3))->previewClose('shift-1', '360.00');
     $t->assertSame('200.0000', $preview['opening_float'], 'preview opening float');
     $t->assertSame('150.0000', $preview['cash_in'], 'preview cash in');
     $t->assertSame('350.0000', $preview['expected'], 'preview expected = float + cash in');
@@ -63,7 +63,7 @@ return static function (TestHarness $t): void {
 
     $t->assertThrows(
         InvalidArgumentException::class,
-        fn () => new ShiftService(new FakeConnection())->openShift('reg-1', '-1.00'),
+        fn () => (new ShiftService(new FakeConnection()))->openShift('reg-1', '-1.00'),
         'a negative opening float is rejected',
     );
 
@@ -104,7 +104,7 @@ return static function (TestHarness $t): void {
         'current' => '100.0000', 'd1_30' => '50.0000', 'd31_60' => '25.0000',
         'd61_90' => '10.0000', 'd90_plus' => '5.0000',
     ]]);
-    $aging = new OpenItemService($conn4)->aging('ar', '2026-02-01');
+    $aging = (new OpenItemService($conn4))->aging('ar', '2026-02-01');
     $t->assertSame('100.0000', $aging['current'], 'aging current bucket');
     $t->assertSame('5.0000', $aging['90_plus'], 'aging 90+ bucket');
 
@@ -150,7 +150,7 @@ return static function (TestHarness $t): void {
 
     $conn5 = new FakeConnection();
     $conn5->on('recognize_breakage', static fn () => null);
-    $t->assertSame(null, new StoredValueService($conn5)->recognizeBreakage(), 'breakage is a no-op when not opted in');
+    $t->assertSame(null, (new StoredValueService($conn5))->recognizeBreakage(), 'breakage is a no-op when not opted in');
 
     // ---- ReportingService -------------------------------------------------
 

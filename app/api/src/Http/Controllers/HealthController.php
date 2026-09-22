@@ -32,7 +32,7 @@ final class HealthController
         return JsonResponse::of([
             'status' => 'ok',
             'service' => 'ninja-emp-api',
-            'time' => new DateTimeImmutable()->format(DateTimeInterface::ATOM),
+            'time' => (new DateTimeImmutable())->format(DateTimeInterface::ATOM),
         ]);
     }
 }

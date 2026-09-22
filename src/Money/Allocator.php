@@ -32,6 +32,11 @@ final class Allocator
      * @throws InvalidArgumentException on empty weights, negative weights, or a zero weight sum
      *
      * @return list<Money> one part per weight, in the same order
+     *
+     * @SuppressWarnings("CyclomaticComplexity") largest-remainder allocation:
+     *   the branches are the exactness guarantees (floor, remainder, tie-break).
+     * @SuppressWarnings("NPathComplexity") same reason — the paths are the
+     *   remainder-distribution cases, all of which are covered by tests.
      */
     public static function allocate(Money $total, array $weights): array
     {

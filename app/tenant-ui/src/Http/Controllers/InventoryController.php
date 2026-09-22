@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Http\Controllers;
 
-use NinjaEmp\TenantUi\Http\Controller;
 use NinjaEMP\Db\Sql\Value;
+use NinjaEmp\TenantUi\Http\Controller;
 
 /**
  * Inventory — items, stock levels, weighted-average cost, adjustments.
@@ -27,9 +27,9 @@ final class InventoryController extends Controller
 
         if ($q !== '') {
             $items = array_values(array_filter($items, static function (array $i) use ($q): bool {
-                return str_contains(strtolower($i['name']), $q)
-                    || str_contains(strtolower($i['sku']), $q)
-                    || str_contains(strtolower($i['category']), $q);
+                return str_contains(strtolower(Value::str($i['name'])), $q)
+                    || str_contains(strtolower(Value::str($i['sku'])), $q)
+                    || str_contains(strtolower(Value::str($i['category'])), $q);
             }));
         }
 
@@ -49,7 +49,7 @@ final class InventoryController extends Controller
     public function show(array $params): void
     {
         $this->require('inventory.manage');
-        $item = $this->repo->item($params['id'] ?? '');
+        $item = $this->repo->item(Value::str($params['id'] ?? ''));
 
         if ($item === null) {
             http_response_code(404);
@@ -57,7 +57,8 @@ final class InventoryController extends Controller
 
             return;
         }
-        $vendor = $item['vendor_id'] ? $this->repo->vendor($item['vendor_id']) : null;
+        $vendorId = Value::str($item['vendor_id']);
+        $vendor = $vendorId !== '' ? $this->repo->vendor($vendorId) : null;
         $this->render('inventory/show', [
             'title'  => $item['name'],
             'item'   => $item,
@@ -84,7 +85,7 @@ final class InventoryController extends Controller
     public function edit(array $params): void
     {
         $this->require('inventory.manage');
-        $item = $this->repo->item($params['id'] ?? '');
+        $item = $this->repo->item(Value::str($params['id'] ?? ''));
 
         if ($item === null) {
             http_response_code(404);
@@ -93,7 +94,7 @@ final class InventoryController extends Controller
             return;
         }
         $this->render('inventory/form', [
-            'title'   => 'Edit ' . $item['name'],
+            'title'   => 'Edit ' . Value::str($item['name']),
             'item'    => $item,
             'vendors' => $this->repo->vendors(),
         ]);
@@ -116,13 +117,17 @@ final class InventoryController extends Controller
     public function update(array $params): void
     {
         $this->require('inventory.manage');
-        $id = $params['id'] ?? '';
+        $id = Value::str($params['id'] ?? '');
         $this->repo->saveItem($id, $this->fields());
         $this->flash('success', 'Item updated.');
         $this->redirect('/inventory/' . $id);
     }
 
-    /** Normalise the item form into repository fields. */
+    /**
+     * Normalise the item form into repository fields.
+     *
+     * @return array<string,mixed>
+     */
     private function fields(): array
     {
         $owner = $this->input('owner', 'vendor') === 'store' ? 'store' : 'vendor';
@@ -156,7 +161,7 @@ final class InventoryController extends Controller
         $names = [];
 
         foreach ($this->repo->vendors() as $v) {
-            $names[$v['id']] = $v['name'];
+            $names[Value::str($v['id'])] = Value::str($v['name']);
         }
 
         return $names;

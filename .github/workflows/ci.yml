@@ -1,0 +1,118 @@
+name: CI
+
+# The quality gate (HANDOFF.md §4). Steps run in the documented order and each
+# one is a hard gate: a red step fails the build.
+#
+#   1. PHP-CS-Fixer   (PSR-12 style)
+#   2. PHPStan        (level 10, zero errors, no baseline)
+#   3. PHPMD          (zero violations)
+#   4. Deptrac        (layer boundaries, no uncovered deps)
+#   5. Unit tests     (PHPUnit bridge over the assertion harness)
+#   6. Functional SQL (real PostgreSQL 18, all db/tests suites)
+#   7. Infection      (mutation testing — PRIMARY gate, MSI >= 80%)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-gate:
+    name: Quality gate
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NINJA_EMP_DSN: 'pgsql:host=127.0.0.1;port=5432;dbname=ninja_emp'
+      NINJA_EMP_USER: ninja_app
+      NINJA_EMP_PASSWORD: ninja_app
+      NINJA_EMP_TENANT_ID: '11111111-1111-7111-8111-111111111111'
+      NINJA_EMP_SCHEMA: tenant_demo
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP 8.5
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: bcmath, mbstring, pdo, pdo_pgsql, pcov
+          coverage: pcov
+          tools: composer:v2
+          ini-values: memory_limit=1G
+
+      - name: Validate composer.json
+        run: composer validate --strict --no-check-publish
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Audit dependencies
+        run: composer audit --no-dev
+
+      # --- 1. Style ---------------------------------------------------------
+      - name: PHP-CS-Fixer (PSR-12)
+        run: composer cs
+
+      # --- 2. Static analysis ----------------------------------------------
+      - name: PHPStan (level 10)
+        run: composer stan
+
+      # --- 3. Mess detection -----------------------------------------------
+      - name: PHPMD
+        run: composer phpmd
+
+      # --- 4. Architecture boundaries --------------------------------------
+      - name: Deptrac
+        run: composer deptrac
+
+      # --- 5. Unit tests ----------------------------------------------------
+      - name: Unit tests (PHPUnit)
+        run: composer test:unit
+
+      # --- 6. Functional SQL suites on real PostgreSQL ----------------------
+      - name: Provision databases
+        run: |
+          sudo -u postgres psql -c "CREATE ROLE ninja_app LOGIN PASSWORD 'ninja_app' SUPERUSER;" || true
+          sudo -u postgres psql -c "CREATE ROLE ninja_control LOGIN PASSWORD 'ninja_control';" || true
+          bash db/provision.sh tenant_demo
+
+      - name: Functional SQL suites
+        run: bash scripts/run_tests.sh
+
+      # --- 7. Mutation testing (PRIMARY gate) -------------------------------
+      - name: Infection (MSI >= 80%)
+        run: composer infect
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: infection-report
+          path: |
+            infection.log
+            infection-summary.log
+            infection.html
+          if-no-files-found: ignore

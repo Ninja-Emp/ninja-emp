@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Domain\Pos;
 
-use NinjaEMP\Db\Sql\Value;
-
 use InvalidArgumentException;
 use NinjaEMP\Db\Connection;
+use NinjaEMP\Db\Sql\Value;
 use NinjaEMP\Money\Currency;
 use NinjaEMP\Money\Money;
 use RuntimeException;
@@ -38,6 +37,9 @@ final class PosService
     /**
      * Ring up and post a sale. Idempotent when the request carries an
      * idempotency key (or one can be derived from its content).
+     *
+     * @SuppressWarnings("CyclomaticComplexity") the branch count is the sale
+     *   pipeline (validate → price → commission → tax → post → persist).
      */
     public function ringUp(SaleRequest $request): SaleResult
     {

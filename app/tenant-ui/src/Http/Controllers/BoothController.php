@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Http\Controllers;
 
+use NinjaEMP\Db\Sql\Value;
 use NinjaEmp\TenantUi\Http\Controller;
 
 /**
@@ -23,7 +24,7 @@ final class BoothController extends Controller
         $vendorNames = [];
 
         foreach ($vendors as $v) {
-            $vendorNames[$v['id']] = $v['name'];
+            $vendorNames[Value::str($v['id'])] = Value::str($v['name']);
         }
 
         $this->render('booths/index', [
@@ -45,7 +46,7 @@ final class BoothController extends Controller
         $vendorNames = [];
 
         foreach ($vendors as $v) {
-            $vendorNames[$v['id']] = $v['name'];
+            $vendorNames[Value::str($v['id'])] = Value::str($v['name']);
         }
 
         $this->render('booths/map', [
@@ -86,7 +87,7 @@ final class BoothController extends Controller
     public function show(array $params): void
     {
         $this->require('booths.manage');
-        $space = $this->repo->space($params['id'] ?? '');
+        $space = $this->repo->space(Value::str($params['id'] ?? ''));
 
         if ($space === null) {
             http_response_code(404);
@@ -94,9 +95,10 @@ final class BoothController extends Controller
 
             return;
         }
-        $vendor = $space['vendor_id'] ? $this->repo->vendor($space['vendor_id']) : null;
+        $vendorId = Value::str($space['vendor_id']);
+        $vendor = $vendorId !== '' ? $this->repo->vendor($vendorId) : null;
         $this->render('booths/form', [
-            'title'   => 'Booth ' . $space['code'],
+            'title'   => 'Booth ' . Value::str($space['code']),
             'space'   => $space,
             'vendor'  => $vendor,
             'vendors' => $this->repo->vendors(),
@@ -110,6 +112,6 @@ final class BoothController extends Controller
     {
         $this->require('booths.manage');
         $this->flash('success', 'Booth updated (mock).');
-        $this->redirect('/booths/' . ($params['id'] ?? ''));
+        $this->redirect('/booths/' . Value::str($params['id'] ?? ''));
     }
 }

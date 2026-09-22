@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace NinjaEmp\Api\Http\Controllers;
 
+use NinjaEMP\Db\Sql\Value;
 use NinjaEMP\Http\Message\JsonResponse;
 use NinjaEMP\Http\Routing\Route;
 use NinjaEMP\OpenApi\ApiSchema;
 use NinjaEMP\Repository\Repository;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
-use NinjaEMP\Db\Sql\Value;
 
 /**
  * Vendor (party) read surface. Demonstrates a container-injected dependency

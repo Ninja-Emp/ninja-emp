@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Http\Message;
 
-use NinjaEMP\Db\Sql\Value;
-
 use InvalidArgumentException;
+use NinjaEMP\Db\Sql\Value;
 use Psr\Http\Message\StreamInterface;
 
 /**

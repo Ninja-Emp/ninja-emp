@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use NinjaEMP\Db\Sql\Value;
+
 /**
  * Router script for PHP's built-in dev server.
  *

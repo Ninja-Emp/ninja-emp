@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Domain\OpenItem;
 
-use NinjaEMP\Db\Sql\Value;
-
 use InvalidArgumentException;
 use NinjaEMP\Db\Connection;
+use NinjaEMP\Db\Sql\Value;
 use NinjaEMP\Money\Currency;
 use NinjaEMP\Money\Money;
 
@@ -43,6 +42,9 @@ final class OpenItemService
      * pass it through unchanged.
      *
      * @return string the open item id
+     *
+     * @SuppressWarnings("ExcessiveParameterList") the parameters mirror the
+     *   open_item columns; grouping them into a DTO would only move the list.
      */
     public function create(
         string $subledgerType,

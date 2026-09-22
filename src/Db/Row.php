@@ -71,11 +71,19 @@ final class Row implements ArrayAccess, Countable, IteratorAggregate
         return $this->values[$offset] ?? null;
     }
 
+    /**
+     * @SuppressWarnings("UnusedFormalParameter") required by ArrayAccess; the
+     *   row is immutable so the arguments are intentionally ignored.
+     */
     public function offsetSet(mixed $offset, mixed $value): void
     {
         throw new LogicException('Row is immutable.');
     }
 
+    /**
+     * @SuppressWarnings("UnusedFormalParameter") required by ArrayAccess; the
+     *   row is immutable so the argument is intentionally ignored.
+     */
     public function offsetUnset(mixed $offset): void
     {
         throw new LogicException('Row is immutable.');

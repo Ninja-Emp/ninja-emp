@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Http\Controllers;
 
-use NinjaEmp\TenantUi\Http\Controller;
 use NinjaEMP\Db\Sql\Value;
+use NinjaEmp\TenantUi\Http\Controller;
 
 /**
  * Registers — create, open (with float), close (with count + variance).
@@ -44,7 +44,7 @@ final class RegisterController extends Controller
     public function edit(array $params): void
     {
         $this->require('pos.use');
-        $register = $this->repo->register($params['id'] ?? '');
+        $register = $this->repo->register(Value::str($params['id'] ?? ''));
 
         if ($register === null) {
             http_response_code(404);
@@ -53,7 +53,7 @@ final class RegisterController extends Controller
             return;
         }
         $this->render('registers/form', [
-            'title'    => 'Edit ' . $register['name'],
+            'title'    => 'Edit ' . Value::str($register['name']),
             'register' => $register,
         ]);
     }
@@ -75,7 +75,7 @@ final class RegisterController extends Controller
     public function update(array $params): void
     {
         $this->require('pos.use');
-        $id = $params['id'] ?? '';
+        $id = Value::str($params['id'] ?? '');
         $this->repo->saveRegister($id, ['name' => $this->input('name', 'Register')]);
         $this->flash('success', 'Register updated.');
         $this->redirect('/registers');
@@ -87,7 +87,7 @@ final class RegisterController extends Controller
     public function open(array $params): void
     {
         $this->require('pos.use');
-        $id = $params['id'] ?? '';
+        $id = Value::str($params['id'] ?? '');
         $float = $this->money('float');
         $this->repo->openRegister($id, $this->input('cashier', 'Cashier'), $float);
         $this->flash('success', 'Register opened with a float of ' . $float . '.');
@@ -100,7 +100,7 @@ final class RegisterController extends Controller
     public function close(array $params): void
     {
         $this->require('pos.use');
-        $id = $params['id'] ?? '';
+        $id = Value::str($params['id'] ?? '');
         $this->repo->closeRegister($id, $this->money('counted'));
         $this->flash('success', 'Register closed.');
         $this->redirect('/registers');

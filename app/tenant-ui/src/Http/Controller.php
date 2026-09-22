@@ -25,13 +25,21 @@ abstract class Controller
     ) {
     }
 
-    /** Render a view into the app shell. */
+    /**
+     * Render a view into the app shell.
+     *
+     * @param array<string,mixed> $data
+     */
     protected function render(string $view, array $data = []): void
     {
         echo $this->view->render($view, $data);
     }
 
-    /** Render a view with no shell (used for full-page islands / fragments). */
+    /**
+     * Render a view with no shell (used for full-page islands / fragments).
+     *
+     * @param array<string,mixed> $data
+     */
     protected function renderBare(string $view, array $data = []): void
     {
         echo $this->view->partial($view, $data);

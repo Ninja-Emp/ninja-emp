@@ -15,6 +15,8 @@ use NinjaEMP\Db\Sql\Value;
 final class Nav
 {
     /**
+     * @param array<string,string> $badges
+     *
      * @return list<array{label:string,items:list<array{label:string,path:string,icon:string,permission:string,badge?:string}>}>
      */
     public static function groups(Auth $auth, array $badges = []): array

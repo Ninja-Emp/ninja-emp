@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace NinjaEMP\OpenApi;
 
 use NinjaEMP\Db\Sql\Value;
-
 use NinjaEMP\Http\Routing\Route;
 use ReflectionClass;
 use ReflectionMethod;
@@ -110,6 +109,10 @@ final class OpenApiDocument
         return $this;
     }
 
+    /**
+     * @SuppressWarnings("CyclomaticComplexity") one branch per OpenAPI field
+     *   (summary, description, tags, params, request, responses, security).
+     */
     private function addOperation(Route $route, ?ApiSchema $api): void
     {
         $path = $this->toOpenApiPath($route->path);

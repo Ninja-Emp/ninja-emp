@@ -1,0 +1,36 @@
+{
+    "$schema": "vendor/infection/infection/resources/schema.json",
+    "source": {
+        "directories": [
+            "src"
+        ],
+        "excludes": [
+            "Psr",
+            "Repository/DbalRepository.php",
+            "Repository/RowMapper.php",
+            "Db/PdoConnection.php",
+            "Db/ConnectionFactory.php",
+            "Db/Type/TypeMapper.php"
+        ]
+    },
+    "logs": {
+        "text": "infection.log",
+        "summary": "infection-summary.log",
+        "html": "infection.html",
+        "json": "infection.json"
+    },
+    "mutators": {
+        "@default": true,
+        "BCMath": false,
+        "IncrementInteger": false,
+        "DecrementInteger": false
+    },
+    "testFramework": "phpunit",
+    "phpUnit": {
+        "configDir": "."
+    },
+    "bootstrap": "vendor/autoload.php",
+    "tmpDir": "build/infection",
+    "minMsi": 80,
+    "minCoveredMsi": 80
+}

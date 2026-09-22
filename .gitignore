@@ -29,6 +29,8 @@ build/
 infection.log
 infection-summary.log
 infection.html
+infection.json
+.deptrac.cache
 
 # --- Large binary DB dumps (keep the SQL text backups; ignore raw custom dumps) ---
 backups/**/*.dump

@@ -50,7 +50,7 @@ return static function (TestHarness $t): void {
     $t->assertSame('/pos', $uri->getPath(), 'uri path');
     $t->assertSame('x=1', $uri->getQuery(), 'uri query');
     $t->assertSame('frag', $uri->getFragment(), 'uri fragment');
-    $t->assertSame(null, new Uri('https://a.b/c')->getPort(), 'default port hidden');
+    $t->assertSame(null, (new Uri('https://a.b/c'))->getPort(), 'default port hidden');
 
     $response = new Response(201, 'created', ['Content-Type' => 'text/plain']);
     $t->assertSame(201, $response->getStatusCode(), 'response status');

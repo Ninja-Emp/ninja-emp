@@ -79,6 +79,7 @@ final class Container implements ContainerInterface
     private function resolve(string $id): object
     {
         $value = $this->get($id);
+
         if (!\is_object($value)) {
             throw new RuntimeException(\sprintf('Service "%s" is not an object.', $id));
         }

@@ -38,6 +38,12 @@ return (new PhpCsFixer\Config())
         '@PSR12:risky' => true,
         '@PHP84Migration' => true,
 
+        // Keep parentheses around `new` even when chaining. The PHP 8.4
+        // "new without parentheses" form is valid but PDepend (PHPMD's parser)
+        // cannot read it, so we standardise on the explicit form.
+        'new_with_parentheses' => ['named_class' => true, 'anonymous_class' => true],
+        'new_expression_parentheses' => ['use_parentheses' => true],
+
         // Strictness
         'declare_strict_types' => true,
         'strict_comparison' => true,

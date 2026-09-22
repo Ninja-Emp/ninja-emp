@@ -19,16 +19,38 @@ final class Flash
     public static function add(string $type, string $message): void
     {
         self::start();
-        $_SESSION['_flash'][] = ['type' => $type, 'message' => $message];
+        $flash = self::read();
+        $flash[] = ['type' => $type, 'message' => $message];
+        $_SESSION['_flash'] = $flash;
     }
 
     /** @return list<array{type:string,message:string}> */
     public static function pull(): array
     {
         self::start();
-        $messages = $_SESSION['_flash'] ?? [];
+        $flash = self::read();
         unset($_SESSION['_flash']);
 
-        return $messages;
+        return $flash;
+    }
+
+    /** @return list<array{type:string,message:string}> */
+    private static function read(): array
+    {
+        $raw = $_SESSION['_flash'] ?? null;
+
+        if (!\is_array($raw)) {
+            return [];
+        }
+
+        $out = [];
+
+        foreach ($raw as $item) {
+            if (\is_array($item) && \is_string($item['type'] ?? null) && \is_string($item['message'] ?? null)) {
+                $out[] = ['type' => $item['type'], 'message' => $item['message']];
+            }
+        }
+
+        return $out;
     }
 }

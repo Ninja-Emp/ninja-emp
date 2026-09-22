@@ -26,6 +26,10 @@ final class SaleLineInput
     public const CONSIGNMENT = 'consignment';
     public const OWNED = 'owned';
 
+    /**
+     * @SuppressWarnings("ExcessiveParameterList") immutable DTO mirroring the
+     *   sale-line fields; a builder would add ceremony without safety.
+     */
     public function __construct(
         public readonly string $kind,
         public readonly string $description,

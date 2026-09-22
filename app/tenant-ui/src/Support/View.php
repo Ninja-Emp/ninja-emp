@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Support;
 
-use RuntimeException;
 use NinjaEMP\Db\Sql\Value;
+use RuntimeException;
 
 /**
  * Tiny, dependency-free template renderer.
@@ -53,7 +53,11 @@ final class View
         return $this->capture($this->layout, $data);
     }
 
-    /** Render a view with no layout (used for partials and fragments). */
+    /**
+     * Render a view with no layout (used for partials and fragments).
+     *
+     * @param array<string,mixed> $data
+     */
     public function partial(string $view, array $data = []): string
     {
         return $this->capture($view, array_merge($this->shared, $data));

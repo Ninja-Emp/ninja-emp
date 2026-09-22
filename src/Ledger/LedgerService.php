@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Ledger;
 
-use NinjaEMP\Db\Sql\Value;
-
 use NinjaEMP\Db\Connection;
+use NinjaEMP\Db\Sql\Value;
 
 /**
  * The ledger engine (ADR-0020 / ADR-0028 / ADR-0029).
