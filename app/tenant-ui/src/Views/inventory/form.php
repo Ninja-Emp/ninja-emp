@@ -1,7 +1,8 @@
 <?php
 /**
  * Inventory item create/edit form.
- * @var \NinjaEmp\TenantUi\Support\View $this
+ *
+ * @var View $this
  */
 use NinjaEmp\TenantUi\Support\View;
 
@@ -49,7 +50,7 @@ $categories = ['Food', 'Bath', 'Home', 'Antiques', 'Apparel', 'Crafts', 'General
         <label for="owner">Ownership</label>
         <select class="select" id="owner" name="owner" data-owner-select>
           <option value="vendor" <?= $owner === 'vendor' ? 'selected' : '' ?>>Vendor-owned (consignment)</option>
-          <option value="store"  <?= $owner === 'store'  ? 'selected' : '' ?>>Store-owned</option>
+          <option value="store"  <?= $owner === 'store' ? 'selected' : '' ?>>Store-owned</option>
         </select>
       </div>
       <div class="field" data-vendor-field <?= $owner === 'store' ? 'hidden' : '' ?>>

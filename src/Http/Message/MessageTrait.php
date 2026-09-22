@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Http\Message;
 
+use NinjaEMP\Db\Sql\Value;
+
 use InvalidArgumentException;
 use Psr\Http\Message\StreamInterface;
 
@@ -57,6 +59,7 @@ trait MessageTrait
         return implode(', ', $this->getHeader($name));
     }
 
+    /** @param mixed $value */
     public function withHeader(string $name, $value): static
     {
         $this->assertHeaderName($name);
@@ -68,6 +71,7 @@ trait MessageTrait
         return $clone;
     }
 
+    /** @param mixed $value */
     public function withAddedHeader(string $name, $value): static
     {
         $this->assertHeaderName($name);
@@ -76,7 +80,7 @@ trait MessageTrait
         $clone->headerNames[$normalized] = $name;
         $clone->headers[$normalized] = array_merge(
             $clone->headers[$normalized] ?? [],
-            $this->normalizeValue($value)
+            $this->normalizeValue($value),
         );
 
         return $clone;
@@ -85,6 +89,7 @@ trait MessageTrait
     public function withoutHeader(string $name): static
     {
         $normalized = strtolower($name);
+
         if (!isset($this->headers[$normalized])) {
             return $this;
         }
@@ -112,26 +117,25 @@ trait MessageTrait
     }
 
     /**
-     * @param string|list<string> $value
-     *
      * @return list<string>
      */
-    private function normalizeValue($value): array
+    private function normalizeValue(mixed $value): array
     {
-        if (is_string($value)) {
+        if (\is_string($value)) {
             return [$value];
         }
-        if (is_array($value)) {
-            return array_values(array_map(static fn ($v): string => (string) $v, $value));
+
+        if (\is_array($value)) {
+            return array_values(array_map(static fn ($v): string => Value::str($v), $value));
         }
 
-        return [(string) $value];
+        return [Value::str($value)];
     }
 
     private function assertHeaderName(string $name): void
     {
         if ($name === '' || preg_match('/^[!#$%&\'*+.^_`|~0-9A-Za-z-]+$/', $name) !== 1) {
-            throw new InvalidArgumentException(sprintf('Invalid header name: "%s".', $name));
+            throw new InvalidArgumentException(\sprintf('Invalid header name: "%s".', $name));
         }
     }
 }

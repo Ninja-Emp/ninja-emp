@@ -29,6 +29,7 @@ final class JsonResponse
     public static function error(string $message, int $status = 400, array $errors = []): ResponseInterface
     {
         $payload = ['error' => ['status' => $status, 'message' => $message]];
+
         if ($errors !== []) {
             $payload['error']['details'] = $errors;
         }

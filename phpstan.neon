@@ -1,0 +1,12 @@
+includes:
+    - vendor/phpstan/phpstan-strict-rules/rules.neon
+
+parameters:
+    level: 10
+    paths:
+        - src
+        - app
+    excludePaths:
+        - src/Psr
+    treatPhpDocTypesAsCertain: false
+    reportUnmatchedIgnoredErrors: true

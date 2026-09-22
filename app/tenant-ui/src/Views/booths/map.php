@@ -1,10 +1,11 @@
 <?php
 /**
  * 2D booth map.
- * @var \NinjaEmp\TenantUi\Support\View $this
+ *
+ * @var View $this
  */
-use NinjaEmp\TenantUi\Support\View;
 use NinjaEmp\TenantUi\Support\Money;
+use NinjaEmp\TenantUi\Support\View;
 
 $cur = $tenant['currency'];
 $statusColor = [
@@ -37,13 +38,14 @@ $statusColor = [
       <div class="booth-map" id="booth-map" role="application" aria-label="Interactive booth map">
         <?php foreach ($spaces as $s): ?>
           <?php
-            $cell = 56; $gap = 8;
+            $cell = 56;
+            $gap = 8;
             $left = ($s['x'] - 1) * ($cell + $gap);
             $top = ($s['y'] - 1) * ($cell + $gap);
             $w = $s['w'] * $cell + ($s['w'] - 1) * $gap;
             $h = $s['h'] * $cell + ($s['h'] - 1) * $gap;
             $vendor = $s['vendor_id'] && isset($vendorNames[$s['vendor_id']]) ? $vendorNames[$s['vendor_id']] : 'Unassigned';
-          ?>
+            ?>
           <a class="booth-cell"
              href="/booths/<?= View::e($s['id']) ?>"
              style="left:<?= $left ?>px; top:<?= $top ?>px; width:<?= $w ?>px; height:<?= $h ?>px;

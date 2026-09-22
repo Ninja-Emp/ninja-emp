@@ -20,8 +20,10 @@ return static function (TestHarness $t): void {
     $t->suite('DBAL (functional)');
 
     $dsn = getenv('NINJA_EMP_DSN');
+
     if ($dsn === false || $dsn === '') {
         echo "  · DBAL functional tests skipped (set NINJA_EMP_DSN to run)\n";
+
         return;
     }
 
@@ -48,16 +50,18 @@ return static function (TestHarness $t): void {
 
     // 3. A bare query outside a transaction is a programming error.
     $t->assertThrows(
-        \NinjaEMP\Db\Exception\TransactionRequiredException::class,
+        NinjaEMP\Db\Exception\TransactionRequiredException::class,
         fn () => $db->select('SELECT 1'),
         'query outside transaction throws',
     );
 
     // 4. Rollback on throw leaves no trace.
     $before = (int) $db->transactional(fn () => $db->scalar('SELECT count(*) FROM account'));
+
     try {
         $db->transactional(function () use ($db): void {
             $db->execute("INSERT INTO account (code, name, account_type_code) VALUES ('ZZZ', 'Temp', 'asset')");
+
             throw new RuntimeException('boom');
         });
     } catch (RuntimeException) {

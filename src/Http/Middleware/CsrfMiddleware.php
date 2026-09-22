@@ -27,7 +27,7 @@ final class CsrfMiddleware implements MiddlewareInterface
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
-        if (in_array($request->getMethod(), self::SAFE_METHODS, true)) {
+        if (\in_array($request->getMethod(), self::SAFE_METHODS, true)) {
             return $handler->handle($request);
         }
 
@@ -43,12 +43,14 @@ final class CsrfMiddleware implements MiddlewareInterface
     private function token(ServerRequestInterface $request): ?string
     {
         $header = $request->getHeaderLine('X-CSRF-Token');
+
         if ($header !== '') {
             return $header;
         }
 
         $body = $request->getParsedBody();
-        if (is_array($body) && isset($body[Csrf::FIELD]) && is_string($body[Csrf::FIELD])) {
+
+        if (\is_array($body) && isset($body[Csrf::FIELD]) && \is_string($body[Csrf::FIELD])) {
             return $body[Csrf::FIELD];
         }
 

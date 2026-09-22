@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace NinjaEMP\Money;
 
 use InvalidArgumentException;
+use NinjaEMP\Db\Sql\Value;
 
 /**
  * Exact allocation of a whole into parts (ADR-0009).
@@ -28,9 +29,9 @@ final class Allocator
      *
      * @param list<string|int> $weights non-negative relative weights (e.g. [1,1,1] or ['0.6','0.4'])
      *
-     * @return list<Money> one part per weight, in the same order
-     *
      * @throws InvalidArgumentException on empty weights, negative weights, or a zero weight sum
+     *
+     * @return list<Money> one part per weight, in the same order
      */
     public static function allocate(Money $total, array $weights): array
     {
@@ -38,9 +39,12 @@ final class Allocator
             throw new InvalidArgumentException('Cannot allocate across zero parts.');
         }
 
+        /** @var numeric-string $sum */
         $sum = '0';
+
         foreach ($weights as $w) {
             $w = self::normaliseWeight($w);
+
             if (bccomp($w, '0', 12) < 0) {
                 throw new InvalidArgumentException('Allocation weights must be non-negative.');
             }
@@ -57,10 +61,11 @@ final class Allocator
         $magnitude = $total->abs()->amount();
 
         $scale = Money::SCALE;
+        /** @var numeric-string $floorSum */
         $floorSum = '0';
-        /** @var list<string> $floors */
+        /** @var array<int, numeric-string> $floors */
         $floors = [];
-        /** @var list<array{index:int, remainder:string}> $remainders */
+        /** @var list<array{index:int, remainder:numeric-string}> $remainders */
         $remainders = [];
 
         foreach ($weights as $i => $w) {
@@ -90,6 +95,7 @@ final class Allocator
         }
 
         $parts = [];
+
         foreach ($floors as $amount) {
             $amount = $negative ? bcmul($amount, '-1', $scale) : $amount;
             $parts[] = Money::of($amount, $total->currency());
@@ -111,21 +117,27 @@ final class Allocator
         return self::allocate($total, $rates);
     }
 
+    /** @return numeric-string */
     private static function normaliseWeight(string|int $weight): string
     {
-        $weight = is_int($weight) ? (string) $weight : trim($weight);
+        $weight = \is_int($weight) ? Value::str($weight) : trim($weight);
 
         if ($weight === '' || preg_match('/^-?\d+(\.\d+)?$/', $weight) !== 1) {
-            throw new InvalidArgumentException(sprintf('Malformed allocation weight: "%s".', $weight));
+            throw new InvalidArgumentException(\sprintf('Malformed allocation weight: "%s".', $weight));
         }
 
-        return $weight;
+        return Value::num($weight);
     }
 
-    /** Truncate (floor toward zero) a decimal string to $scale places, no rounding. */
+    /**
+     * Truncate (floor toward zero) a decimal string to $scale places, no rounding.
+     *
+     * @return numeric-string
+     */
     private static function truncate(string $number, int $scale): string
     {
         $negative = str_starts_with($number, '-');
+
         if ($negative) {
             $number = substr($number, 1);
         }
@@ -139,8 +151,9 @@ final class Allocator
 
         $frac = str_pad(substr($frac, 0, $scale), $scale, '0');
 
+        /** @var numeric-string $result */
         $result = $scale > 0 ? $int . '.' . $frac : $int;
 
-        return $negative ? '-' . $result : $result;
+        return $negative ? Value::num('-' . $result) : $result;
     }
 }

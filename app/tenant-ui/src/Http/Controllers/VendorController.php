@@ -1,9 +1,11 @@
 <?php
+
 declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Http\Controllers;
 
 use NinjaEmp\TenantUi\Http\Controller;
+use NinjaEMP\Db\Sql\Value;
 
 /**
  * Vendors / consignors — list, detail with balances, create/edit, and
@@ -12,6 +14,9 @@ use NinjaEmp\TenantUi\Http\Controller;
  */
 final class VendorController extends Controller
 {
+    /**
+     * @param array<string,mixed> $params
+     */
     public function index(array $params = []): void
     {
         $this->require('vendors.manage');
@@ -21,6 +26,7 @@ final class VendorController extends Controller
 
         // Map vendor -> booth code(s).
         $booths = [];
+
         foreach ($spaces as $s) {
             if ($s['vendor_id']) {
                 $booths[$s['vendor_id']][] = $s['code'];
@@ -35,30 +41,37 @@ final class VendorController extends Controller
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function show(array $params): void
     {
         $this->require('vendors.manage');
         $vendor = $this->repo->vendor($params['id'] ?? '');
+
         if ($vendor === null) {
             http_response_code(404);
             $this->render('errors/404', ['title' => 'Not found']);
+
             return;
         }
 
         $items = array_values(array_filter(
             $this->repo->items(),
-            static fn (array $i): bool => $i['vendor_id'] === $vendor['id']
+            static fn (array $i): bool => $i['vendor_id'] === $vendor['id'],
         ));
         $spaces = array_values(array_filter(
             $this->repo->spaces(),
-            static fn (array $s): bool => $s['vendor_id'] === $vendor['id']
+            static fn (array $s): bool => $s['vendor_id'] === $vendor['id'],
         ));
 
         // Mock statement lines derived from sales containing this vendor's items.
         $statement = [];
+
         foreach ($this->repo->sales() as $sale) {
             foreach ($sale['lines'] as $line) {
                 $item = $this->repo->item($line['item_id']);
+
                 if ($item && $item['vendor_id'] === $vendor['id']) {
                     $statement[] = [
                         'no'         => $sale['no'],
@@ -81,6 +94,9 @@ final class VendorController extends Controller
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function create(array $params = []): void
     {
         $this->require('vendors.manage');
@@ -90,13 +106,18 @@ final class VendorController extends Controller
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function edit(array $params): void
     {
         $this->require('vendors.manage');
         $vendor = $this->repo->vendor($params['id'] ?? '');
+
         if ($vendor === null) {
             http_response_code(404);
             $this->render('errors/404', ['title' => 'Not found']);
+
             return;
         }
         $this->render('vendors/form', [
@@ -105,6 +126,9 @@ final class VendorController extends Controller
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function store(array $params = []): void
     {
         $this->require('vendors.manage');
@@ -113,6 +137,9 @@ final class VendorController extends Controller
         $this->redirect('/vendors/' . $id);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function update(array $params): void
     {
         $this->require('vendors.manage');
@@ -123,13 +150,18 @@ final class VendorController extends Controller
     }
 
     /** Store buys goods from a vendor (creates a store-owned item + payable). */
+    /**
+     * @param array<string,mixed> $params
+     */
     public function purchase(array $params): void
     {
         $this->require('vendors.manage');
         $vendorId = $params['id'] ?? '';
+
         if ($this->repo->vendor($vendorId) === null) {
             http_response_code(404);
             $this->render('errors/404', ['title' => 'Not found']);
+
             return;
         }
         $this->repo->purchaseFromVendor($vendorId, [
@@ -162,6 +194,7 @@ final class VendorController extends Controller
     private function money(string $key): string
     {
         $raw = preg_replace('/[^0-9.\-]/', '', $this->input($key, '0'));
-        return $raw === '' ? '0.0000' : bcadd($raw, '0', 4);
+
+        return $raw === '' ? '0.0000' : bcadd(Value::num($raw), '0', 4);
     }
 }

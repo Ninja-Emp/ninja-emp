@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Support;
@@ -20,11 +21,13 @@ final class Theme
 
     private const MODES = ['light', 'dark'];
 
+    /** @return array<string,array{label:string,swatch:string}> */
     public static function themes(): array
     {
         return self::THEMES;
     }
 
+    /** @return list<string> */
     public static function modes(): array
     {
         return self::MODES;
@@ -37,7 +40,7 @@ final class Theme
 
     public static function isValidMode(string $mode): bool
     {
-        return in_array($mode, self::MODES, true);
+        return \in_array($mode, self::MODES, true);
     }
 
     public static function defaultTheme(): string

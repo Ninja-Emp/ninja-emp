@@ -14,15 +14,9 @@ final class PasswordHasher
 
     public function hash(string $plaintext): string
     {
-        $algo = defined('PASSWORD_ARGON2ID') ? self::ALGO : PASSWORD_BCRYPT;
+        $algo = \defined('PASSWORD_ARGON2ID') ? self::ALGO : PASSWORD_BCRYPT;
 
-        $hash = password_hash($plaintext, $algo);
-
-        if ($hash === false) {
-            throw new \RuntimeException('Password hashing failed.');
-        }
-
-        return $hash;
+        return password_hash($plaintext, $algo);
     }
 
     public function verify(string $plaintext, string $hash): bool
@@ -33,7 +27,7 @@ final class PasswordHasher
     /** True when the stored hash should be upgraded to the current algorithm. */
     public function needsRehash(string $hash): bool
     {
-        $algo = defined('PASSWORD_ARGON2ID') ? self::ALGO : PASSWORD_BCRYPT;
+        $algo = \defined('PASSWORD_ARGON2ID') ? self::ALGO : PASSWORD_BCRYPT;
 
         return password_needs_rehash($hash, $algo);
     }

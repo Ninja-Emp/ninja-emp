@@ -49,7 +49,7 @@ final class Role
     private function __construct(private readonly string $code)
     {
         if (!isset(self::MATRIX[$code])) {
-            throw new InvalidArgumentException(sprintf('Unknown role: "%s".', $code));
+            throw new InvalidArgumentException(\sprintf('Unknown role: "%s".', $code));
         }
     }
 
@@ -75,7 +75,7 @@ final class Role
 
     public function can(string $permission): bool
     {
-        return in_array($permission, self::MATRIX[$this->code], true);
+        return \in_array($permission, self::MATRIX[$this->code], true);
     }
 
     /** @return list<string> */

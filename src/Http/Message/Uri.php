@@ -35,8 +35,9 @@ final class Uri implements UriInterface
         }
 
         $parts = parse_url($uri);
+
         if ($parts === false) {
-            throw new InvalidArgumentException(sprintf('Unable to parse URI: "%s".', $uri));
+            throw new InvalidArgumentException(\sprintf('Unable to parse URI: "%s".', $uri));
         }
 
         $this->scheme = isset($parts['scheme']) ? strtolower($parts['scheme']) : '';
@@ -48,6 +49,7 @@ final class Uri implements UriInterface
 
         if (isset($parts['user'])) {
             $this->userInfo = $parts['user'];
+
             if (isset($parts['pass'])) {
                 $this->userInfo .= ':' . $parts['pass'];
             }
@@ -66,9 +68,11 @@ final class Uri implements UriInterface
         }
 
         $authority = $this->host;
+
         if ($this->userInfo !== '') {
             $authority = $this->userInfo . '@' . $authority;
         }
+
         if ($this->port !== null) {
             $authority .= ':' . $this->port;
         }
@@ -91,6 +95,7 @@ final class Uri implements UriInterface
         if ($this->port === null) {
             return null;
         }
+
         if (isset(self::DEFAULT_PORTS[$this->scheme]) && self::DEFAULT_PORTS[$this->scheme] === $this->port) {
             return null;
         }
@@ -125,6 +130,7 @@ final class Uri implements UriInterface
     {
         $clone = clone $this;
         $clone->userInfo = $user;
+
         if ($password !== null) {
             $clone->userInfo .= ':' . $password;
         }
@@ -178,17 +184,21 @@ final class Uri implements UriInterface
     public function __toString(): string
     {
         $uri = '';
+
         if ($this->scheme !== '') {
             $uri .= $this->scheme . ':';
         }
         $authority = $this->getAuthority();
+
         if ($authority !== '') {
             $uri .= '//' . $authority;
         }
         $uri .= $this->path;
+
         if ($this->query !== '') {
             $uri .= '?' . $this->query;
         }
+
         if ($this->fragment !== '') {
             $uri .= '#' . $this->fragment;
         }

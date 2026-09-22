@@ -1,7 +1,10 @@
 <?php
+
 declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Support;
+
+use NinjaEMP\Db\Sql\Value;
 
 /**
  * Navigation definition for the sidebar.
@@ -50,21 +53,26 @@ final class Nav
 
         // Filter by permission and attach badges.
         $out = [];
+
         foreach ($groups as $group) {
             $items = [];
+
             foreach ($group['items'] as $item) {
                 if (!$auth->can($item['permission'])) {
                     continue;
                 }
+
                 if (isset($badges[$item['path']])) {
-                    $item['badge'] = (string) $badges[$item['path']];
+                    $item['badge'] = Value::str($badges[$item['path']]);
                 }
                 $items[] = $item;
             }
+
             if ($items !== []) {
                 $out[] = ['label' => $group['label'], 'items' => $items];
             }
         }
+
         return $out;
     }
 }

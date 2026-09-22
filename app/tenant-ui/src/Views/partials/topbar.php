@@ -2,7 +2,7 @@
 /**
  * Top bar: mobile menu, global search, theme switcher, account menu.
  *
- * @var \NinjaEmp\TenantUi\Support\View $this
+ * @var View $this
  * @var array $user
  * @var string $roleLabel
  * @var string $theme
@@ -11,6 +11,7 @@
  * @var array $modes
  */
 use NinjaEmp\TenantUi\Support\View;
+
 ?>
 <header class="topbar">
   <button class="icon-btn mobile-only" type="button" data-mobile-toggle aria-label="Open navigation">
@@ -73,7 +74,7 @@ use NinjaEmp\TenantUi\Support\View;
       </button>
       <div class="menu" data-menu-panel hidden>
         <div class="menu-label">Switch role (demo)</div>
-        <?php foreach (\NinjaEmp\TenantUi\Support\Auth::roles() as $key => $label): ?>
+        <?php foreach (NinjaEmp\TenantUi\Support\Auth::roles() as $key => $label): ?>
           <a class="menu-item" href="?role=<?= View::e($key) ?>"
              aria-checked="<?= $key === ($user['role'] ?? '') ? 'true' : 'false' ?>">
             <svg aria-hidden="true"><use href="#i-user"></use></svg>

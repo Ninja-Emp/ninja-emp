@@ -1,7 +1,10 @@
 <?php
+
 declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Data;
+
+use NinjaEMP\Db\Sql\Value;
 
 /**
  * Thin mock data layer.
@@ -14,28 +17,50 @@ namespace NinjaEmp\TenantUi\Data;
  * first use, then mutations (create/update) persist for the life of the session.
  * That keeps the UI fully interactive without a database, while the method
  * signatures stay exactly what a DBAL-backed repository would expose.
+ *
+ * @phpstan-type Store array{
+ *     tenant: array<string,mixed>,
+ *     locations: list<array<string,mixed>>,
+ *     floors: list<array<string,mixed>>,
+ *     spaces: list<array<string,mixed>>,
+ *     vendors: list<array<string,mixed>>,
+ *     items: list<array<string,mixed>>,
+ *     sales: list<array<string,mixed>>,
+ *     sales_trend: list<array<string,mixed>>,
+ *     registers: list<array<string,mixed>>,
+ *     tax_rates: list<array<string,mixed>>
+ * }
  */
 final class MockRepository
 {
-    /** @var array<string,mixed> */
+    /** @var Store */
     private array $data;
 
     public function __construct()
     {
-        if (!isset($_SESSION['nem_data']) || !is_array($_SESSION['nem_data'])) {
+        if (!isset($_SESSION['nem_data']) || !\is_array($_SESSION['nem_data'])) {
             $_SESSION['nem_data'] = require __DIR__ . '/seed.php';
         }
-        $this->data = &$_SESSION['nem_data'];
+
+        /** @var Store $store */
+        $store = $_SESSION['nem_data'];
+        $this->data = &$store;
+        $_SESSION['nem_data'] = &$store;
     }
 
     // ---- Tenant -----------------------------------------------------------
 
+    /** @return array<string,mixed> */
     public function tenant(): array
     {
         return $this->data['tenant'];
     }
 
-    /** Update editable tenant settings (name, currency, timezone). */
+    /**
+     * Update editable tenant settings (name, currency, timezone).
+     *
+     * @param array<string,mixed> $fields
+     */
     public function updateTenant(array $fields): void
     {
         foreach (['name', 'currency', 'timezone'] as $key) {
@@ -53,6 +78,7 @@ final class MockRepository
         return $this->data['spaces'];
     }
 
+    /** @return array<string,mixed>|null */
     public function space(string $id): ?array
     {
         foreach ($this->data['spaces'] as $space) {
@@ -60,14 +86,20 @@ final class MockRepository
                 return $space;
             }
         }
+
         return null;
     }
 
-    /** Create or update a booth. Returns the space id. */
+    /**
+     * Create or update a booth. Returns the space id.
+     *
+     * @param array<string,mixed> $fields
+     */
     public function saveSpace(?string $id, array $fields): string
     {
         if ($id !== null && ($i = $this->indexOf('spaces', $id)) !== null) {
             $this->data['spaces'][$i] = array_merge($this->data['spaces'][$i], $fields);
+
             return $id;
         }
         $id = $this->nextId('spaces', 'sp-');
@@ -76,6 +108,7 @@ final class MockRepository
             'status' => 'available', 'vendor_id' => null, 'rent' => '0.0000',
             'x' => 1, 'y' => 1, 'w' => 1, 'h' => 1,
         ], $fields, ['id' => $id]);
+
         return $id;
     }
 
@@ -87,6 +120,7 @@ final class MockRepository
         return $this->data['vendors'];
     }
 
+    /** @return array<string,mixed>|null */
     public function vendor(string $id): ?array
     {
         foreach ($this->data['vendors'] as $vendor) {
@@ -94,14 +128,20 @@ final class MockRepository
                 return $vendor;
             }
         }
+
         return null;
     }
 
-    /** Create or update a vendor. Returns the vendor id. */
+    /**
+     * Create or update a vendor. Returns the vendor id.
+     *
+     * @param array<string,mixed> $fields
+     */
     public function saveVendor(?string $id, array $fields): string
     {
         if ($id !== null && ($i = $this->indexOf('vendors', $id)) !== null) {
             $this->data['vendors'][$i] = array_merge($this->data['vendors'][$i], $fields);
+
             return $id;
         }
         $id = $this->nextId('vendors', 'v-');
@@ -110,17 +150,20 @@ final class MockRepository
             'type' => 'consignor', 'commission' => '20.0000', 'balance' => '0.0000',
             'status' => 'active', 'since' => date('Y-m-d'),
         ], $fields, ['id' => $id]);
+
         return $id;
     }
 
     /**
      * Store buys goods from a vendor: creates a store-owned item and increases
      * what we owe the vendor (a vendor payable). Returns the new item id.
+     *
+     * @param array<string,mixed> $fields
      */
     public function purchaseFromVendor(string $vendorId, array $fields): string
     {
-        $qty = max(1, (int) ($fields['qty'] ?? 1));
-        $cost = $fields['cost'] ?? '0.0000';
+        $qty = max(1, Value::int($fields['qty'] ?? 1));
+        $cost = Value::num($fields['cost'] ?? '0.0000');
         $itemId = $this->saveItem(null, [
             'name'      => $fields['name'] ?? 'Purchased item',
             'sku'       => $fields['sku'] ?? '',
@@ -138,8 +181,10 @@ final class MockRepository
         // Increase the vendor payable by cost * qty.
         if (($i = $this->indexOf('vendors', $vendorId)) !== null) {
             $owed = bcmul($cost, (string) $qty, 4);
-            $this->data['vendors'][$i]['balance'] = bcadd($this->data['vendors'][$i]['balance'], $owed, 4);
+            $balance = Value::num($this->data['vendors'][$i]['balance']);
+            $this->data['vendors'][$i]['balance'] = bcadd($balance, $owed, 4);
         }
+
         return $itemId;
     }
 
@@ -151,6 +196,7 @@ final class MockRepository
         return $this->data['items'];
     }
 
+    /** @return array<string,mixed>|null */
     public function item(string $id): ?array
     {
         foreach ($this->data['items'] as $item) {
@@ -158,9 +204,11 @@ final class MockRepository
                 return $item;
             }
         }
+
         return null;
     }
 
+    /** @return array<string,mixed>|null */
     public function itemByBarcode(string $barcode): ?array
     {
         foreach ($this->data['items'] as $item) {
@@ -168,14 +216,20 @@ final class MockRepository
                 return $item;
             }
         }
+
         return null;
     }
 
-    /** Create or update an item. Returns the item id. */
+    /**
+     * Create or update an item. Returns the item id.
+     *
+     * @param array<string,mixed> $fields
+     */
     public function saveItem(?string $id, array $fields): string
     {
         if ($id !== null && ($i = $this->indexOf('items', $id)) !== null) {
             $this->data['items'][$i] = array_merge($this->data['items'][$i], $fields);
+
             return $id;
         }
         $id = $this->nextId('items', 'it-');
@@ -184,6 +238,7 @@ final class MockRepository
             'category' => 'General', 'price' => '0.0000', 'cost' => '0.0000',
             'on_hand' => 0, 'reorder' => 0, 'barcode' => '', 'owner' => 'vendor',
         ], $fields, ['id' => $id]);
+
         return $id;
     }
 
@@ -209,6 +264,7 @@ final class MockRepository
         return $this->data['registers'];
     }
 
+    /** @return array<string,mixed>|null */
     public function register(string $id): ?array
     {
         foreach ($this->data['registers'] as $reg) {
@@ -216,14 +272,20 @@ final class MockRepository
                 return $reg;
             }
         }
+
         return null;
     }
 
-    /** Create or update a register. Returns the register id. */
+    /**
+     * Create or update a register. Returns the register id.
+     *
+     * @param array<string,mixed> $fields
+     */
     public function saveRegister(?string $id, array $fields): string
     {
         if ($id !== null && ($i = $this->indexOf('registers', $id)) !== null) {
             $this->data['registers'][$i] = array_merge($this->data['registers'][$i], $fields);
+
             return $id;
         }
         $id = $this->nextId('registers', 'reg-');
@@ -232,6 +294,7 @@ final class MockRepository
             'cashier' => null, 'opened' => null, 'drawer' => '0.0000',
             'float' => '0.0000', 'counted' => null, 'variance' => null,
         ], $fields, ['id' => $id]);
+
         return $id;
     }
 
@@ -256,16 +319,17 @@ final class MockRepository
         if (($i = $this->indexOf('registers', $id)) === null) {
             return;
         }
-        $expected = $this->data['registers'][$i]['drawer'] ?? '0.0000';
+        $expected = Value::num($this->data['registers'][$i]['drawer'] ?? '0.0000');
         $this->data['registers'][$i]['status'] = 'closed';
         $this->data['registers'][$i]['counted'] = $counted;
-        $this->data['registers'][$i]['variance'] = bcsub($counted, $expected, 4);
+        $this->data['registers'][$i]['variance'] = bcsub(Value::num($counted), $expected, 4);
         $this->data['registers'][$i]['cashier'] = null;
         $this->data['registers'][$i]['opened'] = null;
     }
 
     // ---- Tax --------------------------------------------------------------
 
+    /** @return list<array<string,mixed>> */
     public function taxRates(): array
     {
         return $this->data['tax_rates'];
@@ -277,9 +341,11 @@ final class MockRepository
     public function todaySalesTotal(): string
     {
         $total = '0.0000';
+
         foreach ($this->data['sales'] as $sale) {
-            $total = bcadd($total, $sale['total'], 4);
+            $total = bcadd($total, Value::num($sale['total']), 4);
         }
+
         return $total;
     }
 
@@ -287,9 +353,11 @@ final class MockRepository
     public function totalVendorPayable(): string
     {
         $total = '0.0000';
+
         foreach ($this->data['vendors'] as $vendor) {
-            $total = bcadd($total, $vendor['balance'], 4);
+            $total = bcadd($total, Value::num($vendor['balance']), 4);
         }
+
         return $total;
     }
 
@@ -297,11 +365,13 @@ final class MockRepository
     public function lowStockCount(): int
     {
         $count = 0;
+
         foreach ($this->data['items'] as $item) {
-            if ($item['on_hand'] <= $item['reorder']) {
+            if (bccomp(Value::num($item['on_hand']), Value::num($item['reorder']), 4) <= 0) {
                 $count++;
             }
         }
+
         return $count;
     }
 
@@ -309,25 +379,38 @@ final class MockRepository
     public function inventoryValue(): string
     {
         $total = '0.0000';
+
         foreach ($this->data['items'] as $item) {
-            $total = bcadd($total, bcmul($item['cost'], (string) $item['on_hand'], 4), 4);
+            $total = bcadd($total, bcmul(Value::num($item['cost']), Value::num($item['on_hand']), 4), 4);
         }
+
         return $total;
     }
 
-    /** Count of spaces by status. @return array<string,int> */
+    /**
+     * Count of spaces by status.
+     *
+     * @return array<string,int>
+     */
     public function spaceStatusCounts(): array
     {
         $counts = ['available' => 0, 'leased' => 0, 'reserved' => 0, 'maintenance' => 0, 'inactive' => 0];
+
         foreach ($this->data['spaces'] as $space) {
-            $counts[$space['status']] = ($counts[$space['status']] ?? 0) + 1;
+            $status = Value::str($space['status']);
+            $counts[$status] = ($counts[$status] ?? 0) + 1;
         }
+
         return $counts;
     }
 
     // ---- Internals --------------------------------------------------------
 
-    /** Find the array index of a record by id, or null. */
+    /**
+     * Find the array index of a record by id, or null.
+     *
+     * @param 'spaces'|'vendors'|'items'|'registers' $collection
+     */
     private function indexOf(string $collection, string $id): ?int
     {
         foreach ($this->data[$collection] as $i => $row) {
@@ -335,18 +418,25 @@ final class MockRepository
                 return $i;
             }
         }
+
         return null;
     }
 
-    /** Generate the next sequential id for a collection (e.g. it-13). */
+    /**
+     * Generate the next sequential id for a collection (e.g. it-13).
+     *
+     * @param 'spaces'|'vendors'|'items'|'registers' $collection
+     */
     private function nextId(string $collection, string $prefix): string
     {
         $max = 0;
+
         foreach ($this->data[$collection] as $row) {
-            if (preg_match('/^' . preg_quote($prefix, '/') . '(\d+)$/', (string) ($row['id'] ?? ''), $m)) {
+            if (preg_match('/^' . preg_quote($prefix, '/') . '(\d+)$/', Value::str($row['id'] ?? ''), $m) === 1) {
                 $max = max($max, (int) $m[1]);
             }
         }
+
         return $prefix . ($max + 1);
     }
 }

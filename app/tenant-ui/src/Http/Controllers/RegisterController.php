@@ -1,9 +1,11 @@
 <?php
+
 declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Http\Controllers;
 
 use NinjaEmp\TenantUi\Http\Controller;
+use NinjaEMP\Db\Sql\Value;
 
 /**
  * Registers — create, open (with float), close (with count + variance).
@@ -11,6 +13,9 @@ use NinjaEmp\TenantUi\Http\Controller;
  */
 final class RegisterController extends Controller
 {
+    /**
+     * @param array<string,mixed> $params
+     */
     public function index(array $params = []): void
     {
         $this->require('pos.use');
@@ -21,6 +26,9 @@ final class RegisterController extends Controller
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function create(array $params = []): void
     {
         $this->require('pos.use');
@@ -30,13 +38,18 @@ final class RegisterController extends Controller
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function edit(array $params): void
     {
         $this->require('pos.use');
         $register = $this->repo->register($params['id'] ?? '');
+
         if ($register === null) {
             http_response_code(404);
             $this->render('errors/404', ['title' => 'Not found']);
+
             return;
         }
         $this->render('registers/form', [
@@ -45,6 +58,9 @@ final class RegisterController extends Controller
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function store(array $params = []): void
     {
         $this->require('pos.use');
@@ -53,6 +69,9 @@ final class RegisterController extends Controller
         $this->redirect('/registers');
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function update(array $params): void
     {
         $this->require('pos.use');
@@ -62,6 +81,9 @@ final class RegisterController extends Controller
         $this->redirect('/registers');
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function open(array $params): void
     {
         $this->require('pos.use');
@@ -72,6 +94,9 @@ final class RegisterController extends Controller
         $this->redirect('/registers');
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function close(array $params): void
     {
         $this->require('pos.use');
@@ -84,6 +109,7 @@ final class RegisterController extends Controller
     private function money(string $key): string
     {
         $raw = preg_replace('/[^0-9.\-]/', '', $this->input($key, '0'));
-        return $raw === '' ? '0.0000' : bcadd($raw, '0', 4);
+
+        return $raw === '' ? '0.0000' : bcadd(Value::num($raw), '0', 4);
     }
 }

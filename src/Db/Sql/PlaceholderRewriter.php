@@ -30,7 +30,7 @@ final class PlaceholderRewriter
         $out = '';
         $orderedNames = [];
         $indexByName = [];
-        $length = strlen($sql);
+        $length = \strlen($sql);
         $i = 0;
 
         while ($i < $length) {
@@ -85,13 +85,14 @@ final class PlaceholderRewriter
             // --- named parameter (:name) --------------------------------------
             if ($char === ':' && preg_match('/[A-Za-z_]/', $sql[$i + 1] ?? '') === 1) {
                 $j = $i + 1;
+
                 while ($j < $length && preg_match('/[A-Za-z0-9_]/', $sql[$j]) === 1) {
                     $j++;
                 }
                 $name = substr($sql, $i + 1, $j - $i - 1);
 
-                if (!array_key_exists($name, $indexByName)) {
-                    $indexByName[$name] = count($orderedNames) + 1;
+                if (!\array_key_exists($name, $indexByName)) {
+                    $indexByName[$name] = \count($orderedNames) + 1;
                     $orderedNames[] = $name;
                 }
 
@@ -111,7 +112,7 @@ final class PlaceholderRewriter
     }
 
     /**
-     * @param list<string>         $orderedNames
+     * @param list<string> $orderedNames
      * @param array<string, mixed> $params
      *
      * @return list<mixed>
@@ -121,15 +122,16 @@ final class PlaceholderRewriter
         $values = [];
 
         foreach ($orderedNames as $name) {
-            if (!array_key_exists($name, $params)) {
-                throw new InvalidArgumentException(sprintf('Missing value for named parameter ":%s".', $name));
+            if (!\array_key_exists($name, $params)) {
+                throw new InvalidArgumentException(\sprintf('Missing value for named parameter ":%s".', $name));
             }
             $values[] = $params[$name];
         }
 
         $unused = array_diff(array_keys($params), $orderedNames);
+
         if ($unused !== []) {
-            throw new InvalidArgumentException(sprintf(
+            throw new InvalidArgumentException(\sprintf(
                 'Unused named parameter(s): %s.',
                 implode(', ', array_map(static fn (string $n): string => ':' . $n, $unused)),
             ));
@@ -146,7 +148,7 @@ final class PlaceholderRewriter
      */
     private function consumeQuoted(string $sql, int $start, string $quote): array
     {
-        $length = strlen($sql);
+        $length = \strlen($sql);
         $i = $start + 1;
 
         while ($i < $length) {
@@ -184,13 +186,13 @@ final class PlaceholderRewriter
      */
     private function consumeDollarQuoted(string $sql, int $start, string $tag): array
     {
-        $close = strpos($sql, $tag, $start + strlen($tag));
+        $close = strpos($sql, $tag, $start + \strlen($tag));
 
         if ($close === false) {
-            return [substr($sql, $start), strlen($sql)];
+            return [substr($sql, $start), \strlen($sql)];
         }
 
-        $end = $close + strlen($tag);
+        $end = $close + \strlen($tag);
 
         return [substr($sql, $start, $end - $start), $end];
     }

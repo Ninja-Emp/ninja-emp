@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Domain\Pos;
 
+use NinjaEMP\Db\Sql\Value;
+
 use InvalidArgumentException;
 use NinjaEMP\Db\Connection;
 use NinjaEMP\Money\Currency;
 use NinjaEMP\Money\Money;
+use RuntimeException;
 
 /**
  * Register and shift (cash-drawer session) lifecycle.
@@ -46,6 +49,7 @@ final class ShiftService
         if (trim($code) === '') {
             throw new InvalidArgumentException('A register code is required.');
         }
+
         if (trim($name) === '') {
             throw new InvalidArgumentException('A register name is required.');
         }
@@ -64,10 +68,10 @@ final class ShiftService
             )->first();
 
             if ($row === null) {
-                throw new \RuntimeException('Failed to create the register.');
+                throw new RuntimeException('Failed to create the register.');
             }
 
-            return (string) $row->get('id');
+            return Value::str($row->get('id'));
         });
     }
 
@@ -83,6 +87,7 @@ final class ShiftService
         string $currency = 'USD',
     ): string {
         $float = Money::of($openingFloat, Currency::of($currency));
+
         if ($float->isNegative()) {
             throw new InvalidArgumentException('An opening float cannot be negative.');
         }
@@ -101,10 +106,10 @@ final class ShiftService
             )->first();
 
             if ($row === null) {
-                throw new \RuntimeException('Failed to open the shift.');
+                throw new RuntimeException('Failed to open the shift.');
             }
 
-            return (string) $row->get('id');
+            return Value::str($row->get('id'));
         });
     }
 
@@ -130,7 +135,7 @@ final class ShiftService
                 'key' => $idempotencyKey,
             ]);
 
-            return $entry === null ? null : (string) $entry;
+            return $entry === null ? null : Value::str($entry);
         });
     }
 
@@ -149,11 +154,11 @@ final class ShiftService
             ['id' => $shiftId],
         );
 
-        $currency = (string) $shift->get('currency');
-        $openingFloat = Money::of((string) $shift->get('opening_float'), Currency::of($currency));
+        $currency = Value::str($shift->get('currency'));
+        $openingFloat = Money::of(Value::str($shift->get('opening_float')), Currency::of($currency));
 
         $cashIn = Money::of(
-            (string) $this->conn->scalar(
+            $this->conn->scalarString(
                 'SELECT COALESCE(sum(pt.amount), 0)
                    FROM sale s
                    JOIN payment p ON p.sale_id = s.id AND p.status = \'captured\'

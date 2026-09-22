@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace NinjaEMP\Money;
 
 use InvalidArgumentException;
+use NinjaEMP\Db\Sql\Value;
 use NinjaEMP\Money\Exception\CurrencyMismatchException;
+use Stringable;
 
 /**
  * Exact monetary amount, string-backed, scale 4 (ADR-0002 / ADR-0011).
@@ -19,10 +21,13 @@ use NinjaEMP\Money\Exception\CurrencyMismatchException;
  * routed through the largest-remainder allocator (ADR-0009) by the caller; this
  * class refuses to silently round.
  */
-final class Money implements \Stringable
+final class Money implements Stringable
 {
     public const SCALE = 4;
 
+    /**
+     * @param numeric-string $amount canonical decimal string, exactly SCALE places
+     */
     private function __construct(
         private readonly string $amount,
         private readonly Currency $currency,
@@ -36,14 +41,14 @@ final class Money implements \Stringable
      */
     public static function of(string|int $amount, Currency $currency): self
     {
-        if (is_int($amount)) {
-            $amount = (string) $amount;
+        if (\is_int($amount)) {
+            $amount = Value::str($amount);
         }
 
         $amount = trim($amount);
 
         if ($amount === '' || preg_match('/^-?\d+(\.\d+)?$/', $amount) !== 1) {
-            throw new InvalidArgumentException(sprintf('Malformed money amount: "%s".', $amount));
+            throw new InvalidArgumentException(\sprintf('Malformed money amount: "%s".', $amount));
         }
 
         return new self(self::normalise($amount), $currency);
@@ -55,9 +60,9 @@ final class Money implements \Stringable
      */
     public static function fromDatabase(string|int|float $value, Currency $currency): self
     {
-        if (is_float($value)) {
+        if (\is_float($value)) {
             throw new InvalidArgumentException(
-                'Refusing to build Money from a float — money must stay exact (ADR-0002).'
+                'Refusing to build Money from a float — money must stay exact (ADR-0002).',
             );
         }
 
@@ -69,6 +74,7 @@ final class Money implements \Stringable
         return new self('0.0000', $currency);
     }
 
+    /** @return numeric-string */
     public function amount(): string
     {
         return $this->amount;
@@ -124,13 +130,13 @@ final class Money implements \Stringable
      */
     public function times(string|int $factor): self
     {
-        $factor = is_int($factor) ? (string) $factor : trim($factor);
+        $factor = \is_int($factor) ? Value::str($factor) : trim($factor);
 
         if ($factor === '' || preg_match('/^-?\d+(\.\d+)?$/', $factor) !== 1) {
-            throw new InvalidArgumentException(sprintf('Malformed multiplier: "%s".', $factor));
+            throw new InvalidArgumentException(\sprintf('Malformed multiplier: "%s".', $factor));
         }
 
-        return new self(bcmul($this->amount, $factor, self::SCALE), $this->currency);
+        return new self(bcmul($this->amount, Value::num($factor), self::SCALE), $this->currency);
     }
 
     /**
@@ -138,11 +144,13 @@ final class Money implements \Stringable
      */
     public function dividedBy(string|int $divisor): self
     {
-        $divisor = is_int($divisor) ? (string) $divisor : trim($divisor);
+        $divisor = \is_int($divisor) ? Value::str($divisor) : trim($divisor);
 
         if ($divisor === '' || preg_match('/^-?\d+(\.\d+)?$/', $divisor) !== 1) {
-            throw new InvalidArgumentException(sprintf('Malformed divisor: "%s".', $divisor));
+            throw new InvalidArgumentException(\sprintf('Malformed divisor: "%s".', $divisor));
         }
+
+        $divisor = Value::num($divisor);
 
         if (bccomp($divisor, '0', self::SCALE) === 0) {
             throw new InvalidArgumentException('Division by zero.');
@@ -180,7 +188,7 @@ final class Money implements \Stringable
      */
     public function format(int $decimals = 2): string
     {
-        return number_format((float) $this->amount, $decimals, '.', ',');
+        return number_format(Value::float($this->amount), $decimals, '.', ',');
     }
 
     /** The exact decimal string, suitable for binding back to the database. */
@@ -198,6 +206,8 @@ final class Money implements \Stringable
 
     /**
      * Canonicalise to exactly SCALE decimal places, half-up, without floats.
+     *
+     * @return numeric-string
      */
     private static function normalise(string $amount): string
     {
@@ -206,27 +216,35 @@ final class Money implements \Stringable
 
         [$whole, $fraction] = array_pad(explode('.', $unsigned, 2), 2, '');
 
-        if (strlen($fraction) > self::SCALE) {
+        if (\strlen($fraction) > self::SCALE) {
             // Round half-up at the boundary using integer string maths.
             $keep = substr($fraction, 0, self::SCALE);
             $next = $fraction[self::SCALE] ?? '0';
-            $scaled = $whole . $keep;
+            $scaled = Value::num($whole . $keep);
+
             if ($next >= '5') {
                 $scaled = bcadd($scaled, '1', 0);
             }
-            $whole = substr($scaled, 0, max(0, strlen($scaled) - self::SCALE)) ?: '0';
+
+            $wholePart = substr($scaled, 0, max(0, \strlen($scaled) - self::SCALE));
+            $whole = $wholePart === '' ? '0' : $wholePart;
             $fraction = str_pad(substr($scaled, -self::SCALE), self::SCALE, '0', STR_PAD_LEFT);
         } else {
             $fraction = str_pad($fraction, self::SCALE, '0', STR_PAD_RIGHT);
         }
 
         $whole = ltrim($whole, '0');
+
         if ($whole === '') {
             $whole = '0';
         }
 
-        $result = $whole . '.' . $fraction;
+        $result = Value::num($whole . '.' . $fraction);
 
-        return ($negative && bccomp($result, '0', self::SCALE) !== 0) ? '-' . $result : $result;
+        if ($negative && bccomp($result, '0', self::SCALE) !== 0) {
+            return Value::num('-' . $result);
+        }
+
+        return $result;
     }
 }

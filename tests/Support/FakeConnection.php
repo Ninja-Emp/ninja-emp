@@ -7,6 +7,8 @@ namespace NinjaEMP\Tests\Support;
 use NinjaEMP\Db\Connection;
 use NinjaEMP\Db\ResultSet;
 use NinjaEMP\Db\Row;
+use NinjaEMP\Db\Sql\Value;
+use RuntimeException;
 
 /**
  * An in-memory Connection test double.
@@ -60,13 +62,14 @@ final class FakeConnection implements Connection
             return new ResultSet([]);
         }
 
-        if (!is_array($result)) {
+        if (!\is_array($result)) {
             return new ResultSet([new Row(['value' => $result])]);
         }
 
         $rows = [];
+
         foreach ($result as $row) {
-            $rows[] = new Row(is_array($row) ? $row : ['value' => $row]);
+            $rows[] = new Row(\is_array($row) ? $row : ['value' => $row]);
         }
 
         return new ResultSet($rows);
@@ -77,7 +80,7 @@ final class FakeConnection implements Connection
         $set = $this->select($sql, $params);
 
         if ($set->isEmpty()) {
-            throw new \RuntimeException('selectOne() expected exactly one row, got none.');
+            throw new RuntimeException('selectOne() expected exactly one row, got none.');
         }
 
         return $set->first();
@@ -100,16 +103,27 @@ final class FakeConnection implements Connection
             return null;
         }
 
-        if (is_array($result)) {
+        if (\is_array($result)) {
             $first = $result[0] ?? null;
+
             if ($first === null) {
                 return null;
             }
 
-            return is_array($first) ? reset($first) : $first;
+            return \is_array($first) ? reset($first) : $first;
         }
 
         return $result;
+    }
+
+    public function scalarString(string $sql, array $params = []): string
+    {
+        return Value::str($this->scalar($sql, $params));
+    }
+
+    public function scalarInt(string $sql, array $params = []): int
+    {
+        return Value::int($this->scalar($sql, $params));
     }
 
     public function transactional(callable $work): mixed

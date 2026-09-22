@@ -1,7 +1,8 @@
 <?php
 /**
  * Settings.
- * @var \NinjaEmp\TenantUi\Support\View $this
+ *
+ * @var View $this
  */
 use NinjaEmp\TenantUi\Support\View;
 

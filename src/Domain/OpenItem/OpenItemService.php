@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Domain\OpenItem;
 
+use NinjaEMP\Db\Sql\Value;
+
 use InvalidArgumentException;
 use NinjaEMP\Db\Connection;
 use NinjaEMP\Money\Currency;
@@ -58,7 +60,7 @@ final class OpenItemService
             throw new InvalidArgumentException('An open item of zero has nothing to settle.');
         }
 
-        return $this->conn->transactional(fn (): string => (string) $this->conn->scalar(
+        return $this->conn->transactional(fn (): string => $this->conn->scalarString(
             'SELECT open_item_create(:subledger, :party, :source, :ref, :doc, :amount, :currency, :issue, :due, :entry)',
             [
                 'subledger' => $subledgerType,
@@ -91,7 +93,7 @@ final class OpenItemService
     ): string {
         $entryDate ??= date('Y-m-d');
 
-        return $this->conn->transactional(fn (): string => (string) $this->conn->scalar(
+        return $this->conn->transactional(fn (): string => $this->conn->scalarString(
             'SELECT apply_payment(:party, :subledger, :amount, :date, :key)',
             [
                 'party' => $partyId,
@@ -117,7 +119,7 @@ final class OpenItemService
     ): string {
         $entryDate ??= date('Y-m-d');
 
-        return $this->conn->transactional(fn (): string => (string) $this->conn->scalar(
+        return $this->conn->transactional(fn (): string => $this->conn->scalarString(
             'SELECT write_off_open_item(:item, :date, :amount, :memo, :key)',
             [
                 'item' => $openItemId,
@@ -174,11 +176,11 @@ final class OpenItemService
         );
 
         return [
-            'current' => (string) $row->get('current'),
-            '1_30' => (string) $row->get('d1_30'),
-            '31_60' => (string) $row->get('d31_60'),
-            '61_90' => (string) $row->get('d61_90'),
-            '90_plus' => (string) $row->get('d90_plus'),
+            'current' => Value::str($row->get('current')),
+            '1_30' => Value::str($row->get('d1_30')),
+            '31_60' => Value::str($row->get('d31_60')),
+            '61_90' => Value::str($row->get('d61_90')),
+            '90_plus' => Value::str($row->get('d90_plus')),
         ];
     }
 

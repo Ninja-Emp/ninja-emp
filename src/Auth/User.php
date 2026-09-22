@@ -24,10 +24,15 @@ final class User
 
     public function initials(): string
     {
-        $parts = preg_split('/\s+/', trim($this->name)) ?: [];
+        $parts = preg_split('/\s+/', trim($this->name));
+
+        if ($parts === false) {
+            $parts = [];
+        }
+
         $initials = '';
 
-        foreach (array_slice($parts, 0, 2) as $part) {
+        foreach (\array_slice($parts, 0, 2) as $part) {
             if ($part !== '') {
                 $initials .= strtoupper($part[0]);
             }

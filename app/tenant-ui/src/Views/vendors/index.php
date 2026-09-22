@@ -1,10 +1,11 @@
 <?php
 /**
  * Vendors list.
- * @var \NinjaEmp\TenantUi\Support\View $this
+ *
+ * @var View $this
  */
-use NinjaEmp\TenantUi\Support\View;
 use NinjaEmp\TenantUi\Support\Money;
+use NinjaEmp\TenantUi\Support\View;
 
 $cur = $tenant['currency'];
 ?>

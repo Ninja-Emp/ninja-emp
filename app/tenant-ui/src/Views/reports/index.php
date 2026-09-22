@@ -1,14 +1,20 @@
 <?php
 /**
  * Reports.
- * @var \NinjaEmp\TenantUi\Support\View $this
+ *
+ * @var View $this
  */
-use NinjaEmp\TenantUi\Support\View;
 use NinjaEmp\TenantUi\Support\Money;
+use NinjaEmp\TenantUi\Support\View;
 
 $cur = $tenant['currency'];
 $maxTrend = '0.0000';
-foreach ($trend as $d) { if (bccomp($d['amount'], $maxTrend, 4) > 0) { $maxTrend = $d['amount']; } }
+
+foreach ($trend as $d) {
+    if (bccomp($d['amount'], $maxTrend, 4) > 0) {
+        $maxTrend = $d['amount'];
+    }
+}
 $tenderTotal = array_sum($tenderMix) ?: 1;
 ?>
 <div class="page-head">
@@ -53,7 +59,7 @@ $tenderTotal = array_sum($tenderMix) ?: 1;
           <?php
             $h = bccomp($maxTrend, '0', 4) > 0 ? (int) round((float) bcdiv(bcmul($d['amount'], '100', 4), $maxTrend, 2)) : 0;
             $isLast = $i === count($trend) - 1;
-          ?>
+            ?>
           <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; height:100%; justify-content:flex-end"
                title="<?= View::e($d['day']) ?>: <?= View::e(Money::format($d['amount'], $cur)) ?>">
             <div style="width:100%; height:<?= max(4, $h) ?>%; border-radius:6px 6px 0 0;

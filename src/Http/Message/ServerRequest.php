@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Http\Message;
 
+use NinjaEMP\Db\Sql\Value;
+
 use Psr\Http\Message\ServerRequestInterface;
-use Psr\Http\Message\UploadedFileInterface;
 use Psr\Http\Message\UriInterface;
 
 /**
@@ -42,13 +43,14 @@ final class ServerRequest implements ServerRequestInterface
 
     /**
      * @param array<string, mixed> $serverParams
+     * @param array<string, string|list<string>> $headers
      */
     public function __construct(
         string $method,
         UriInterface $uri,
         array $serverParams = [],
         ?string $body = null,
-        array $headers = []
+        array $headers = [],
     ) {
         $this->method = strtoupper($method);
         $this->uri = $uri;
@@ -56,8 +58,8 @@ final class ServerRequest implements ServerRequestInterface
         $this->body = Stream::fromString($body ?? '');
 
         foreach ($headers as $name => $value) {
-            $this->headers[strtolower((string) $name)] = $this->normalizeValue($value);
-            $this->headerNames[strtolower((string) $name)] = (string) $name;
+            $this->headers[strtolower(Value::str($name))] = $this->normalizeValue($value);
+            $this->headerNames[strtolower(Value::str($name))] = Value::str($name);
         }
     }
 
@@ -73,25 +75,26 @@ final class ServerRequest implements ServerRequestInterface
         ?array $server = null,
         ?array $query = null,
         ?array $body = null,
-        ?array $cookies = null
+        ?array $cookies = null,
     ): self {
-        $server ??= $_SERVER;
-        $query ??= $_GET;
-        $body ??= $_POST;
-        $cookies ??= $_COOKIE;
+        $server = self::asStringKeyed($server ?? $_SERVER);
+        $query = self::asStringKeyed($query ?? $_GET);
+        $body = self::asStringKeyed($body ?? $_POST);
+        $cookies = self::asStringKeyed($cookies ?? $_COOKIE);
 
-        $method = (string) ($server['REQUEST_METHOD'] ?? 'GET');
+        $method = Value::str($server['REQUEST_METHOD'] ?? 'GET');
         $uri = self::uriFromServer($server);
-        $rawBody = (string) file_get_contents('php://input');
+        $rawBody = Value::str(file_get_contents('php://input'));
 
         $request = new self($method, $uri, $server, $rawBody, self::headersFromServer($server));
-        $request->cookieParams = array_map('strval', $cookies);
+        $request->cookieParams = array_map(static fn (mixed $v): string => Value::str($v), $cookies);
         $request->queryParams = $query;
 
         $contentType = $request->getHeaderLine('Content-Type');
+
         if (str_contains($contentType, 'application/json')) {
             $decoded = json_decode($rawBody, true);
-            $request->parsedBody = is_array($decoded) ? $decoded : null;
+            $request->parsedBody = \is_array($decoded) ? self::asStringKeyed($decoded) : null;
         } else {
             $request->parsedBody = $body;
         }
@@ -100,14 +103,33 @@ final class ServerRequest implements ServerRequestInterface
     }
 
     /**
+     * Normalise an arbitrary array to string-keyed form (superglobals and
+     * json_decode both yield array<mixed>).
+     *
+     * @param array<mixed> $input
+     *
+     * @return array<string, mixed>
+     */
+    private static function asStringKeyed(array $input): array
+    {
+        $out = [];
+
+        foreach ($input as $key => $value) {
+            $out[Value::str($key)] = $value;
+        }
+
+        return $out;
+    }
+
+    /**
      * @param array<string, mixed> $server
      */
     private static function uriFromServer(array $server): Uri
     {
-        $https = (string) ($server['HTTPS'] ?? '');
+        $https = Value::str($server['HTTPS'] ?? '');
         $scheme = ($https !== '' && $https !== 'off') ? 'https' : 'http';
-        $host = (string) ($server['HTTP_HOST'] ?? $server['SERVER_NAME'] ?? 'localhost');
-        $requestUri = (string) ($server['REQUEST_URI'] ?? '/');
+        $host = Value::str($server['HTTP_HOST'] ?? $server['SERVER_NAME'] ?? 'localhost');
+        $requestUri = Value::str($server['REQUEST_URI'] ?? '/');
 
         return new Uri($scheme . '://' . $host . $requestUri);
     }
@@ -120,18 +142,21 @@ final class ServerRequest implements ServerRequestInterface
     private static function headersFromServer(array $server): array
     {
         $headers = [];
+
         foreach ($server as $key => $value) {
-            if (!is_string($key) || !str_starts_with($key, 'HTTP_')) {
+            if (!\is_string($key) || !str_starts_with($key, 'HTTP_')) {
                 continue;
             }
             $name = str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($key, 5)))));
-            $headers[$name] = (string) $value;
+            $headers[$name] = Value::str($value);
         }
+
         if (isset($server['CONTENT_TYPE'])) {
-            $headers['Content-Type'] = (string) $server['CONTENT_TYPE'];
+            $headers['Content-Type'] = Value::str($server['CONTENT_TYPE']);
         }
+
         if (isset($server['CONTENT_LENGTH'])) {
-            $headers['Content-Length'] = (string) $server['CONTENT_LENGTH'];
+            $headers['Content-Length'] = Value::str($server['CONTENT_LENGTH']);
         }
 
         return $headers;
@@ -144,9 +169,11 @@ final class ServerRequest implements ServerRequestInterface
         }
 
         $target = $this->uri->getPath();
+
         if ($target === '') {
             $target = '/';
         }
+
         if ($this->uri->getQuery() !== '') {
             $target .= '?' . $this->uri->getQuery();
         }
@@ -205,10 +232,14 @@ final class ServerRequest implements ServerRequestInterface
         return $this->cookieParams;
     }
 
+    /** @param array<mixed> $cookies */
     public function withCookieParams(array $cookies): static
     {
         $clone = clone $this;
-        $clone->cookieParams = array_map('strval', $cookies);
+        $clone->cookieParams = array_map(
+            static fn (mixed $v): string => Value::str($v),
+            self::asStringKeyed($cookies),
+        );
 
         return $clone;
     }
@@ -219,10 +250,11 @@ final class ServerRequest implements ServerRequestInterface
         return $this->queryParams;
     }
 
+    /** @param array<mixed> $query */
     public function withQueryParams(array $query): static
     {
         $clone = clone $this;
-        $clone->queryParams = $query;
+        $clone->queryParams = self::asStringKeyed($query);
 
         return $clone;
     }
@@ -233,10 +265,11 @@ final class ServerRequest implements ServerRequestInterface
         return $this->uploadedFiles;
     }
 
+    /** @param array<mixed> $uploadedFiles */
     public function withUploadedFiles(array $uploadedFiles): static
     {
         $clone = clone $this;
-        $clone->uploadedFiles = $uploadedFiles;
+        $clone->uploadedFiles = self::asStringKeyed($uploadedFiles);
 
         return $clone;
     }
@@ -247,10 +280,18 @@ final class ServerRequest implements ServerRequestInterface
         return $this->parsedBody;
     }
 
+    /** @param mixed $data */
     public function withParsedBody($data): static
     {
         $clone = clone $this;
-        $clone->parsedBody = $data;
+
+        if (\is_array($data)) {
+            $clone->parsedBody = self::asStringKeyed($data);
+        } elseif (\is_object($data)) {
+            $clone->parsedBody = $data;
+        } else {
+            $clone->parsedBody = null;
+        }
 
         return $clone;
     }
@@ -261,11 +302,17 @@ final class ServerRequest implements ServerRequestInterface
         return $this->attributes;
     }
 
+    /**
+     * @param mixed $default
+     *
+     * @return mixed
+     */
     public function getAttribute(string $name, $default = null)
     {
         return $this->attributes[$name] ?? $default;
     }
 
+    /** @param mixed $value */
     public function withAttribute(string $name, $value): static
     {
         $clone = clone $this;

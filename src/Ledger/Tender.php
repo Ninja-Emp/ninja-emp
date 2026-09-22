@@ -46,7 +46,7 @@ final class Tender
         public readonly ?string $partyId = null,
     ) {
         if (!isset(self::MAP[$this->code])) {
-            throw new InvalidArgumentException(sprintf('Unknown tender type: "%s".', $this->code));
+            throw new InvalidArgumentException(\sprintf('Unknown tender type: "%s".', $this->code));
         }
     }
 
@@ -74,7 +74,7 @@ final class Tender
         $subledger = $this->subledgerTypeCode();
 
         if ($subledger !== null && $this->partyId === null) {
-            throw new InvalidArgumentException(sprintf('Tender "%s" requires a party id (subledger-tagged).', $this->code));
+            throw new InvalidArgumentException(\sprintf('Tender "%s" requires a party id (subledger-tagged).', $this->code));
         }
 
         return JournalLine::debit($this->debitRole(), $this->amount, $this->partyId, $subledger);

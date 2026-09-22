@@ -7,9 +7,11 @@ namespace NinjaEMP\Db;
 use NinjaEMP\Db\Exception\TransactionRequiredException;
 use NinjaEMP\Db\Sql\Identifier;
 use NinjaEMP\Db\Sql\PlaceholderRewriter;
+use NinjaEMP\Db\Sql\Value;
 use NinjaEMP\Db\Type\TypeMapper;
 use PDO;
 use PDOException;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -52,7 +54,7 @@ final class PdoConnection implements Connection
         $rows = $this->run($sql, $params);
 
         if ($rows === []) {
-            throw new \RuntimeException('selectOne() expected exactly one row, got none.');
+            throw new RuntimeException('selectOne() expected exactly one row, got none.');
         }
 
         return new Row($this->typeMapper->map($rows[0]));
@@ -87,6 +89,23 @@ final class PdoConnection implements Connection
         return $first === [] ? null : reset($first);
     }
 
+    public function scalarString(string $sql, array $params = []): string
+    {
+        return Value::str($this->scalar($sql, $params));
+    }
+
+    public function scalarInt(string $sql, array $params = []): int
+    {
+        return Value::int($this->scalar($sql, $params));
+    }
+
+    /**
+     * @template T
+     *
+     * @param callable(Connection): T $work
+     *
+     * @return T
+     */
     public function transactional(callable $work): mixed
     {
         // Nested calls join the outer transaction (savepoints off by default).
@@ -109,16 +128,19 @@ final class PdoConnection implements Connection
             return $result;
         } catch (Throwable $e) {
             $this->rollback();
+
             throw $e;
         }
     }
 
     public function lastInsertId(): string
     {
-        return $this->pdo->lastInsertId();
+        return Value::str($this->pdo->lastInsertId());
     }
 
     /**
+     * @param array<string, mixed> $params
+     *
      * @return list<array<string, mixed>>
      */
     private function run(string $sql, array $params): array
@@ -169,7 +191,7 @@ final class PdoConnection implements Connection
     {
         $schema = Identifier::of($this->context->schema())->quoted();
 
-        $this->pdo->exec(sprintf('SET LOCAL search_path = %s, kernel', $schema));
+        $this->pdo->exec(\sprintf('SET LOCAL search_path = %s, kernel', $schema));
 
         $this->setLocal('app.tenant_id', $this->context->tenantId());
 
@@ -180,7 +202,7 @@ final class PdoConnection implements Connection
 
     private function setLocal(string $setting, string $value): void
     {
-        $statement = $this->pdo->prepare(sprintf('SELECT set_config(%s, :value, true)', $this->quoteLiteral($setting)));
+        $statement = $this->pdo->prepare(\sprintf('SELECT set_config(%s, :value, true)', $this->quoteLiteral($setting)));
         $statement->execute(['value' => $value]);
     }
 
@@ -193,7 +215,7 @@ final class PdoConnection implements Connection
     {
         if ($this->transactionDepth === 0) {
             throw new TransactionRequiredException(
-                'Tenant-scoped work must run inside transactional(); SET LOCAL requires a transaction.'
+                'Tenant-scoped work must run inside transactional(); SET LOCAL requires a transaction.',
             );
         }
     }

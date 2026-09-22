@@ -1,9 +1,11 @@
 <?php
+
 declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Http\Controllers;
 
 use NinjaEmp\TenantUi\Http\Controller;
+use NinjaEMP\Db\Sql\Value;
 
 /**
  * Inventory — items, stock levels, weighted-average cost, adjustments.
@@ -13,6 +15,9 @@ use NinjaEmp\TenantUi\Http\Controller;
  */
 final class InventoryController extends Controller
 {
+    /**
+     * @param array<string,mixed> $params
+     */
     public function index(array $params = []): void
     {
         $this->require('inventory.manage');
@@ -38,13 +43,18 @@ final class InventoryController extends Controller
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function show(array $params): void
     {
         $this->require('inventory.manage');
         $item = $this->repo->item($params['id'] ?? '');
+
         if ($item === null) {
             http_response_code(404);
             $this->render('errors/404', ['title' => 'Not found']);
+
             return;
         }
         $vendor = $item['vendor_id'] ? $this->repo->vendor($item['vendor_id']) : null;
@@ -55,6 +65,9 @@ final class InventoryController extends Controller
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function create(array $params = []): void
     {
         $this->require('inventory.manage');
@@ -65,13 +78,18 @@ final class InventoryController extends Controller
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function edit(array $params): void
     {
         $this->require('inventory.manage');
         $item = $this->repo->item($params['id'] ?? '');
+
         if ($item === null) {
             http_response_code(404);
             $this->render('errors/404', ['title' => 'Not found']);
+
             return;
         }
         $this->render('inventory/form', [
@@ -81,6 +99,9 @@ final class InventoryController extends Controller
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function store(array $params = []): void
     {
         $this->require('inventory.manage');
@@ -89,6 +110,9 @@ final class InventoryController extends Controller
         $this->redirect('/inventory/' . $id);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function update(array $params): void
     {
         $this->require('inventory.manage');
@@ -103,6 +127,7 @@ final class InventoryController extends Controller
     {
         $owner = $this->input('owner', 'vendor') === 'store' ? 'store' : 'vendor';
         $vendorId = $this->input('vendor_id');
+
         return [
             'name'      => $this->input('name'),
             'sku'       => $this->input('sku'),
@@ -121,16 +146,19 @@ final class InventoryController extends Controller
     private function money(string $key): string
     {
         $raw = preg_replace('/[^0-9.\-]/', '', $this->input($key, '0'));
-        return $raw === '' ? '0.0000' : bcadd($raw, '0', 4);
+
+        return $raw === '' ? '0.0000' : bcadd(Value::num($raw), '0', 4);
     }
 
     /** @return array<string,string> */
     private function vendorNames(): array
     {
         $names = [];
+
         foreach ($this->repo->vendors() as $v) {
             $names[$v['id']] = $v['name'];
         }
+
         return $names;
     }
 }

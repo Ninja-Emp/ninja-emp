@@ -28,13 +28,14 @@ final class ControllerResolver
     {
         if ($this->container !== null && $this->container->has($controller)) {
             $instance = $this->container->get($controller);
-            if (is_object($instance)) {
+
+            if (\is_object($instance)) {
                 return $instance;
             }
         }
 
         if (!class_exists($controller)) {
-            throw new NotFoundException(sprintf('Controller "%s" not found.', $controller));
+            throw new NotFoundException(\sprintf('Controller "%s" not found.', $controller));
         }
 
         return new $controller();

@@ -1,9 +1,11 @@
 <?php
+
 declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Http\Controllers;
 
 use NinjaEmp\TenantUi\Http\Controller;
+use NinjaEMP\Db\Sql\Value;
 
 /**
  * Point of Sale — the priority surface.
@@ -26,12 +28,16 @@ final class PosController extends Controller
         ['id' => 'vendor_draw',      'label' => 'Vendor Payable Draw',  'icon' => 'i-vendor'],
     ];
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function index(array $params = []): void
     {
         $this->require('pos.use');
 
         $registers = $this->repo->registers();
         $openRegister = null;
+
         foreach ($registers as $r) {
             if ($r['status'] === 'open') {
                 $openRegister = $r;
@@ -44,7 +50,7 @@ final class PosController extends Controller
             'vendors'      => $this->repo->vendors(),
             'storeItems'   => array_values(array_filter(
                 $this->repo->items(),
-                static fn (array $i): bool => ($i['owner'] ?? 'vendor') === 'store'
+                static fn (array $i): bool => ($i['owner'] ?? 'vendor') === 'store',
             )),
             'tenders'      => self::TENDERS,
             'taxRates'     => $this->repo->taxRates(),
@@ -55,6 +61,9 @@ final class PosController extends Controller
     }
 
     /** Barcode/SKU lookup endpoint (JSON). */
+    /**
+     * @param array<string,mixed> $params
+     */
     public function scan(array $params = []): void
     {
         $this->require('pos.use');
@@ -66,6 +75,7 @@ final class PosController extends Controller
         if ($item === null) {
             http_response_code(404);
             echo json_encode(['ok' => false, 'error' => 'No item matches that code.']);
+
             return;
         }
         echo json_encode(['ok' => true, 'item' => $item]);
@@ -75,6 +85,10 @@ final class PosController extends Controller
      * Instant inventory: create an item at the register and return it so it can
      * be added to the cart. Vendor-owned by default (consignment); the store can
      * also quick-add its own goods with owner=store.
+     * @param array<string,mixed> $params
+     */
+    /**
+     * @param array<string,mixed> $params
      */
     public function quickAdd(array $params = []): void
     {
@@ -82,9 +96,11 @@ final class PosController extends Controller
         header('Content-Type: application/json');
 
         $name = $this->input('name');
+
         if ($name === '') {
             http_response_code(422);
             echo json_encode(['ok' => false, 'error' => 'A name is required.']);
+
             return;
         }
 
@@ -110,15 +126,20 @@ final class PosController extends Controller
     }
 
     /** Store buys goods from a vendor (creates a store-owned item + payable). */
+    /**
+     * @param array<string,mixed> $params
+     */
     public function buyFromVendor(array $params = []): void
     {
         $this->require('pos.use');
         header('Content-Type: application/json');
 
         $vendorId = $this->input('vendor_id');
+
         if ($vendorId === '' || $this->repo->vendor($vendorId) === null) {
             http_response_code(422);
             echo json_encode(['ok' => false, 'error' => 'Choose a vendor.']);
+
             return;
         }
         $id = $this->repo->purchaseFromVendor($vendorId, [
@@ -134,6 +155,9 @@ final class PosController extends Controller
     }
 
     /** Checkout endpoint (mock posting). */
+    /**
+     * @param array<string,mixed> $params
+     */
     public function checkout(array $params = []): void
     {
         $this->require('pos.use');
@@ -148,6 +172,7 @@ final class PosController extends Controller
     private function money(string $key): string
     {
         $raw = preg_replace('/[^0-9.\-]/', '', $this->input($key, '0'));
-        return $raw === '' ? '0.0000' : bcadd($raw, '0', 4);
+
+        return $raw === '' ? '0.0000' : bcadd(Value::num($raw), '0', 4);
     }
 }

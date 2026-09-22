@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Domain\VendorMall;
 
+use NinjaEMP\Db\Sql\Value;
+
 use InvalidArgumentException;
 use NinjaEMP\Db\Connection;
+use RuntimeException;
 
 /**
  * The vendor-mall domain service.
@@ -60,10 +63,10 @@ final class VendorMallService
             )->first();
 
             if ($row === null) {
-                throw new \RuntimeException('Failed to create the lease.');
+                throw new RuntimeException('Failed to create the lease.');
             }
 
-            return (string) $row->get('id');
+            return Value::str($row->get('id'));
         });
     }
 
@@ -107,9 +110,10 @@ final class VendorMallService
         ?string $effectiveFrom = null,
         ?string $effectiveThru = null,
     ): string {
-        if (!in_array($billingFrequency, ['monthly', 'quarterly', 'annual'], true)) {
-            throw new InvalidArgumentException(sprintf('Unknown billing frequency: "%s".', $billingFrequency));
+        if (!\in_array($billingFrequency, ['monthly', 'quarterly', 'annual'], true)) {
+            throw new InvalidArgumentException(\sprintf('Unknown billing frequency: "%s".', $billingFrequency));
         }
+
         if ($componentTypeCode === 'percentage_rent' && $percentRate === null) {
             throw new InvalidArgumentException('Percentage rent requires a percent rate.');
         }
@@ -137,10 +141,10 @@ final class VendorMallService
             )->first();
 
             if ($row === null) {
-                throw new \RuntimeException('Failed to add the rent component.');
+                throw new RuntimeException('Failed to add the rent component.');
             }
 
-            return (string) $row->get('id');
+            return Value::str($row->get('id'));
         });
     }
 
@@ -161,7 +165,7 @@ final class VendorMallService
         $key = $idempotencyKey ?? 'rent:' . $leaseId . ':' . $periodStart . ':' . $periodEnd;
 
         return $this->conn->transactional(function (Connection $c) use ($leaseId, $periodStart, $periodEnd, $entryDate, $key): string {
-            $entryId = $c->scalar('SELECT post_rent_invoice(:lease, :start, :end, :date, :key)', [
+            $entryId = $c->scalarString('SELECT post_rent_invoice(:lease, :start, :end, :date, :key)', [
                 'lease' => $leaseId,
                 'start' => $periodStart,
                 'end' => $periodEnd,
@@ -169,7 +173,7 @@ final class VendorMallService
                 'key' => $key,
             ]);
 
-            return (string) $entryId;
+            return Value::str($entryId);
         });
     }
 
@@ -197,19 +201,19 @@ final class VendorMallService
             )->first();
 
             if ($row === null) {
-                throw new \RuntimeException('Failed to create the lease deposit.');
+                throw new RuntimeException('Failed to create the lease deposit.');
             }
 
-            $depositId = (string) $row->get('id');
+            $depositId = Value::str($row->get('id'));
             $key = $idempotencyKey ?? 'deposit:' . $depositId;
 
-            $entryId = $c->scalar('SELECT post_deposit_receipt(:deposit, :date, :key)', [
+            $entryId = $c->scalarString('SELECT post_deposit_receipt(:deposit, :date, :key)', [
                 'deposit' => $depositId,
                 'date' => $entryDate,
                 'key' => $key,
             ]);
 
-            return (string) $entryId;
+            return Value::str($entryId);
         });
     }
 }

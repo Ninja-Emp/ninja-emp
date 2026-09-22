@@ -15,7 +15,7 @@ final class CurrencyMismatchException extends RuntimeException
 {
     public function __construct(Currency $left, Currency $right)
     {
-        parent::__construct(sprintf(
+        parent::__construct(\sprintf(
             'Cannot combine amounts in different currencies: %s vs %s.',
             $left->code(),
             $right->code(),

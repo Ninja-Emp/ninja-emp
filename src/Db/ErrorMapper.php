@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Db;
 
+use NinjaEMP\Db\Sql\Value;
+
 use NinjaEMP\Db\Exception\AppendOnlyViolationException;
 use NinjaEMP\Db\Exception\ConflictException;
 use NinjaEMP\Db\Exception\ConstraintViolationException;
@@ -21,7 +23,7 @@ final class ErrorMapper
 {
     public function map(PDOException $e): DatabaseException
     {
-        $state = $e->getCode() !== '' ? (string) $e->getCode() : null;
+        $state = $e->getCode() !== '' ? Value::str($e->getCode()) : null;
         $message = $e->getMessage();
 
         return match ($state) {

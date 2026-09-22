@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Db;
 
+use ArrayIterator;
 use Countable;
 use IteratorAggregate;
-use ArrayIterator;
 use Traversable;
 
 /**
@@ -46,7 +46,7 @@ final class ResultSet implements Countable, IteratorAggregate
 
     public function count(): int
     {
-        return count($this->rows);
+        return \count($this->rows);
     }
 
     public function getIterator(): Traversable

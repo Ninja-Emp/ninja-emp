@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Http;
 
+use NinjaEMP\Db\Sql\Value;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -25,11 +26,11 @@ final class Emitter
     private function emitStatusLine(ResponseInterface $response): void
     {
         $reason = $response->getReasonPhrase();
-        $line = sprintf(
+        $line = \sprintf(
             '%s %d%s',
-            $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.1',
+            Value::str($_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.1'),
             $response->getStatusCode(),
-            $reason !== '' ? ' ' . $reason : ''
+            $reason !== '' ? ' ' . $reason : '',
         );
         header($line, true, $response->getStatusCode());
     }
@@ -38,8 +39,9 @@ final class Emitter
     {
         foreach ($response->getHeaders() as $name => $values) {
             $first = true;
+
             foreach ($values as $value) {
-                header(sprintf('%s: %s', $name, $value), $first);
+                header(\sprintf('%s: %s', $name, $value), $first);
                 $first = false;
             }
         }
@@ -48,6 +50,7 @@ final class Emitter
     private function emitBody(ResponseInterface $response): void
     {
         $body = $response->getBody();
+
         if ($body->isSeekable()) {
             $body->rewind();
         }

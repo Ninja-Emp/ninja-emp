@@ -2,12 +2,13 @@
 /**
  * Sidebar navigation. Role-aware (items filtered by permission).
  *
- * @var \NinjaEmp\TenantUi\Support\View $this
+ * @var View $this
  * @var array $navGroups
  * @var string $currentPath
  * @var array $tenant
  */
 use NinjaEmp\TenantUi\Support\View;
+
 ?>
 <aside class="sidebar" id="sidebar" aria-label="Primary">
   <div class="sidebar-brand">
@@ -26,7 +27,7 @@ use NinjaEmp\TenantUi\Support\View;
           $isActive = $item['path'] === '/'
               ? $currentPath === '/'
               : str_starts_with($currentPath, $item['path']);
-        ?>
+          ?>
         <a class="nav-item"
            href="<?= View::e($item['path']) ?>"
            <?= $isActive ? 'aria-current="page"' : '' ?>

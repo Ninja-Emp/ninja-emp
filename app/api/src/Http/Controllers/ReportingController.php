@@ -23,6 +23,9 @@ final class ReportingController
     {
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     #[Route('GET', '/api/reports/income-statement', name: 'reports.income_statement', permission: 'reports.view')]
     #[ApiSchema(
         summary: 'Income statement (accrual)',
@@ -42,6 +45,9 @@ final class ReportingController
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     #[Route('GET', '/api/reports/cash-basis', name: 'reports.cash_basis', permission: 'reports.view')]
     #[ApiSchema(
         summary: 'Income statement (cash basis)',
@@ -61,6 +67,9 @@ final class ReportingController
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     #[Route('GET', '/api/reports/balance-sheet', name: 'reports.balance_sheet', permission: 'reports.view')]
     #[ApiSchema(
         summary: 'Balance sheet',
@@ -79,6 +88,9 @@ final class ReportingController
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     #[Route('GET', '/api/reports/sales', name: 'reports.sales', permission: 'reports.view')]
     #[ApiSchema(
         summary: 'Sales summary',
@@ -99,6 +111,9 @@ final class ReportingController
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     #[Route('GET', '/api/reports/inventory-valuation', name: 'reports.inventory_valuation', permission: 'reports.view')]
     #[ApiSchema(
         summary: 'Inventory valuation',
@@ -113,6 +128,9 @@ final class ReportingController
         return JsonResponse::of(['data' => $this->reports->inventoryValuation($currency)]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     #[Route('GET', '/api/reports/tax', name: 'reports.tax', permission: 'reports.view')]
     #[ApiSchema(
         summary: 'Tax collected',
@@ -147,6 +165,6 @@ final class ReportingController
         $params = $request->getQueryParams();
         $value = $params[$key] ?? null;
 
-        return is_string($value) && $value !== '' ? $value : null;
+        return \is_string($value) && $value !== '' ? $value : null;
     }
 }

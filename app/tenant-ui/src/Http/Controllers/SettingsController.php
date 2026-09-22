@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Http\Controllers;
@@ -12,6 +13,9 @@ use NinjaEmp\TenantUi\Support\Theme;
  */
 final class SettingsController extends Controller
 {
+    /**
+     * @param array<string,mixed> $params
+     */
     public function index(array $params = []): void
     {
         $this->require('settings.manage');
@@ -25,6 +29,9 @@ final class SettingsController extends Controller
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function update(array $params = []): void
     {
         $this->require('settings.manage');
@@ -32,9 +39,11 @@ final class SettingsController extends Controller
         // Appearance.
         $theme = $this->input('theme');
         $mode = $this->input('mode');
+
         if (Theme::isValidTheme($theme)) {
             $_SESSION['theme'] = $theme;
         }
+
         if (Theme::isValidMode($mode)) {
             $_SESSION['mode'] = $mode;
         }
@@ -52,6 +61,7 @@ final class SettingsController extends Controller
 
     /**
      * Build the role → permission matrix for display.
+     *
      * @return array{permissions:list<string>,roles:array<string,array<string,bool>>}
      */
     private function permissionMatrix(): array
@@ -61,13 +71,16 @@ final class SettingsController extends Controller
             'inventory.manage', 'reports.view', 'settings.manage', 'accounting.view',
         ];
         $matrix = [];
+
         foreach (array_keys(Auth::roles()) as $role) {
             $probe = new Auth();
             $probe->loginAs($role);
+
             foreach ($permissions as $perm) {
                 $matrix[$role][$perm] = $probe->can($perm);
             }
         }
+
         return ['permissions' => $permissions, 'roles' => $matrix];
     }
 }

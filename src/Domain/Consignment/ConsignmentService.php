@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Domain\Consignment;
 
+use NinjaEMP\Db\Sql\Value;
+
 use InvalidArgumentException;
 use NinjaEMP\Db\Connection;
 use NinjaEMP\Money\Currency;
 use NinjaEMP\Money\Money;
+use RuntimeException;
 
 /**
  * The consignment domain service.
@@ -42,11 +45,12 @@ final class ConsignmentService
         ?string $startDate = null,
         ?string $notes = null,
     ): string {
-        if (bccomp($defaultCommissionRate, '0', 6) < 0 || bccomp($defaultCommissionRate, '1', 6) > 0) {
+        if (bccomp(Value::num($defaultCommissionRate), '0', 6) < 0 || bccomp(Value::num($defaultCommissionRate), '1', 6) > 0) {
             throw new InvalidArgumentException('Commission rate must be between 0 and 1.');
         }
-        if (!in_array($settlementFrequency, ['on_demand', 'weekly', 'biweekly', 'monthly'], true)) {
-            throw new InvalidArgumentException(sprintf('Unknown settlement frequency: "%s".', $settlementFrequency));
+
+        if (!\in_array($settlementFrequency, ['on_demand', 'weekly', 'biweekly', 'monthly'], true)) {
+            throw new InvalidArgumentException(\sprintf('Unknown settlement frequency: "%s".', $settlementFrequency));
         }
 
         return $this->conn->transactional(function (Connection $c) use ($consignorPartyId, $defaultCommissionRate, $settlementFrequency, $startDate, $notes): string {
@@ -65,10 +69,10 @@ final class ConsignmentService
             )->first();
 
             if ($row === null) {
-                throw new \RuntimeException('Failed to create the consignor agreement.');
+                throw new RuntimeException('Failed to create the consignor agreement.');
             }
 
-            return (string) $row->get('id');
+            return Value::str($row->get('id'));
         });
     }
 
@@ -111,10 +115,10 @@ final class ConsignmentService
             )->first();
 
             if ($row === null) {
-                throw new \RuntimeException('Failed to receive the consigned item.');
+                throw new RuntimeException('Failed to receive the consigned item.');
             }
 
-            return (string) $row->get('id');
+            return Value::str($row->get('id'));
         });
     }
 
@@ -125,8 +129,9 @@ final class ConsignmentService
     {
         $this->conn->transactional(function (Connection $c) use ($itemId, $newPrice, $reason): void {
             $current = $c->select('SELECT agreed_price FROM consignment_item WHERE id = :id', ['id' => $itemId])->first();
+
             if ($current === null) {
-                throw new InvalidArgumentException(sprintf('No consignment item %s.', $itemId));
+                throw new InvalidArgumentException(\sprintf('No consignment item %s.', $itemId));
             }
 
             $c->execute(
@@ -134,7 +139,7 @@ final class ConsignmentService
                  VALUES (:item, :old, :new, :reason)',
                 [
                     'item' => $itemId,
-                    'old' => (string) $current->get('agreed_price'),
+                    'old' => Value::str($current->get('agreed_price')),
                     'new' => $newPrice,
                     'reason' => $reason,
                 ],
@@ -167,8 +172,9 @@ final class ConsignmentService
         if ($lines === []) {
             throw new InvalidArgumentException('A consignment sale needs at least one line.');
         }
-        if (!in_array($channel, ['store', 'online', 'event', 'other'], true)) {
-            throw new InvalidArgumentException(sprintf('Unknown consignment channel: "%s".', $channel));
+
+        if (!\in_array($channel, ['store', 'online', 'event', 'other'], true)) {
+            throw new InvalidArgumentException(\sprintf('Unknown consignment channel: "%s".', $channel));
         }
 
         $saleDate ??= date('Y-m-d');
@@ -186,11 +192,11 @@ final class ConsignmentService
             )->first();
 
             if ($saleRow === null) {
-                throw new \RuntimeException('Failed to insert the consignment sale.');
+                throw new RuntimeException('Failed to insert the consignment sale.');
             }
 
-            $saleId = (string) $saleRow->get('id');
-            $saleNo = (string) $saleRow->get('sale_no');
+            $saleId = Value::str($saleRow->get('id'));
+            $saleNo = Value::str($saleRow->get('sale_no'));
 
             foreach ($lines as $line) {
                 $price = Money::of($line['salePrice'], $ccy);
@@ -223,7 +229,7 @@ final class ConsignmentService
             }
 
             $key = $idempotencyKey ?? 'consignment_sale:' . $saleId;
-            $entryId = $c->scalar('SELECT post_consignment_sale(:sale, :date, :key)', [
+            $entryId = $c->scalarString('SELECT post_consignment_sale(:sale, :date, :key)', [
                 'sale' => $saleId,
                 'date' => $saleDate,
                 'key' => $key,
@@ -232,7 +238,7 @@ final class ConsignmentService
             return [
                 'saleId' => $saleId,
                 'saleNo' => $saleNo,
-                'journalEntryId' => (string) $entryId,
+                'journalEntryId' => Value::str($entryId),
                 'gross' => $gross->amount(),
                 'net' => $net->amount(),
             ];
@@ -254,8 +260,8 @@ final class ConsignmentService
         ?string $payoutDate = null,
         ?string $idempotencyKey = null,
     ): array {
-        if (!in_array($method, ['cash', 'check', 'ach', 'store_credit', 'other'], true)) {
-            throw new InvalidArgumentException(sprintf('Unknown payout method: "%s".', $method));
+        if (!\in_array($method, ['cash', 'check', 'ach', 'store_credit', 'other'], true)) {
+            throw new InvalidArgumentException(\sprintf('Unknown payout method: "%s".', $method));
         }
 
         $payoutDate ??= date('Y-m-d');
@@ -284,14 +290,14 @@ final class ConsignmentService
             $lines = [];
 
             foreach ($rows as $row) {
-                $g = Money::of((string) $row->get('sale_price'), $ccy);
-                $cm = Money::of((string) $row->get('commission_amount'), $ccy);
-                $n = Money::of((string) $row->get('net_to_consignor'), $ccy);
+                $g = Money::of(Value::str($row->get('sale_price')), $ccy);
+                $cm = Money::of(Value::str($row->get('commission_amount')), $ccy);
+                $n = Money::of(Value::str($row->get('net_to_consignor')), $ccy);
                 $gross = $gross->plus($g);
                 $commission = $commission->plus($cm);
                 $net = $net->plus($n);
                 $lines[] = [
-                    'sale_line_id' => (string) $row->get('id'),
+                    'sale_line_id' => Value::str($row->get('id')),
                     'gross' => $g->amount(),
                     'commission' => $cm->amount(),
                     'net' => $n->amount(),
@@ -316,10 +322,10 @@ final class ConsignmentService
             )->first();
 
             if ($settlementRow === null) {
-                throw new \RuntimeException('Failed to create the consignor settlement.');
+                throw new RuntimeException('Failed to create the consignor settlement.');
             }
 
-            $settlementId = (string) $settlementRow->get('id');
+            $settlementId = Value::str($settlementRow->get('id'));
 
             foreach ($lines as $line) {
                 $c->execute(
@@ -354,13 +360,13 @@ final class ConsignmentService
             )->first();
 
             if ($payoutRow === null) {
-                throw new \RuntimeException('Failed to create the consignor payout.');
+                throw new RuntimeException('Failed to create the consignor payout.');
             }
 
-            $payoutId = (string) $payoutRow->get('id');
+            $payoutId = Value::str($payoutRow->get('id'));
             $key = $idempotencyKey ?? 'consignor_payout:' . $payoutId;
 
-            $entryId = $c->scalar('SELECT post_consignor_payout(:payout, :date, :key)', [
+            $entryId = $c->scalarString('SELECT post_consignor_payout(:payout, :date, :key)', [
                 'payout' => $payoutId,
                 'date' => $payoutDate,
                 'key' => $key,
@@ -369,7 +375,7 @@ final class ConsignmentService
             return [
                 'settlementId' => $settlementId,
                 'payoutId' => $payoutId,
-                'journalEntryId' => (string) $entryId,
+                'journalEntryId' => Value::str($entryId),
                 'netPayable' => $net->amount(),
             ];
         });

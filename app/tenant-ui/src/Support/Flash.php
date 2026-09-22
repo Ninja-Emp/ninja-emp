@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Support;
@@ -27,6 +28,7 @@ final class Flash
         self::start();
         $messages = $_SESSION['_flash'] ?? [];
         unset($_SESSION['_flash']);
+
         return $messages;
     }
 }

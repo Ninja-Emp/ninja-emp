@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Http\Message;
 
+use NinjaEMP\Db\Sql\Value;
 use Psr\Http\Message\StreamInterface;
 use RuntimeException;
 
@@ -30,8 +31,8 @@ final class Stream implements StreamInterface
     {
         $meta = stream_get_meta_data($resource);
         $this->resource = $resource;
-        $this->seekable = (bool) ($meta['seekable'] ?? false);
-        $mode = (string) ($meta['mode'] ?? '');
+        $this->seekable = $meta['seekable'];
+        $mode = $meta['mode'];
         $this->readable = str_contains($mode, 'r') || str_contains($mode, '+');
         $this->writable = str_contains($mode, 'w') || str_contains($mode, '+')
             || str_contains($mode, 'a') || str_contains($mode, 'x') || str_contains($mode, 'c');
@@ -41,9 +42,11 @@ final class Stream implements StreamInterface
     public static function fromString(string $content = ''): self
     {
         $resource = fopen('php://temp', 'r+');
+
         if ($resource === false) {
             throw new RuntimeException('Unable to open a temporary stream.');
         }
+
         if ($content !== '') {
             fwrite($resource, $content);
             rewind($resource);
@@ -52,7 +55,11 @@ final class Stream implements StreamInterface
         return new self($resource);
     }
 
-    /** Create a stream from an existing resource. */
+    /**
+     * Create a stream from an existing resource.
+     *
+     * @param resource $resource
+     */
     public static function fromResource($resource): self
     {
         return new self($resource);
@@ -63,6 +70,7 @@ final class Stream implements StreamInterface
         if ($this->resource === null) {
             return '';
         }
+
         if ($this->seekable) {
             $this->rewind();
         }
@@ -79,6 +87,7 @@ final class Stream implements StreamInterface
         $this->size = null;
     }
 
+    /** @return resource|null */
     public function detach()
     {
         $resource = $this->resource;
@@ -93,12 +102,14 @@ final class Stream implements StreamInterface
         if ($this->resource === null) {
             return null;
         }
+
         if ($this->size !== null) {
             return $this->size;
         }
         $stats = fstat($this->resource);
+
         if ($stats !== false && isset($stats['size'])) {
-            $this->size = (int) $stats['size'];
+            $this->size = Value::int($stats['size']);
         }
 
         return $this->size;
@@ -106,8 +117,9 @@ final class Stream implements StreamInterface
 
     public function tell(): int
     {
-        $this->assertAttached();
-        $position = ftell($this->resource);
+        $resource = $this->assertAttached();
+        $position = ftell($resource);
+
         if ($position === false) {
             throw new RuntimeException('Unable to determine stream position.');
         }
@@ -127,11 +139,13 @@ final class Stream implements StreamInterface
 
     public function seek(int $offset, int $whence = SEEK_SET): void
     {
-        $this->assertAttached();
+        $resource = $this->assertAttached();
+
         if (!$this->seekable) {
             throw new RuntimeException('Stream is not seekable.');
         }
-        if (fseek($this->resource, $offset, $whence) !== 0) {
+
+        if (fseek($resource, $offset, $whence) !== 0) {
             throw new RuntimeException('Unable to seek in stream.');
         }
     }
@@ -148,11 +162,13 @@ final class Stream implements StreamInterface
 
     public function write(string $string): int
     {
-        $this->assertAttached();
+        $resource = $this->assertAttached();
+
         if (!$this->writable) {
             throw new RuntimeException('Stream is not writable.');
         }
-        $written = fwrite($this->resource, $string);
+        $written = fwrite($resource, $string);
+
         if ($written === false) {
             throw new RuntimeException('Unable to write to stream.');
         }
@@ -168,17 +184,21 @@ final class Stream implements StreamInterface
 
     public function read(int $length): string
     {
-        $this->assertAttached();
+        $resource = $this->assertAttached();
+
         if (!$this->readable) {
             throw new RuntimeException('Stream is not readable.');
         }
+
         if ($length < 0) {
             throw new RuntimeException('Length must be non-negative.');
         }
+
         if ($length === 0) {
             return '';
         }
-        $data = fread($this->resource, $length);
+        $data = fread($resource, $length);
+
         if ($data === false) {
             throw new RuntimeException('Unable to read from stream.');
         }
@@ -188,8 +208,9 @@ final class Stream implements StreamInterface
 
     public function getContents(): string
     {
-        $this->assertAttached();
-        $contents = stream_get_contents($this->resource);
+        $resource = $this->assertAttached();
+        $contents = stream_get_contents($resource);
+
         if ($contents === false) {
             throw new RuntimeException('Unable to read stream contents.');
         }
@@ -197,7 +218,7 @@ final class Stream implements StreamInterface
         return $contents;
     }
 
-    public function getMetadata(?string $key = null)
+    public function getMetadata(?string $key = null): mixed
     {
         if ($this->resource === null) {
             return $key === null ? [] : null;
@@ -207,10 +228,13 @@ final class Stream implements StreamInterface
         return $key === null ? $meta : ($meta[$key] ?? null);
     }
 
-    private function assertAttached(): void
+    /** @return resource */
+    private function assertAttached()
     {
         if ($this->resource === null) {
             throw new RuntimeException('Stream is detached.');
         }
+
+        return $this->resource;
     }
 }

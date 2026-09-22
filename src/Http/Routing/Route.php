@@ -31,7 +31,7 @@ final class Route
     /** @return list<string> */
     public function methodList(): array
     {
-        $methods = is_array($this->methods) ? $this->methods : [$this->methods];
+        $methods = \is_array($this->methods) ? $this->methods : [$this->methods];
 
         return array_values(array_map(static fn (string $m): string => strtoupper($m), $methods));
     }

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Http\Controllers;
@@ -11,6 +12,9 @@ use NinjaEmp\TenantUi\Support\Auth;
  */
 final class AuthController extends Controller
 {
+    /**
+     * @param array<string,mixed> $params
+     */
     public function login(array $params = []): void
     {
         $this->view->setLayout('layout-bare');
@@ -20,6 +24,9 @@ final class AuthController extends Controller
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function logout(array $params = []): void
     {
         unset($_SESSION['role']);

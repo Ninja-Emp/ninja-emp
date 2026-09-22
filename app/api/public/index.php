@@ -25,7 +25,6 @@ use NinjaEmp\Api\Http\Controllers\StoredValueController;
 use NinjaEmp\Api\Http\Controllers\VendorController;
 use NinjaEMP\Auth\Csrf;
 use NinjaEMP\Auth\SessionAuth;
-use NinjaEMP\Db\ConnectionFactory;
 use NinjaEMP\Http\ControllerResolver;
 use NinjaEMP\Http\Emitter;
 use NinjaEMP\Http\ErrorRenderer;
@@ -50,11 +49,13 @@ require $root . '/src/autoload.php';
 // ---- PSR-4 autoloader for NinjaEmp\Api\ -> app/api/src/ --------------------
 spl_autoload_register(static function (string $class) use ($root): void {
     $prefix = 'NinjaEmp\\Api\\';
+
     if (!str_starts_with($class, $prefix)) {
         return;
     }
     $relative = substr($class, strlen($prefix));
     $file = $root . '/app/api/src/' . str_replace('\\', '/', $relative) . '.php';
+
     if (is_file($file)) {
         require $file;
     }
@@ -74,11 +75,14 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 // ---- Database (optional; API boots without one) ---------------------------
 $connectionFactory = null;
 $dsn = getenv('NINJA_EMP_DSN');
+
 if (is_string($dsn) && $dsn !== '') {
+    $dbUser = getenv('NINJA_EMP_DB_USER');
+    $dbPassword = getenv('NINJA_EMP_DB_PASSWORD');
     $connectionFactory = Container::connectionFactory(
         $dsn,
-        (string) (getenv('NINJA_EMP_DB_USER') ?: 'ninja_emp'),
-        (string) (getenv('NINJA_EMP_DB_PASSWORD') ?: ''),
+        \is_string($dbUser) && $dbUser !== '' ? $dbUser : 'ninja_emp',
+        \is_string($dbPassword) ? $dbPassword : '',
     );
 }
 
@@ -90,11 +94,11 @@ $container = Container::bootstrap($connectionFactory);
 $registry = new InMemoryTenantRegistry();
 $registry->add(
     new TenantRecord('t-demo', 'demo', 'tenant_demo', 'Demo Mall'),
-    'demo.ninjaemp.app'
+    'demo.ninjaemp.app',
 );
 $registry->add(
     new TenantRecord('t-demo', 'demo', 'tenant_demo', 'Demo Mall'),
-    'localhost'
+    'localhost',
 );
 $resolver = new TenantResolver($registry);
 
@@ -109,6 +113,7 @@ $controllers = [
 ];
 
 $routes = new RouteCollection();
+
 foreach ($controllers as $controller) {
     $routes->addController($controller);
 }
@@ -124,14 +129,15 @@ $routes->addController(OpenApiController::class);
 $kernel = new HttpKernel(new Router($routes), new ControllerResolver($container));
 
 // ---- Middleware stack -----------------------------------------------------
+/** @var LoggerInterface $logger */
+$logger = $container->get(LoggerInterface::class);
 $kernel->pipe(new ErrorHandlerMiddleware(
     new ErrorRenderer($debug),
-    $container->get(LoggerInterface::class),
+    $logger,
 ));
 $kernel->pipe(new TenantMiddleware(
     $resolver,
     required: false,
-    holder: $container->get(TenantContextHolder::class),
 ));
 $kernel->pipe(new AuthMiddleware(new SessionAuth()));
 $kernel->pipeAfterRouting(new RbacMiddleware());
@@ -140,4 +146,4 @@ $kernel->pipeAfterRouting(new CsrfMiddleware(new Csrf()));
 // ---- Handle + emit --------------------------------------------------------
 $request = ServerRequest::fromGlobals();
 $response = $kernel->handle($request);
-(new Emitter())->emit($response);
+new Emitter()->emit($response);

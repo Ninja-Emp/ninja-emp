@@ -42,14 +42,15 @@ final class SaleLineInput
         public readonly bool $isTaxable = true,
         public readonly string $taxAmount = '0',
     ) {
-        if (!in_array($kind, [self::CONSIGNMENT, self::OWNED], true)) {
-            throw new InvalidArgumentException(sprintf('Unknown sale line kind: "%s".', $kind));
+        if (!\in_array($kind, [self::CONSIGNMENT, self::OWNED], true)) {
+            throw new InvalidArgumentException(\sprintf('Unknown sale line kind: "%s".', $kind));
         }
 
         if ($kind === self::CONSIGNMENT) {
             if ($consignorPartyId === null) {
                 throw new InvalidArgumentException('A consignment line requires a consignor party id.');
             }
+
             if ($commissionRate === null) {
                 throw new InvalidArgumentException('A consignment line requires a commission rate.');
             }

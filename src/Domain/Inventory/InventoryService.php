@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Domain\Inventory;
 
+use NinjaEMP\Db\Sql\Value;
+
 use InvalidArgumentException;
 use NinjaEMP\Db\Connection;
 use NinjaEMP\Money\Currency;
 use NinjaEMP\Money\Money;
+use RuntimeException;
 
 /**
  * The inventory domain service (ADR-0031: moving weighted-average cost).
@@ -66,10 +69,10 @@ final class InventoryService
             )->first();
 
             if ($row === null) {
-                throw new \RuntimeException('Failed to create the inventory item.');
+                throw new RuntimeException('Failed to create the inventory item.');
             }
 
-            return (string) $row->get('id');
+            return Value::str($row->get('id'));
         });
     }
 
@@ -91,15 +94,16 @@ final class InventoryService
     ): string {
         $entryDate ??= date('Y-m-d');
 
-        if (bccomp($quantity, '0', 4) <= 0) {
+        if (bccomp(Value::num($quantity), '0', 4) <= 0) {
             throw new InvalidArgumentException('Receipt quantity must be positive.');
         }
-        if (bccomp($unitCost, '0', 4) < 0) {
+
+        if (bccomp(Value::num($unitCost), '0', 4) < 0) {
             throw new InvalidArgumentException('Unit cost cannot be negative.');
         }
 
         return $this->conn->transactional(function (Connection $c) use ($itemId, $quantity, $unitCost, $onAccount, $entryDate, $idempotencyKey): string {
-            $entryId = $c->scalar(
+            $entryId = $c->scalarString(
                 'SELECT receive_inventory(:item, :qty, :cost, :date, :key, :on_account)',
                 [
                     'item' => $itemId,
@@ -111,7 +115,7 @@ final class InventoryService
                 ],
             );
 
-            return (string) $entryId;
+            return Value::str($entryId);
         });
     }
 
@@ -130,12 +134,12 @@ final class InventoryService
     ): string {
         $entryDate ??= date('Y-m-d');
 
-        if (bccomp($quantityDelta, '0', 4) === 0) {
+        if (bccomp(Value::num($quantityDelta), '0', 4) === 0) {
             throw new InvalidArgumentException('Adjustment quantity cannot be zero.');
         }
 
         return $this->conn->transactional(function (Connection $c) use ($itemId, $quantityDelta, $memo, $entryDate, $idempotencyKey): string {
-            $entryId = $c->scalar(
+            $entryId = $c->scalarString(
                 'SELECT adjust_inventory(:item, :delta, :date, :memo, :key)',
                 [
                     'item' => $itemId,
@@ -146,7 +150,7 @@ final class InventoryService
                 ],
             );
 
-            return (string) $entryId;
+            return Value::str($entryId);
         });
     }
 
@@ -164,13 +168,13 @@ final class InventoryService
             )->first();
 
             if ($row === null) {
-                throw new InvalidArgumentException(sprintf('No inventory item %s.', $itemId));
+                throw new InvalidArgumentException(\sprintf('No inventory item %s.', $itemId));
             }
 
             return [
-                'on_hand' => (string) $row->get('on_hand', '0'),
-                'avg_cost' => (string) $row->get('avg_cost', '0'),
-                'currency' => (string) $row->get('currency', 'USD'),
+                'on_hand' => Value::str($row->get('on_hand', '0')),
+                'avg_cost' => Value::str($row->get('avg_cost', '0')),
+                'currency' => Value::str($row->get('currency', 'USD')),
             ];
         });
     }
@@ -182,14 +186,14 @@ final class InventoryService
     public function totalValue(string $currency = 'USD'): string
     {
         return $this->conn->transactional(function (Connection $c) use ($currency): string {
-            $value = $c->scalar(
+            $value = $c->scalarString(
                 'SELECT COALESCE(sum(on_hand * avg_cost), 0)
                    FROM inventory_item
                   WHERE currency = :currency AND deleted_at IS NULL',
                 ['currency' => $currency],
             );
 
-            return Money::of((string) ($value ?? '0'), Currency::of($currency))->amount();
+            return Money::of(Value::str($value), Currency::of($currency))->amount();
         });
     }
 }

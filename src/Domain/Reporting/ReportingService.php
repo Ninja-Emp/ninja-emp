@@ -68,7 +68,7 @@ final class ReportingService
      */
     public function netIncome(string $from, string $to): string
     {
-        return (string) $this->conn->scalar('SELECT net_income(:from, :to)', ['from' => $from, 'to' => $to]);
+        return $this->conn->scalarString('SELECT net_income(:from, :to)', ['from' => $from, 'to' => $to]);
     }
 
     /**

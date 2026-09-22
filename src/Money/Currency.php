@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace NinjaEMP\Money;
 
 use InvalidArgumentException;
+use Stringable;
 
 /**
  * ISO-4217 alpha-3 currency code.
@@ -12,7 +13,7 @@ use InvalidArgumentException;
  * Mirrors the database domain kernel.currency_code: char(3), uppercase, ^[A-Z]{3}$.
  * Immutable value object. Never constructed from user input without validation.
  */
-final class Currency implements \Stringable
+final class Currency implements Stringable
 {
     /** @var array<string, string> code => display name (the currencies we ship with) */
     private const KNOWN = [
@@ -44,7 +45,7 @@ final class Currency implements \Stringable
         $normalised = strtoupper(trim($code));
 
         if (preg_match('/^[A-Z]{3}$/', $normalised) !== 1) {
-            throw new InvalidArgumentException(sprintf('Invalid ISO-4217 currency code: "%s".', $code));
+            throw new InvalidArgumentException(\sprintf('Invalid ISO-4217 currency code: "%s".', $code));
         }
 
         return new self($normalised);

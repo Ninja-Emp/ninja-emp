@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Http;
@@ -64,14 +65,16 @@ abstract class Controller
     protected function input(string $key, string $default = ''): string
     {
         $value = $_POST[$key] ?? $default;
-        return is_string($value) ? trim($value) : $default;
+
+        return \is_string($value) ? trim($value) : $default;
     }
 
     /** Read a trimmed string from GET. */
     protected function query(string $key, string $default = ''): string
     {
         $value = $_GET[$key] ?? $default;
-        return is_string($value) ? trim($value) : $default;
+
+        return \is_string($value) ? trim($value) : $default;
     }
 
     /** Add a flash message for the next request. */

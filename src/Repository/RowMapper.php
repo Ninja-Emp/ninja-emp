@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Repository;
 
+use NinjaEMP\Db\Sql\Value;
+
 /**
  * Pure functions that map normalized schema rows onto the flat array shapes the
  * tenant UI expects.
@@ -27,7 +29,7 @@ final class RowMapper
             return '0.0000';
         }
 
-        return bcadd((string) $value, '0', 4);
+        return bcadd(Value::num($value), '0', 4);
     }
 
     /**
@@ -40,7 +42,7 @@ final class RowMapper
             return 0;
         }
 
-        return (int) bcadd((string) $value, '0', 0);
+        return (int) bcadd(Value::num($value), '0', 0);
     }
 
     /**
@@ -52,7 +54,7 @@ final class RowMapper
             return '0.0000';
         }
 
-        return bcmul((string) $rate, '100', 4);
+        return bcmul(Value::num($rate), '100', 4);
     }
 
     /**
@@ -60,11 +62,11 @@ final class RowMapper
      */
     public static function bool(mixed $value): bool
     {
-        if (is_bool($value)) {
+        if (\is_bool($value)) {
             return $value;
         }
 
-        return in_array((string) $value, ['1', 't', 'true', 'TRUE', 'y', 'yes'], true);
+        return \in_array(Value::str($value), ['1', 't', 'true', 'TRUE', 'y', 'yes'], true);
     }
 
     /**
@@ -76,7 +78,7 @@ final class RowMapper
             return '';
         }
 
-        return substr((string) $value, 0, 10);
+        return substr(Value::str($value), 0, 10);
     }
 
     /**
@@ -88,7 +90,7 @@ final class RowMapper
             return '';
         }
 
-        $string = (string) $value;
+        $string = Value::str($value);
 
         if (preg_match('/(\d{2}):(\d{2})/', $string, $m) === 1) {
             return $m[1] . ':' . $m[2];
@@ -107,14 +109,14 @@ final class RowMapper
     public static function space(array $r): array
     {
         return [
-            'id'        => (string) $r['id'],
-            'code'      => (string) ($r['code'] ?? ''),
-            'name'      => (string) ($r['name'] ?? ''),
-            'floor_id'  => (string) ($r['floor_id'] ?? ''),
-            'type'      => (string) ($r['space_type_code'] ?? 'inline'),
+            'id'        => Value::str($r['id']),
+            'code'      => Value::str($r['code'] ?? ''),
+            'name'      => Value::str($r['name'] ?? ''),
+            'floor_id'  => Value::str($r['floor_id'] ?? ''),
+            'type'      => Value::str($r['space_type_code'] ?? 'inline'),
             'sqft'      => self::int($r['area_sqft'] ?? 0),
-            'status'    => (string) ($r['status'] ?? 'available'),
-            'vendor_id' => isset($r['vendor_id']) && $r['vendor_id'] !== null ? (string) $r['vendor_id'] : null,
+            'status'    => Value::str($r['status'] ?? 'available'),
+            'vendor_id' => isset($r['vendor_id']) ? Value::str($r['vendor_id']) : null,
             'rent'      => self::money($r['rent'] ?? 0),
             'x'         => self::int($r['x'] ?? 1),
             'y'         => self::int($r['y'] ?? 1),
@@ -132,11 +134,12 @@ final class RowMapper
      */
     public static function vendor(array $r): array
     {
-        $role = (string) ($r['role_type_code'] ?? 'vendor');
-        $agreementStatus = (string) ($r['agreement_status'] ?? '');
+        $role = Value::str($r['role_type_code'] ?? 'vendor');
+        $agreementStatus = Value::str($r['agreement_status'] ?? '');
         $isActive = self::bool($r['is_active'] ?? true);
 
         $status = 'active';
+
         if (!$isActive) {
             $status = 'inactive';
         } elseif ($agreementStatus === 'suspended') {
@@ -144,11 +147,11 @@ final class RowMapper
         }
 
         return [
-            'id'         => (string) $r['id'],
-            'name'       => (string) ($r['display_name'] ?? ''),
-            'contact'    => (string) ($r['contact'] ?? ''),
-            'email'      => (string) ($r['email'] ?? ''),
-            'phone'      => (string) ($r['phone'] ?? ''),
+            'id'         => Value::str($r['id']),
+            'name'       => Value::str($r['display_name'] ?? ''),
+            'contact'    => Value::str($r['contact'] ?? ''),
+            'email'      => Value::str($r['email'] ?? ''),
+            'phone'      => Value::str($r['phone'] ?? ''),
             'type'       => $role === 'consignor' ? 'consignor' : 'vendor',
             'commission' => self::percent($r['default_commission_rate'] ?? 0),
             'balance'    => self::money($r['balance'] ?? 0),
@@ -169,17 +172,17 @@ final class RowMapper
     public static function ownedItem(array $r): array
     {
         return [
-            'id'       => (string) $r['id'],
-            'sku'      => (string) ($r['sku'] ?? ''),
-            'name'     => (string) ($r['description'] ?? ''),
-            'vendor_id' => isset($r['supplier_party_id']) && $r['supplier_party_id'] !== null
-                ? (string) $r['supplier_party_id'] : null,
-            'category' => (string) ($r['category'] ?? 'General'),
+            'id'       => Value::str($r['id']),
+            'sku'      => Value::str($r['sku'] ?? ''),
+            'name'     => Value::str($r['description'] ?? ''),
+            'vendor_id' => isset($r['supplier_party_id'])
+                ? Value::str($r['supplier_party_id']) : null,
+            'category' => Value::str($r['category'] ?? 'General'),
             'price'    => self::money($r['list_price'] ?? 0),
             'cost'     => self::money($r['avg_cost'] ?? 0),
             'on_hand'  => self::int($r['on_hand'] ?? 0),
             'reorder'  => self::int($r['reorder_point'] ?? 0),
-            'barcode'  => (string) ($r['barcode'] ?? ''),
+            'barcode'  => Value::str($r['barcode'] ?? ''),
             'owner'    => 'store',
         ];
     }
@@ -193,21 +196,21 @@ final class RowMapper
      */
     public static function consignedItem(array $r): array
     {
-        $status = (string) ($r['status'] ?? 'received');
-        $onFloor = in_array($status, ['received', 'available', 'reserved'], true);
+        $status = Value::str($r['status'] ?? 'received');
+        $onFloor = \in_array($status, ['received', 'available', 'reserved'], true);
 
         return [
-            'id'       => (string) $r['id'],
-            'sku'      => (string) ($r['sku'] ?? ''),
-            'name'     => (string) ($r['description'] ?? ''),
-            'vendor_id' => isset($r['consignor_party_id']) && $r['consignor_party_id'] !== null
-                ? (string) $r['consignor_party_id'] : null,
-            'category' => (string) ($r['category'] ?? 'General'),
+            'id'       => Value::str($r['id']),
+            'sku'      => Value::str($r['sku'] ?? ''),
+            'name'     => Value::str($r['description'] ?? ''),
+            'vendor_id' => isset($r['consignor_party_id'])
+                ? Value::str($r['consignor_party_id']) : null,
+            'category' => Value::str($r['category'] ?? 'General'),
             'price'    => self::money($r['agreed_price'] ?? 0),
             'cost'     => '0.0000',
             'on_hand'  => $onFloor ? 1 : 0,
             'reorder'  => 0,
-            'barcode'  => (string) ($r['barcode'] ?? ''),
+            'barcode'  => Value::str($r['barcode'] ?? ''),
             'owner'    => 'vendor',
         ];
     }
@@ -224,16 +227,16 @@ final class RowMapper
         $open = self::bool($r['shift_open'] ?? false);
 
         return [
-            'id'       => (string) $r['id'],
-            'name'     => (string) ($r['name'] ?? 'Register'),
+            'id'       => Value::str($r['id']),
+            'name'     => Value::str($r['name'] ?? 'Register'),
             'status'   => $open ? 'open' : 'closed',
-            'cashier'  => $open ? (string) ($r['cashier'] ?? '') : null,
+            'cashier'  => $open ? Value::str($r['cashier'] ?? '') : null,
             'opened'   => $open ? self::time($r['opened_at'] ?? '') : null,
             'drawer'   => self::money($r['drawer'] ?? 0),
             'float'    => self::money($r['opening_float'] ?? 0),
-            'counted'  => isset($r['counted_cash']) && $r['counted_cash'] !== null
+            'counted'  => isset($r['counted_cash'])
                 ? self::money($r['counted_cash']) : null,
-            'variance' => isset($r['over_short']) && $r['over_short'] !== null
+            'variance' => isset($r['over_short'])
                 ? self::money($r['over_short']) : null,
         ];
     }
@@ -241,7 +244,7 @@ final class RowMapper
     // ---- Sales ------------------------------------------------------------
 
     /**
-     * @param array<string,mixed>       $r     sale row joined with register/shift
+     * @param array<string,mixed> $r sale row joined with register/shift
      * @param list<array<string,mixed>> $lines sale_line rows for this sale
      *
      * @return array<string,mixed>
@@ -249,10 +252,11 @@ final class RowMapper
     public static function sale(array $r, array $lines = []): array
     {
         $mappedLines = [];
+
         foreach ($lines as $line) {
             $mappedLines[] = [
-                'item_id'    => (string) ($line['item_ref'] ?? ''),
-                'name'       => (string) ($line['description'] ?? ''),
+                'item_id'    => Value::str($line['item_ref'] ?? ''),
+                'name'       => Value::str($line['description'] ?? ''),
                 'qty'        => self::int($line['quantity'] ?? 0),
                 'price'      => self::money($line['unit_price'] ?? 0),
                 'commission' => self::money($line['commission_amount'] ?? 0),
@@ -261,16 +265,17 @@ final class RowMapper
         }
 
         $tenders = [];
-        if (isset($r['tenders']) && is_array($r['tenders'])) {
-            $tenders = array_values(array_map('strval', $r['tenders']));
+
+        if (isset($r['tenders']) && \is_array($r['tenders'])) {
+            $tenders = array_values(array_map(static fn (mixed $v): string => Value::str($v), $r['tenders']));
         }
 
         return [
-            'id'       => (string) $r['id'],
-            'no'       => 'S-' . (string) ($r['sale_no'] ?? ''),
+            'id'       => Value::str($r['id']),
+            'no'       => 'S-' . Value::str($r['sale_no'] ?? ''),
             'time'     => self::time($r['created_at'] ?? ''),
-            'register' => (string) ($r['register_name'] ?? ''),
-            'cashier'  => (string) ($r['cashier'] ?? ''),
+            'register' => Value::str($r['register_name'] ?? ''),
+            'cashier'  => Value::str($r['cashier'] ?? ''),
             'total'    => self::money($r['total'] ?? 0),
             'tenders'  => $tenders,
             'lines'    => $mappedLines,
@@ -302,8 +307,8 @@ final class RowMapper
     public static function taxRate(array $r): array
     {
         return [
-            'id'   => (string) $r['id'],
-            'name' => (string) ($r['jurisdiction_name'] ?? $r['name'] ?? 'Tax'),
+            'id'   => Value::str($r['id']),
+            'name' => Value::str($r['jurisdiction_name'] ?? $r['name'] ?? 'Tax'),
             'rate' => self::percent($r['rate'] ?? 0),
         ];
     }
@@ -318,6 +323,7 @@ final class RowMapper
         }
 
         $ts = strtotime($date);
+
         if ($ts === false) {
             return $date;
         }

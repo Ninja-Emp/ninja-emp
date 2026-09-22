@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 /**
@@ -25,17 +26,20 @@ use NinjaEmp\TenantUi\Support\Flash;
 use NinjaEmp\TenantUi\Support\Router;
 use NinjaEmp\TenantUi\Support\Theme;
 use NinjaEmp\TenantUi\Support\View;
+use NinjaEMP\Db\Sql\Value;
 
 $root = dirname(__DIR__);
 
 // ---- PSR-4 autoloader for NinjaEmp\TenantUi\ -> src/ ----------------------
 spl_autoload_register(static function (string $class) use ($root): void {
     $prefix = 'NinjaEmp\\TenantUi\\';
+
     if (!str_starts_with($class, $prefix)) {
         return;
     }
     $relative = substr($class, strlen($prefix));
     $file = $root . '/src/' . str_replace('\\', '/', $relative) . '.php';
+
     if (is_file($file)) {
         require $file;
     }
@@ -57,10 +61,12 @@ $view = new View($root . '/src/Views');
 // ---- Theme + mode (query override -> session -> default) ------------------
 $theme = $_GET['theme'] ?? $_SESSION['theme'] ?? Theme::defaultTheme();
 $mode  = $_GET['mode']  ?? $_SESSION['mode']  ?? Theme::defaultMode();
-if (!Theme::isValidTheme((string) $theme)) {
+
+if (!Theme::isValidTheme(Value::str($theme))) {
     $theme = Theme::defaultTheme();
 }
-if (!Theme::isValidMode((string) $mode)) {
+
+if (!Theme::isValidMode(Value::str($mode))) {
     $mode = Theme::defaultMode();
 }
 $_SESSION['theme'] = $theme;
@@ -68,10 +74,10 @@ $_SESSION['mode']  = $mode;
 
 // ---- Role switching (demo login) ------------------------------------------
 if (isset($_GET['role'])) {
-    $auth->loginAs((string) $_GET['role']);
+    $auth->loginAs(Value::str($_GET['role']));
     $_SESSION['role'] = $auth->role();
 } elseif (isset($_SESSION['role'])) {
-    $auth->loginAs((string) $_SESSION['role']);
+    $auth->loginAs(Value::str($_SESSION['role']));
 }
 
 // ---- Values shared with every view ----------------------------------------
@@ -83,8 +89,8 @@ $view->share('mode', $mode);
 $view->share('themes', Theme::themes());
 $view->share('modes', Theme::modes());
 $view->share('flash', Flash::pull());
-$view->share('currentPath', '/' . trim((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/'));
-$view->share('navGroups', \NinjaEmp\TenantUi\Support\Nav::groups($auth, [
+$view->share('currentPath', '/' . trim(Value::str(parse_url(Value::str($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH)), '/'));
+$view->share('navGroups', NinjaEmp\TenantUi\Support\Nav::groups($auth, [
     '/inventory' => $repo->lowStockCount() > 0 ? (string) $repo->lowStockCount() : '',
 ]));
 
@@ -138,17 +144,18 @@ $router->get('/login', [AuthController::class, 'login']);
 $router->get('/logout', [AuthController::class, 'logout']);
 
 // ---- Dispatch -------------------------------------------------------------
-$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-$path = (string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+$method = Value::str($_SERVER['REQUEST_METHOD'] ?? 'GET');
+$path = Value::str(parse_url(Value::str($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH));
 
 $match = $router->resolve($method, $path);
 
 if ($match === null) {
     http_response_code(404);
     echo $view->render('errors/404', ['title' => 'Not found']);
+
     return;
 }
 
 [$class, $action] = $match['handler'];
 $controller = new $class($repo, $auth, $view);
-$controller->{$action}($match['params']);
+(new \ReflectionMethod($controller, $action))->invoke($controller, $match['params']);

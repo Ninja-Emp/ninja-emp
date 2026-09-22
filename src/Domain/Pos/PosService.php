@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Domain\Pos;
 
+use NinjaEMP\Db\Sql\Value;
+
 use InvalidArgumentException;
 use NinjaEMP\Db\Connection;
 use NinjaEMP\Money\Currency;
 use NinjaEMP\Money\Money;
+use RuntimeException;
 
 /**
  * The point-of-sale domain service.
@@ -67,7 +70,7 @@ final class PosService
                 $net = Money::zero(Currency::of($currency));
 
                 if ($line->isConsignment()) {
-                    $commission = $extended->times((string) $line->commissionRate);
+                    $commission = $extended->times(Value::str($line->commissionRate));
                     $net = $extended->minus($commission); // exact remainder
                 }
 
@@ -84,11 +87,13 @@ final class PosService
 
             // --- Tenders must cover the total exactly ------------------------
             $tenderSum = Money::zero(Currency::of($currency));
+
             foreach ($request->tenders as $tender) {
                 $tenderSum = $tenderSum->plus(Money::of($tender->amount, Currency::of($currency)));
             }
+
             if (!$tenderSum->equals($total)) {
-                throw new InvalidArgumentException(sprintf(
+                throw new InvalidArgumentException(\sprintf(
                     'Tenders (%s) do not equal the sale total (%s).',
                     $tenderSum->amount(),
                     $total->amount(),
@@ -119,14 +124,15 @@ final class PosService
             )->first();
 
             if ($saleRow === null) {
-                throw new \RuntimeException('Failed to insert the sale header.');
+                throw new RuntimeException('Failed to insert the sale header.');
             }
 
-            $saleId = (string) $saleRow->get('id');
-            $saleNo = (string) $saleRow->get('sale_no');
+            $saleId = Value::str($saleRow->get('id'));
+            $saleNo = Value::str($saleRow->get('sale_no'));
 
             // --- Persist the lines -------------------------------------------
             $lineNo = 0;
+
             foreach ($prepared as $p) {
                 $lineNo++;
                 $line = $p['line'];
@@ -181,10 +187,10 @@ final class PosService
             )->first();
 
             if ($paymentRow === null) {
-                throw new \RuntimeException('Failed to insert the payment.');
+                throw new RuntimeException('Failed to insert the payment.');
             }
 
-            $paymentId = (string) $paymentRow->get('id');
+            $paymentId = Value::str($paymentRow->get('id'));
 
             foreach ($request->tenders as $tender) {
                 $c->execute(
@@ -204,13 +210,13 @@ final class PosService
             }
 
             // --- Hand the ledger side to the database ------------------------
-            $entryId = $c->scalar('SELECT post_sale(:sale, :date, :key)', [
+            $entryId = $c->scalarString('SELECT post_sale(:sale, :date, :key)', [
                 'sale' => $saleId,
                 'date' => $entryDate,
                 'key' => $key,
             ]);
 
-            $relieved = (int) $c->scalar('SELECT post_sale_inventory(:sale, :date)', [
+            $relieved = $c->scalarInt('SELECT post_sale_inventory(:sale, :date)', [
                 'sale' => $saleId,
                 'date' => $entryDate,
             ]);
@@ -223,7 +229,7 @@ final class PosService
                 taxTotal: $taxTotal->amount(),
                 total: $total->amount(),
                 currency: $currency,
-                journalEntryId: $entryId === null ? null : (string) $entryId,
+                journalEntryId: Value::str($entryId),
                 inventoryLinesRelieved: $relieved,
             );
         });
@@ -233,8 +239,8 @@ final class PosService
      * Refund a completed sale. A refund is its OWN document that reverses the
      * original (reversal-not-edit): we never mutate the original's journal entry.
      *
-     * @param list<SaleLineInput> $lines   the lines being returned (mirror of the original)
-     * @param list<TenderInput>   $tenders how the money goes back out
+     * @param list<SaleLineInput> $lines the lines being returned (mirror of the original)
+     * @param list<TenderInput> $tenders how the money goes back out
      */
     public function refund(
         string $originalSaleId,
@@ -263,8 +269,9 @@ final class PosService
 
                 $commission = Money::zero($ccy);
                 $net = Money::zero($ccy);
+
                 if ($line->isConsignment()) {
-                    $commission = $extended->times((string) $line->commissionRate);
+                    $commission = $extended->times(Value::str($line->commissionRate));
                     $net = $extended->minus($commission);
                 }
 
@@ -298,13 +305,14 @@ final class PosService
             )->first();
 
             if ($saleRow === null) {
-                throw new \RuntimeException('Failed to insert the refund document.');
+                throw new RuntimeException('Failed to insert the refund document.');
             }
 
-            $saleId = (string) $saleRow->get('id');
-            $saleNo = (string) $saleRow->get('sale_no');
+            $saleId = Value::str($saleRow->get('id'));
+            $saleNo = Value::str($saleRow->get('sale_no'));
 
             $lineNo = 0;
+
             foreach ($prepared as $p) {
                 $lineNo++;
                 $line = $p['line'];
@@ -352,10 +360,11 @@ final class PosService
             )->first();
 
             if ($paymentRow === null) {
-                throw new \RuntimeException('Failed to insert the refund payment.');
+                throw new RuntimeException('Failed to insert the refund payment.');
             }
 
-            $paymentId = (string) $paymentRow->get('id');
+            $paymentId = Value::str($paymentRow->get('id'));
+
             foreach ($tenders as $tender) {
                 $c->execute(
                     'INSERT INTO payment_tender
@@ -373,13 +382,13 @@ final class PosService
                 );
             }
 
-            $entryId = $c->scalar('SELECT post_refund(:sale, :date, :key)', [
+            $entryId = $c->scalarString('SELECT post_refund(:sale, :date, :key)', [
                 'sale' => $saleId,
                 'date' => $entryDate,
                 'key' => $key,
             ]);
 
-            $relieved = (int) $c->scalar('SELECT post_refund_inventory(:sale, :date)', [
+            $relieved = $c->scalarInt('SELECT post_refund_inventory(:sale, :date)', [
                 'sale' => $saleId,
                 'date' => $entryDate,
             ]);
@@ -392,7 +401,7 @@ final class PosService
                 taxTotal: $taxTotal->amount(),
                 total: $total->amount(),
                 currency: $currency,
-                journalEntryId: $entryId === null ? null : (string) $entryId,
+                journalEntryId: Value::str($entryId),
                 inventoryLinesRelieved: $relieved,
             );
         });
@@ -419,10 +428,10 @@ final class PosService
             )->first();
 
             if ($row === null) {
-                throw new \RuntimeException('Failed to open the shift.');
+                throw new RuntimeException('Failed to open the shift.');
             }
 
-            return (string) $row->get('id');
+            return Value::str($row->get('id'));
         });
     }
 
@@ -443,7 +452,7 @@ final class PosService
                 'key' => $key,
             ]);
 
-            return $entryId === null ? null : (string) $entryId;
+            return Value::nullableStr($entryId);
         });
     }
 
@@ -483,19 +492,19 @@ final class PosService
             )->first();
 
             if ($row === null) {
-                throw new \RuntimeException('Failed to insert the merchant settlement.');
+                throw new RuntimeException('Failed to insert the merchant settlement.');
             }
 
-            $settlementId = (string) $row->get('id');
+            $settlementId = Value::str($row->get('id'));
             $key = $idempotencyKey ?? 'merchant_settlement:' . $settlementId;
 
-            $entryId = $c->scalar('SELECT post_merchant_settlement(:settlement, :date, :key)', [
+            $entryId = $c->scalarString('SELECT post_merchant_settlement(:settlement, :date, :key)', [
                 'settlement' => $settlementId,
                 'date' => $entryDate,
                 'key' => $key,
             ]);
 
-            return (string) $entryId;
+            return Value::str($entryId);
         });
     }
 

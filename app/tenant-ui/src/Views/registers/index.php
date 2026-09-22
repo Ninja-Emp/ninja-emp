@@ -1,10 +1,11 @@
 <?php
 /**
  * Registers list — create, open, close.
- * @var \NinjaEmp\TenantUi\Support\View $this
+ *
+ * @var View $this
  */
-use NinjaEmp\TenantUi\Support\View;
 use NinjaEmp\TenantUi\Support\Money;
+use NinjaEmp\TenantUi\Support\View;
 
 $cur = $tenant['currency'];
 ?>
@@ -34,7 +35,7 @@ $cur = $tenant['currency'];
           <div class="row between">
             <span class="muted">Variance</span>
             <?php $v = (float) $r['variance']; ?>
-            <span class="tnum strong" style="color:<?= $v == 0.0 ? 'var(--success)' : 'var(--danger)' ?>"><?= View::e(Money::format($r['variance'], $cur)) ?></span>
+            <span class="tnum strong" style="color:<?= $v === 0.0 ? 'var(--success)' : 'var(--danger)' ?>"><?= View::e(Money::format($r['variance'], $cur)) ?></span>
           </div>
         <?php endif; ?>
       </div>

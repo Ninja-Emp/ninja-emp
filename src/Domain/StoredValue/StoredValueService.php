@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Domain\StoredValue;
 
+use NinjaEMP\Db\Sql\Value;
+
 use InvalidArgumentException;
 use NinjaEMP\Db\Connection;
 use NinjaEMP\Money\Currency;
@@ -41,6 +43,7 @@ final class StoredValueService
      * @param bool $paidWithCash true when the customer paid cash for it (debit
      *                           cash); false when it is granted (e.g. a goodwill
      *                           credit) and the offset is the configured source.
+     *
      * @return string the stored value id
      */
     public function issue(
@@ -53,19 +56,21 @@ final class StoredValueService
         ?string $expiresDate = null,
         ?string $idempotencyKey = null,
     ): string {
-        if (!in_array($instrumentKind, [self::GIFT_CERTIFICATE, self::STORE_CREDIT], true)) {
-            throw new InvalidArgumentException(sprintf('Unknown instrument kind: "%s".', $instrumentKind));
+        if (!\in_array($instrumentKind, [self::GIFT_CERTIFICATE, self::STORE_CREDIT], true)) {
+            throw new InvalidArgumentException(\sprintf('Unknown instrument kind: "%s".', $instrumentKind));
         }
+
         if (trim($code) === '') {
             throw new InvalidArgumentException('A stored value code is required.');
         }
+
         if (!Money::of($amount, Currency::of('USD'))->isPositive()) {
             throw new InvalidArgumentException('Stored value amount must be positive.');
         }
 
         $entryDate ??= date('Y-m-d');
 
-        return $this->conn->transactional(fn (): string => (string) $this->conn->scalar(
+        return $this->conn->transactional(fn (): string => $this->conn->scalarString(
             'SELECT issue_stored_value(:kind, :code, :party, :amount, :date, :cash, :expires, :key)',
             [
                 'kind' => $instrumentKind,
@@ -95,13 +100,13 @@ final class StoredValueService
     ): string {
         if ($saleId === null && $entryId === null) {
             throw new InvalidArgumentException(
-                'A redemption must be linked to a sale or a journal entry for GL linkage.'
+                'A redemption must be linked to a sale or a journal entry for GL linkage.',
             );
         }
 
         $entryDate ??= date('Y-m-d');
 
-        return $this->conn->transactional(fn (): string => (string) $this->conn->scalar(
+        return $this->conn->transactional(fn (): string => $this->conn->scalarString(
             'SELECT redeem_stored_value(:code, :amount, :date, :sale, :entry)',
             [
                 'code' => $code,
@@ -127,7 +132,7 @@ final class StoredValueService
                 'key' => $idempotencyKey,
             ]);
 
-            return $entry === null ? null : (string) $entry;
+            return $entry === null ? null : Value::str($entry);
         });
     }
 
@@ -154,7 +159,7 @@ final class StoredValueService
      */
     public function outstanding(string $instrumentKind, string $currency = 'USD'): string
     {
-        return (string) $this->conn->scalar(
+        return $this->conn->scalarString(
             'SELECT COALESCE(sum(balance), 0)
                FROM stored_value
               WHERE instrument_kind = :kind

@@ -1,14 +1,18 @@
 <?php
 /**
  * Point of Sale.
- * @var \NinjaEmp\TenantUi\Support\View $this
+ *
+ * @var View $this
  */
-use NinjaEmp\TenantUi\Support\View;
 use NinjaEmp\TenantUi\Support\Money;
+use NinjaEmp\TenantUi\Support\View;
 
 $cur = $tenant['currency'];
 $taxTotal = '0.0000';
-foreach ($taxRates as $t) { $taxTotal = bcadd($taxTotal, $t['rate'], 4); }
+
+foreach ($taxRates as $t) {
+    $taxTotal = bcadd($taxTotal, $t['rate'], 4);
+}
 ?>
 <div class="page-head">
   <div class="titles">

@@ -1,7 +1,8 @@
 <?php
 /**
  * Vendor create/edit form.
- * @var \NinjaEmp\TenantUi\Support\View $this
+ *
+ * @var View $this
  */
 use NinjaEmp\TenantUi\Support\View;
 

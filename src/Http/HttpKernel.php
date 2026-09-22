@@ -12,6 +12,7 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use RuntimeException;
 
 /**
  * The HTTP kernel.
@@ -86,28 +87,34 @@ final class HttpKernel
             {
                 $match = $request->getAttribute(RoutingMiddleware::ATTRIBUTE);
 
-                if (!$match instanceof \NinjaEMP\Http\Routing\RouteMatch) {
+                if (!$match instanceof Routing\RouteMatch) {
                     throw new NotFoundException('No route matched the request.');
                 }
 
-                $controller = $this->resolver->resolve($match->controller);
+                $controllerClass = $match->controller;
+
+                if (!class_exists($controllerClass)) {
+                    throw new NotFoundException(\sprintf('Controller "%s" not found.', $controllerClass));
+                }
+
+                $controller = $this->resolver->resolve($controllerClass);
                 $action = $match->action;
 
                 if (!method_exists($controller, $action)) {
-                    throw new NotFoundException(sprintf(
+                    throw new NotFoundException(\sprintf(
                         'Action "%s::%s" not found.',
                         $match->controller,
-                        $action
+                        $action,
                     ));
                 }
 
-                $response = $controller->{$action}($request, $match->params);
+                $response = (new \ReflectionMethod($controller, $action))->invoke($controller, $request, $match->params);
 
                 if (!$response instanceof ResponseInterface) {
-                    throw new \RuntimeException(sprintf(
+                    throw new RuntimeException(\sprintf(
                         'Controller %s::%s must return a PSR-7 ResponseInterface.',
                         $match->controller,
-                        $action
+                        $action,
                     ));
                 }
 

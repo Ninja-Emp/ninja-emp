@@ -1,7 +1,11 @@
 <?php
+
 declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Support;
+
+use RuntimeException;
+use NinjaEMP\Db\Sql\Value;
 
 /**
  * Tiny, dependency-free template renderer.
@@ -45,6 +49,7 @@ final class View
 
         // The layout receives the rendered content plus the same data.
         $data['content'] = $content;
+
         return $this->capture($this->layout, $data);
     }
 
@@ -58,18 +63,20 @@ final class View
     private function capture(string $view, array $data): string
     {
         $file = $this->viewsPath . '/' . $view . '.php';
+
         if (!is_file($file)) {
-            throw new \RuntimeException("View not found: {$view} ({$file})");
+            throw new RuntimeException("View not found: {$view} ({$file})");
         }
         extract($data, EXTR_SKIP);
         ob_start();
         require $file;
+
         return (string) ob_get_clean();
     }
 
     /** Escape a value for safe HTML output. */
     public static function e(mixed $value): string
     {
-        return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        return htmlspecialchars(Value::str($value), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 }

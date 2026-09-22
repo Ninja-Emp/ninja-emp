@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Http\Message;
 
+use NinjaEMP\Db\Sql\Value;
+
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -43,19 +45,20 @@ final class Response implements ResponseInterface
 
     private string $reasonPhrase;
 
+    /** @param array<string, string|list<string>> $headers */
     public function __construct(
         int $status = 200,
         ?string $body = null,
         array $headers = [],
-        string $reason = ''
+        string $reason = '',
     ) {
         $this->statusCode = $status;
         $this->reasonPhrase = $reason;
         $this->body = Stream::fromString($body ?? '');
 
         foreach ($headers as $name => $value) {
-            $this->headers[strtolower((string) $name)] = $this->normalizeValue($value);
-            $this->headerNames[strtolower((string) $name)] = (string) $name;
+            $this->headers[strtolower(Value::str($name))] = $this->normalizeValue($value);
+            $this->headerNames[strtolower(Value::str($name))] = Value::str($name);
         }
     }
 

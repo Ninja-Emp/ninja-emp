@@ -21,7 +21,7 @@ final class Csrf
     /** Return the current token, generating one on first use. */
     public function token(): string
     {
-        if (!isset($_SESSION[$this->sessionKey]) || !is_string($_SESSION[$this->sessionKey])) {
+        if (!isset($_SESSION[$this->sessionKey]) || !\is_string($_SESSION[$this->sessionKey])) {
             $_SESSION[$this->sessionKey] = bin2hex(random_bytes(32));
         }
 
@@ -32,7 +32,7 @@ final class Csrf
     {
         $expected = $_SESSION[$this->sessionKey] ?? null;
 
-        if (!is_string($expected) || $expected === '' || $candidate === null || $candidate === '') {
+        if (!\is_string($expected) || $expected === '' || $candidate === null || $candidate === '') {
             return false;
         }
 

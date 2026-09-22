@@ -113,6 +113,7 @@ return static function (TestHarness $t): void {
     $shared = new OpenApiDocument('Shared', '1.0.0');
     Components::register($shared);
     $sharedArr = $shared->toArray();
+
     foreach (['Error', 'Money', 'Tenant', 'User', 'Vendor', 'VendorList', 'VendorEnvelope', 'Health', 'Me'] as $name) {
         $t->assertTrue(isset($sharedArr['components']['schemas'][$name]), "shared schema {$name} registered");
     }

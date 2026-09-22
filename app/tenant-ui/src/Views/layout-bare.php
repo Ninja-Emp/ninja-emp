@@ -2,7 +2,7 @@
 /**
  * Bare layout (no shell) — used for the login screen.
  *
- * @var \NinjaEmp\TenantUi\Support\View $this
+ * @var View $this
  * @var string $content
  * @var string $title
  * @var string $theme
@@ -10,6 +10,7 @@
  * @var array $tenant
  */
 use NinjaEmp\TenantUi\Support\View;
+
 ?>
 <!doctype html>
 <html lang="en" data-theme="<?= View::e($theme) ?>" data-mode="<?= View::e($mode) ?>">

@@ -22,7 +22,7 @@ final class ApiSchema
 {
     /**
      * @param list<string> $tags
-     * @param array<int, string> $errors
+     * @param list<int> $errors
      */
     public function __construct(
         public readonly string $summary = '',

@@ -50,20 +50,40 @@ final class Container implements ContainerInterface
         return isset($this->instances[$id]) || isset($this->factories[$id]);
     }
 
-    public function get(string $id)
+    public function get(string $id): mixed
     {
-        if (array_key_exists($id, $this->instances)) {
+        if (\array_key_exists($id, $this->instances)) {
             return $this->instances[$id];
         }
 
         if (!isset($this->factories[$id])) {
-            throw new class (sprintf('No entry found for "%s".', $id)) extends RuntimeException implements NotFoundExceptionInterface {
+            throw new class (\sprintf('No entry found for "%s".', $id)) extends RuntimeException implements NotFoundExceptionInterface {
             };
         }
 
         $value = ($this->factories[$id])($this);
         $this->instances[$id] = $value;
 
+        return $value;
+    }
+
+    /**
+     * Resolve a service and assert it is an object of the expected type.
+     *
+     * @template T of object
+     *
+     * @param class-string<T> $id
+     *
+     * @return T
+     */
+    private function resolve(string $id): object
+    {
+        $value = $this->get($id);
+        if (!\is_object($value)) {
+            throw new RuntimeException(\sprintf('Service "%s" is not an object.', $id));
+        }
+
+        /** @var T $value */
         return $value;
     }
 
@@ -87,25 +107,25 @@ final class Container implements ContainerInterface
         $container->set(Connection::class, static function (self $c) use ($connectionFactory): Connection {
             if ($connectionFactory === null) {
                 throw new RuntimeException(
-                    'No database connection configured. Set NINJA_EMP_DSN to enable data endpoints.'
+                    'No database connection configured. Set NINJA_EMP_DSN to enable data endpoints.',
                 );
             }
 
-            return $connectionFactory($c->get(TenantContextHolder::class)->get());
+            return $connectionFactory($c->resolve(TenantContextHolder::class)->get());
         });
 
         $container->set(Repository::class, static function (self $c): Repository {
             return new DbalRepository(
-                $c->get(Connection::class),
-                $c->get(TenantContextHolder::class)->get(),
+                $c->resolve(Connection::class),
+                $c->resolve(TenantContextHolder::class)->get(),
             );
         });
 
         // Domain services — each is a thin orchestration layer over the ledger.
-        $container->set(ShiftService::class, static fn (self $c): ShiftService => new ShiftService($c->get(Connection::class)));
-        $container->set(OpenItemService::class, static fn (self $c): OpenItemService => new OpenItemService($c->get(Connection::class)));
-        $container->set(StoredValueService::class, static fn (self $c): StoredValueService => new StoredValueService($c->get(Connection::class)));
-        $container->set(ReportingService::class, static fn (self $c): ReportingService => new ReportingService($c->get(Connection::class)));
+        $container->set(ShiftService::class, static fn (self $c): ShiftService => new ShiftService($c->resolve(Connection::class)));
+        $container->set(OpenItemService::class, static fn (self $c): OpenItemService => new OpenItemService($c->resolve(Connection::class)));
+        $container->set(StoredValueService::class, static fn (self $c): StoredValueService => new StoredValueService($c->resolve(Connection::class)));
+        $container->set(ReportingService::class, static fn (self $c): ReportingService => new ReportingService($c->resolve(Connection::class)));
 
         return $container;
     }

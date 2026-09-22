@@ -11,6 +11,7 @@ use NinjaEMP\OpenApi\Components;
 use NinjaEMP\OpenApi\OpenApiDocument;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use NinjaEMP\Db\Sql\Value;
 
 /**
  * Serves the generated OpenAPI 3.1 contract and a minimal HTML explorer.
@@ -27,6 +28,9 @@ final class OpenApiController
     {
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     #[Route('GET', '/api/openapi.json', name: 'openapi.json', public: true)]
     #[ApiSchema(summary: 'OpenAPI 3.1 document', tags: ['System'])]
     public function document(ServerRequestInterface $request, array $params): ResponseInterface
@@ -36,6 +40,9 @@ final class OpenApiController
         return new Response(200, $json, ['Content-Type' => 'application/json; charset=utf-8']);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     #[Route('GET', '/api/docs', name: 'openapi.docs', public: true)]
     #[ApiSchema(summary: 'API explorer', tags: ['System'])]
     public function docs(ServerRequestInterface $request, array $params): ResponseInterface
@@ -51,7 +58,7 @@ final class OpenApiController
         $doc = new OpenApiDocument(
             'Ninja EMP API',
             '1.0.0',
-            'Vendor mall + consignment SaaS. Double-entry accounting, API-first.'
+            'Vendor mall + consignment SaaS. Double-entry accounting, API-first.',
         );
         $doc->server('/', 'Current host');
         $doc->tag('System', 'Health, identity and the contract itself.');
@@ -71,34 +78,39 @@ final class OpenApiController
      */
     private function renderExplorer(array $doc): string
     {
-        $title = htmlspecialchars((string) ($doc['info']['title'] ?? 'API'), ENT_QUOTES);
-        $version = htmlspecialchars((string) ($doc['info']['version'] ?? ''), ENT_QUOTES);
-        $description = htmlspecialchars((string) ($doc['info']['description'] ?? ''), ENT_QUOTES);
+        /** @var array<string, mixed> $info */
+        $info = \is_array($doc['info'] ?? null) ? $doc['info'] : [];
+        $title = htmlspecialchars(Value::str($info['title'] ?? 'API'), ENT_QUOTES);
+        $version = htmlspecialchars(Value::str($info['version'] ?? ''), ENT_QUOTES);
+        $description = htmlspecialchars(Value::str($info['description'] ?? ''), ENT_QUOTES);
 
         $rows = '';
         /** @var array<string, array<string, mixed>> $paths */
-        $paths = is_array($doc['paths'] ?? null) ? $doc['paths'] : [];
+        $paths = \is_array($doc['paths'] ?? null) ? $doc['paths'] : [];
         ksort($paths);
 
         foreach ($paths as $path => $operations) {
             foreach ($operations as $method => $op) {
+                /** @var array<string, mixed> $op */
                 $m = strtoupper((string) $method);
-                $summary = htmlspecialchars((string) ($op['summary'] ?? ''), ENT_QUOTES);
-                $opId = htmlspecialchars((string) ($op['operationId'] ?? ''), ENT_QUOTES);
+                $summary = htmlspecialchars(Value::str($op['summary'] ?? ''), ENT_QUOTES);
+                $opId = htmlspecialchars(Value::str($op['operationId'] ?? ''), ENT_QUOTES);
                 $secured = isset($op['security']) ? '🔒' : '';
-                $rows .= sprintf(
+                $rows .= \sprintf(
                     '<tr><td><span class="m m-%s">%s</span></td><td><code>%s</code></td><td>%s</td><td class="op">%s %s</td></tr>',
                     strtolower($m),
                     $m,
                     htmlspecialchars((string) $path, ENT_QUOTES),
                     $summary,
                     $opId,
-                    $secured
+                    $secured,
                 );
             }
         }
 
-        $schemaNames = array_keys(is_array($doc['components']['schemas'] ?? null) ? $doc['components']['schemas'] : []);
+        /** @var array<string, mixed> $components */
+        $components = \is_array($doc['components'] ?? null) ? $doc['components'] : [];
+        $schemaNames = array_keys(\is_array($components['schemas'] ?? null) ? $components['schemas'] : []);
         sort($schemaNames);
         $schemaList = implode(', ', array_map(static fn (string $n): string => htmlspecialchars($n, ENT_QUOTES), $schemaNames));
 

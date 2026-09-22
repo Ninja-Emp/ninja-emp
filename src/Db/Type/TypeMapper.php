@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Db\Type;
 
+use NinjaEMP\Db\Sql\Value;
+
 use DateTimeImmutable;
 use DateTimeZone;
 use NinjaEMP\Money\Currency;
@@ -20,12 +22,12 @@ use NinjaEMP\Money\Money;
 final class TypeMapper
 {
     /**
-     * @param array<string, mixed> $raw          raw PDO row
+     * @param array<string, mixed> $raw raw PDO row
      * @param array<string, string> $moneyColumns column => currency code
-     * @param list<string>          $jsonColumns  columns holding jsonb
-     * @param list<string>          $boolColumns  columns holding boolean
-     * @param list<string>          $intColumns   columns holding bigint/int
-     * @param list<string>          $timeColumns  columns holding timestamptz/date
+     * @param list<string> $jsonColumns columns holding jsonb
+     * @param list<string> $boolColumns columns holding boolean
+     * @param list<string> $intColumns columns holding bigint/int
+     * @param list<string> $timeColumns columns holding timestamptz/date
      *
      * @return array<string, mixed>
      */
@@ -46,26 +48,28 @@ final class TypeMapper
             }
 
             if (isset($moneyColumns[$column])) {
-                $mapped[$column] = Money::fromDatabase($value, Currency::of($moneyColumns[$column]));
+                $mapped[$column] = \is_string($value) || \is_int($value) || \is_float($value)
+                    ? Money::fromDatabase($value, Currency::of($moneyColumns[$column]))
+                    : null;
                 continue;
             }
 
-            if (in_array($column, $jsonColumns, true)) {
+            if (\in_array($column, $jsonColumns, true)) {
                 $mapped[$column] = $this->decodeJson($value);
                 continue;
             }
 
-            if (in_array($column, $boolColumns, true)) {
+            if (\in_array($column, $boolColumns, true)) {
                 $mapped[$column] = $this->toBool($value);
                 continue;
             }
 
-            if (in_array($column, $intColumns, true)) {
+            if (\in_array($column, $intColumns, true)) {
                 $mapped[$column] = $this->toInt($value);
                 continue;
             }
 
-            if (in_array($column, $timeColumns, true)) {
+            if (\in_array($column, $timeColumns, true)) {
                 $mapped[$column] = $this->toDateTime($value);
                 continue;
             }
@@ -81,22 +85,22 @@ final class TypeMapper
      */
     private function decodeJson(mixed $value): ?array
     {
-        if (is_array($value)) {
+        if (\is_array($value)) {
             return $value;
         }
 
-        $decoded = json_decode((string) $value, true);
+        $decoded = json_decode(Value::str($value), true);
 
-        return is_array($decoded) ? $decoded : null;
+        return \is_array($decoded) ? $decoded : null;
     }
 
     private function toBool(mixed $value): bool
     {
-        if (is_bool($value)) {
+        if (\is_bool($value)) {
             return $value;
         }
 
-        return in_array((string) $value, ['1', 't', 'true', 'TRUE', 'y', 'yes'], true);
+        return \in_array(Value::str($value), ['1', 't', 'true', 'TRUE', 'y', 'yes'], true);
     }
 
     /**
@@ -104,17 +108,17 @@ final class TypeMapper
      */
     private function toInt(mixed $value): int|string
     {
-        if (is_int($value)) {
+        if (\is_int($value)) {
             return $value;
         }
 
-        $string = (string) $value;
+        $string = Value::num($value);
 
         if (bccomp($string, (string) PHP_INT_MAX, 0) > 0 || bccomp($string, (string) PHP_INT_MIN, 0) < 0) {
             return $string;
         }
 
-        return (int) $string;
+        return Value::int($string);
     }
 
     private function toDateTime(mixed $value): DateTimeImmutable
@@ -126,10 +130,10 @@ final class TypeMapper
         $utc = new DateTimeZone('UTC');
 
         // A bare date (YYYY-MM-DD) becomes midnight UTC.
-        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $value) === 1) {
-            return new DateTimeImmutable((string) $value . ' 00:00:00', $utc);
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', Value::str($value)) === 1) {
+            return new DateTimeImmutable(Value::str($value) . ' 00:00:00', $utc);
         }
 
-        return new DateTimeImmutable((string) $value, $utc);
+        return new DateTimeImmutable(Value::str($value), $utc);
     }
 }

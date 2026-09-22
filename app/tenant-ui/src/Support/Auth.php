@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Support;
@@ -101,7 +102,7 @@ final class Auth
 
     public function can(string $permission): bool
     {
-        return in_array($permission, self::MATRIX[$this->role()] ?? [], true);
+        return \in_array($permission, self::MATRIX[$this->role()] ?? [], true);
     }
 
     /** @return list<string> */

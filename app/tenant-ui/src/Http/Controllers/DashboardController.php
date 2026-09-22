@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Http\Controllers;
@@ -10,13 +11,16 @@ use NinjaEmp\TenantUi\Http\Controller;
  */
 final class DashboardController extends Controller
 {
+    /**
+     * @param array<string,mixed> $params
+     */
     public function index(array $params = []): void
     {
         $this->require('dashboard.view');
 
         $spaces = $this->repo->spaces();
         $statusCounts = $this->repo->spaceStatusCounts();
-        $totalSpaces = count($spaces);
+        $totalSpaces = \count($spaces);
         $occupied = $statusCounts['leased'] + $statusCounts['reserved'];
         $occupancy = $totalSpaces > 0 ? (int) round($occupied / $totalSpaces * 100) : 0;
 
@@ -30,10 +34,10 @@ final class DashboardController extends Controller
             'statusCounts'   => $statusCounts,
             'totalSpaces'    => $totalSpaces,
             'occupancy'      => $occupancy,
-            'recentSales'    => array_slice(array_reverse($this->repo->sales()), 0, 5),
+            'recentSales'    => \array_slice(array_reverse($this->repo->sales()), 0, 5),
             'lowStockItems'  => array_values(array_filter(
                 $this->repo->items(),
-                static fn (array $i): bool => $i['on_hand'] <= $i['reorder']
+                static fn (array $i): bool => $i['on_hand'] <= $i['reorder'],
             )),
             'registers'      => $this->repo->registers(),
             'vendors'        => $this->repo->vendors(),

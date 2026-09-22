@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Ledger;
 
+use NinjaEMP\Db\Sql\Value;
+
 use NinjaEMP\Db\Connection;
 
 /**
@@ -32,11 +34,11 @@ final class LedgerService
             $lines = [];
 
             foreach ($entry->lines as $line) {
-                $accountId = $line->accountId ?? $this->resolveAccount((string) $line->accountRole);
+                $accountId = $line->accountId ?? $this->resolveAccount(Value::str($line->accountRole));
                 $lines[] = $line->toArray($accountId);
             }
 
-            return (string) $this->db->scalar(
+            return $this->db->scalarString(
                 'SELECT post_journal_entry(:date, :memo, :source, :ref, :key, :lines)',
                 [
                     'date' => $entry->entryDate,
@@ -56,7 +58,7 @@ final class LedgerService
      */
     public function reverse(string $entryId, string $reversalDate, ?string $memo = null, ?string $idempotencyKey = null): string
     {
-        return (string) $this->db->transactional(fn (): string => (string) $this->db->scalar(
+        return (string) $this->db->transactional(fn (): string => $this->db->scalarString(
             'SELECT reverse_journal_entry(:entry, :date, :memo, :key)',
             [
                 'entry' => $entryId,
@@ -73,6 +75,6 @@ final class LedgerService
      */
     public function resolveAccount(string $roleCode): string
     {
-        return (string) $this->db->scalar('SELECT posting_account(:role)', ['role' => $roleCode]);
+        return $this->db->scalarString('SELECT posting_account(:role)', ['role' => $roleCode]);
     }
 }

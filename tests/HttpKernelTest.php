@@ -6,13 +6,13 @@ use NinjaEMP\Auth\Csrf;
 use NinjaEMP\Auth\Role;
 use NinjaEMP\Auth\SessionAuth;
 use NinjaEMP\Auth\User;
-use NinjaEMP\Http\ErrorRenderer;
-use NinjaEMP\Http\HttpKernel;
 use NinjaEMP\Http\ControllerResolver;
+use NinjaEMP\Http\ErrorRenderer;
 use NinjaEMP\Http\Exception\AccessDeniedException;
 use NinjaEMP\Http\Exception\NotFoundException;
 use NinjaEMP\Http\Exception\TenantNotResolvedException;
 use NinjaEMP\Http\Exception\UnauthorizedException;
+use NinjaEMP\Http\HttpKernel;
 use NinjaEMP\Http\Message\Response;
 use NinjaEMP\Http\Message\ServerRequest;
 use NinjaEMP\Http\Message\Stream;
@@ -50,7 +50,7 @@ return static function (TestHarness $t): void {
     $t->assertSame('/pos', $uri->getPath(), 'uri path');
     $t->assertSame('x=1', $uri->getQuery(), 'uri query');
     $t->assertSame('frag', $uri->getFragment(), 'uri fragment');
-    $t->assertSame(null, (new Uri('https://a.b/c'))->getPort(), 'default port hidden');
+    $t->assertSame(null, new Uri('https://a.b/c')->getPort(), 'default port hidden');
 
     $response = new Response(201, 'created', ['Content-Type' => 'text/plain']);
     $t->assertSame(201, $response->getStatusCode(), 'response status');
@@ -101,7 +101,7 @@ return static function (TestHarness $t): void {
     $t->assertThrows(
         NotFoundException::class,
         fn () => $kernel->handle(new ServerRequest('GET', new Uri('http://localhost/missing'))),
-        'unmatched route throws NotFound'
+        'unmatched route throws NotFound',
     );
 
     // ---- RBAC -------------------------------------------------------------
@@ -114,14 +114,14 @@ return static function (TestHarness $t): void {
     $t->assertThrows(
         UnauthorizedException::class,
         fn () => $rbacKernel->handle(new ServerRequest('GET', new Uri('http://localhost/secure'))),
-        'anonymous request to protected route is 401'
+        'anonymous request to protected route is 401',
     );
 
     $auth->login(new User('u-1', 'Dana', Role::of(Role::CASHIER), 't-1'));
     $t->assertThrows(
         AccessDeniedException::class,
         fn () => $rbacKernel->handle(new ServerRequest('GET', new Uri('http://localhost/secure'))),
-        'cashier denied settings.manage'
+        'cashier denied settings.manage',
     );
 
     $res = $rbacKernel->handle(new ServerRequest('GET', new Uri('http://localhost/pos')));
@@ -146,7 +146,7 @@ return static function (TestHarness $t): void {
     $t->assertThrows(
         TenantNotResolvedException::class,
         fn () => $tenantKernel->handle(new ServerRequest('GET', new Uri('http://unknown.example/echo-tenant'))),
-        'unknown host cannot resolve a tenant'
+        'unknown host cannot resolve a tenant',
     );
 
     // ---- CSRF -------------------------------------------------------------
@@ -160,9 +160,9 @@ return static function (TestHarness $t): void {
     $t->assertSame(200, $res->getStatusCode(), 'safe method bypasses CSRF');
 
     $t->assertThrows(
-        \NinjaEMP\Http\Exception\HttpException::class,
+        NinjaEMP\Http\Exception\HttpException::class,
         fn () => $csrfKernel->handle(new ServerRequest('POST', new Uri('http://localhost/things'))),
-        'POST without token is rejected'
+        'POST without token is rejected',
     );
 
     $post = new ServerRequest('POST', new Uri('http://localhost/things'), [], null, ['X-CSRF-Token' => $token]);
@@ -190,14 +190,14 @@ return static function (TestHarness $t): void {
 
     // ---- Pipeline ordering ------------------------------------------------
     $order = [];
-    $mk = static function (string $tag) use (&$order): \Psr\Http\Server\MiddlewareInterface {
-        return new class ($tag, $order) implements \Psr\Http\Server\MiddlewareInterface {
+    $mk = static function (string $tag) use (&$order): Psr\Http\Server\MiddlewareInterface {
+        return new class ($tag, $order) implements Psr\Http\Server\MiddlewareInterface {
             /** @param array<int,string> $order */
             public function __construct(private string $tag, private array &$order)
             {
             }
 
-            public function process(\Psr\Http\Message\ServerRequestInterface $request, \Psr\Http\Server\RequestHandlerInterface $handler): \Psr\Http\Message\ResponseInterface
+            public function process(Psr\Http\Message\ServerRequestInterface $request, Psr\Http\Server\RequestHandlerInterface $handler): Psr\Http\Message\ResponseInterface
             {
                 $this->order[] = $this->tag . ':in';
                 $response = $handler->handle($request);

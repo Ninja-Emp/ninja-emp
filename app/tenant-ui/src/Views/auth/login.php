@@ -1,9 +1,11 @@
 <?php
 /**
  * Login (mock role picker).
- * @var \NinjaEmp\TenantUi\Support\View $this
+ *
+ * @var View $this
  */
 use NinjaEmp\TenantUi\Support\View;
+
 ?>
 <div style="min-height:100vh; display:grid; place-items:center; padding:var(--space-6); background:var(--bg)">
   <div style="width:100%; max-width:420px">

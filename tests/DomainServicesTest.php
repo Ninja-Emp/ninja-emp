@@ -36,6 +36,7 @@ return static function (TestHarness $t): void {
     $t->assertSame('3.3333', $parts[1]->amount(), 'largest remainder: second part');
     $t->assertSame('3.3333', $parts[2]->amount(), 'largest remainder: third part');
     $sum = Money::zero($usd);
+
     foreach ($parts as $p) {
         $sum = $sum->plus($p);
     }

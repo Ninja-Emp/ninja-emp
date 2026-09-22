@@ -55,7 +55,7 @@ final class JournalEntry
             $creditTotal = $credits[$currency];
 
             if (!$debitTotal->equals($creditTotal)) {
-                throw new InvalidArgumentException(sprintf(
+                throw new InvalidArgumentException(\sprintf(
                     'Unbalanced journal entry in %s: debits %s ≠ credits %s.',
                     $currency,
                     $debitTotal->amount(),

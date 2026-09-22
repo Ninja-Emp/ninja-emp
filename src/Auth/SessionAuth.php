@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Auth;
 
+use NinjaEMP\Db\Sql\Value;
+
 /**
  * Session-backed authentication. Stores only the user id, role and tenant id in
  * the session; the full user is rehydrated on demand. Session id is regenerated
@@ -42,26 +44,28 @@ final class SessionAuth
 
     public function check(): bool
     {
-        return isset($_SESSION[$this->sessionKey]['id']);
+        $data = $_SESSION[$this->sessionKey] ?? null;
+
+        return \is_array($data) && isset($data['id']);
     }
 
     public function user(): ?User
     {
         $data = $_SESSION[$this->sessionKey] ?? null;
 
-        if (!is_array($data) || !isset($data['id'], $data['role'], $data['tenant_id'])) {
+        if (!\is_array($data) || !isset($data['id'], $data['role'], $data['tenant_id'])) {
             return null;
         }
 
-        if (!Role::isValid((string) $data['role'])) {
+        if (!Role::isValid(Value::str($data['role']))) {
             return null;
         }
 
         return new User(
-            (string) $data['id'],
-            (string) ($data['name'] ?? 'User'),
-            Role::of((string) $data['role']),
-            (string) $data['tenant_id'],
+            Value::str($data['id']),
+            Value::str($data['name'] ?? 'User'),
+            Role::of(Value::str($data['role'])),
+            Value::str($data['tenant_id']),
         );
     }
 

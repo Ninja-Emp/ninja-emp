@@ -1,9 +1,10 @@
 <?php
 /**
- * @var \NinjaEmp\TenantUi\Support\View $this
+ * @var View $this
  * @var string $permission
  */
 use NinjaEmp\TenantUi\Support\View;
+
 ?>
 <div class="empty" style="padding-top:var(--space-12)">
   <svg aria-hidden="true"><use href="#i-lock"></use></svg>

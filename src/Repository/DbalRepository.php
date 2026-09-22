@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Repository;
 
+use NinjaEMP\Db\Sql\Value;
+
+use InvalidArgumentException;
 use NinjaEMP\Db\Connection;
 use NinjaEMP\Db\TenantContext;
 
@@ -37,7 +40,7 @@ final class DbalRepository implements Repository
     {
         return $this->conn->transactional(function (Connection $c): array {
             $row = $c->select(
-                'SELECT legal_name, functional_currency, timezone FROM tenant_config LIMIT 1'
+                'SELECT legal_name, functional_currency, timezone FROM tenant_config LIMIT 1',
             )->first();
 
             if ($row === null) {
@@ -47,14 +50,15 @@ final class DbalRepository implements Repository
             $r = $row->toArray();
 
             return [
-                'name'     => (string) ($r['legal_name'] ?? ''),
+                'name'     => Value::str($r['legal_name'] ?? ''),
                 'slug'     => $this->slug(),
-                'currency' => (string) ($r['functional_currency'] ?? 'USD'),
-                'timezone' => (string) ($r['timezone'] ?? 'UTC'),
+                'currency' => Value::str($r['functional_currency'] ?? 'USD'),
+                'timezone' => Value::str($r['timezone'] ?? 'UTC'),
             ];
         });
     }
 
+    /** @param array<string, mixed> $fields */
     public function updateTenant(array $fields): void
     {
         $this->conn->transactional(function (Connection $c) use ($fields): void {
@@ -63,15 +67,17 @@ final class DbalRepository implements Repository
 
             if (isset($fields['name']) && $fields['name'] !== '') {
                 $sets[] = 'legal_name = :name';
-                $params['name'] = (string) $fields['name'];
+                $params['name'] = Value::str($fields['name']);
             }
+
             if (isset($fields['currency']) && $fields['currency'] !== '') {
                 $sets[] = 'functional_currency = :currency';
-                $params['currency'] = strtoupper((string) $fields['currency']);
+                $params['currency'] = strtoupper(Value::str($fields['currency']));
             }
+
             if (isset($fields['timezone']) && $fields['timezone'] !== '') {
                 $sets[] = 'timezone = :timezone';
-                $params['timezone'] = (string) $fields['timezone'];
+                $params['timezone'] = Value::str($fields['timezone']);
             }
 
             if ($sets === []) {
@@ -105,14 +111,15 @@ final class DbalRepository implements Repository
         });
     }
 
+    /** @param array<string, mixed> $fields */
     public function saveSpace(?string $id, array $fields): string
     {
         return $this->conn->transactional(function (Connection $c) use ($id, $fields): string {
-            $code = (string) ($fields['code'] ?? '');
-            $name = (string) ($fields['name'] ?? '');
-            $type = (string) ($fields['type'] ?? 'inline');
-            $sqft = (string) ($fields['sqft'] ?? '0');
-            $status = (string) ($fields['status'] ?? 'available');
+            $code = Value::str($fields['code'] ?? '');
+            $name = Value::str($fields['name'] ?? '');
+            $type = Value::str($fields['type'] ?? 'inline');
+            $sqft = Value::str($fields['sqft'] ?? '0');
+            $status = Value::str($fields['status'] ?? 'available');
 
             if ($id !== null && $id !== '') {
                 $c->execute(
@@ -123,12 +130,13 @@ final class DbalRepository implements Repository
                 );
                 $spaceId = $id;
             } else {
-                $floorId = (string) ($fields['floor_id'] ?? '');
+                $floorId = Value::str($fields['floor_id'] ?? '');
+
                 if ($floorId === '') {
-                    $floorId = (string) $c->scalar('SELECT id FROM floor ORDER BY level_no LIMIT 1');
+                    $floorId = Value::str($c->scalar('SELECT id FROM floor ORDER BY level_no LIMIT 1'));
                 }
 
-                $spaceId = (string) $c->scalar(
+                $spaceId = $c->scalarString(
                     'INSERT INTO space (floor_id, code, name, space_type_code, area_sqft, status)
                      VALUES (:floor, :code, :name, :type, :sqft, :status)
                      RETURNING id',
@@ -138,8 +146,8 @@ final class DbalRepository implements Repository
 
             $this->upsertSpaceAttributes($c, $spaceId, $fields);
 
-            if (array_key_exists('vendor_id', $fields)) {
-                $this->assignSpaceVendor($c, $spaceId, $fields['vendor_id'] === null ? null : (string) $fields['vendor_id']);
+            if (\array_key_exists('vendor_id', $fields)) {
+                $this->assignSpaceVendor($c, $spaceId, $fields['vendor_id'] === null ? null : Value::str($fields['vendor_id']));
             }
 
             return $spaceId;
@@ -152,7 +160,7 @@ final class DbalRepository implements Repository
     {
         return $this->conn->transactional(function (Connection $c): array {
             $rows = $c->select(
-                'SELECT * FROM (' . self::VENDOR_SELECT . ' WHERE p.deleted_at IS NULL) v ORDER BY v.display_name'
+                'SELECT * FROM (' . self::VENDOR_SELECT . ' WHERE p.deleted_at IS NULL) v ORDER BY v.display_name',
             );
 
             return array_map(static fn ($row): array => RowMapper::vendor($row->toArray()), $rows->rows());
@@ -171,14 +179,15 @@ final class DbalRepository implements Repository
         });
     }
 
+    /** @param array<string, mixed> $fields */
     public function saveVendor(?string $id, array $fields): string
     {
         return $this->conn->transactional(function (Connection $c) use ($id, $fields): string {
-            $name = (string) ($fields['name'] ?? '');
-            $type = (string) ($fields['type'] ?? 'vendor');
+            $name = Value::str($fields['name'] ?? '');
+            $type = Value::str($fields['type'] ?? 'vendor');
             $role = $type === 'consignor' ? 'consignor' : 'vendor';
-            $rate = bcdiv((string) ($fields['commission'] ?? '0'), '100', 6);
-            $status = (string) ($fields['status'] ?? 'active');
+            $rate = bcdiv(Value::str($fields['commission'] ?? '0'), '100', 6);
+            $status = Value::str($fields['status'] ?? 'active');
 
             if ($id !== null && $id !== '') {
                 $c->execute('UPDATE party SET display_name = :name WHERE id = :id', ['name' => $name, 'id' => $id]);
@@ -190,7 +199,7 @@ final class DbalRepository implements Repository
                 );
                 $vendorId = $id;
             } else {
-                $vendorId = (string) $c->scalar(
+                $vendorId = $c->scalarString(
                     "INSERT INTO party (party_type, display_name) VALUES ('organization', :name) RETURNING id",
                     ['name' => $name],
                 );
@@ -202,6 +211,7 @@ final class DbalRepository implements Repository
                     'INSERT INTO party_role (party_id, role_type_code) VALUES (:id, :role)',
                     ['id' => $vendorId, 'role' => $role],
                 );
+
                 if ($role === 'consignor') {
                     $c->execute(
                         'INSERT INTO consignor_agreement (consignor_party_id, default_commission_rate, status)
@@ -211,28 +221,29 @@ final class DbalRepository implements Repository
                 }
             }
 
-            $this->upsertContact($c, $vendorId, 'email', (string) ($fields['email'] ?? ''));
-            $this->upsertContact($c, $vendorId, 'phone', (string) ($fields['phone'] ?? ''));
+            $this->upsertContact($c, $vendorId, 'email', Value::str($fields['email'] ?? ''));
+            $this->upsertContact($c, $vendorId, 'phone', Value::str($fields['phone'] ?? ''));
 
             return $vendorId;
         });
     }
 
+    /** @param array<string, mixed> $fields */
     public function purchaseFromVendor(string $vendorId, array $fields): string
     {
         return $this->conn->transactional(function (Connection $c) use ($vendorId, $fields): string {
-            $qty = max(1, (int) ($fields['qty'] ?? 1));
+            $qty = max(1, Value::int($fields['qty'] ?? 1));
             $cost = RowMapper::money($fields['cost'] ?? '0');
             $price = RowMapper::money($fields['price'] ?? $cost);
-            $sku = (string) ($fields['sku'] ?? '');
-            $name = (string) ($fields['name'] ?? 'Purchased item');
-            $category = (string) ($fields['category'] ?? 'General');
-            $barcode = (string) ($fields['barcode'] ?? '');
-            $currency = (string) ($fields['currency'] ?? 'USD');
+            $sku = Value::str($fields['sku'] ?? '');
+            $name = Value::str($fields['name'] ?? 'Purchased item');
+            $category = Value::str($fields['category'] ?? 'General');
+            $barcode = Value::str($fields['barcode'] ?? '');
+            $currency = Value::str($fields['currency'] ?? 'USD');
 
             // Insert the item with zero running state; receive_inventory() is the
             // only writer of on_hand / avg_cost (ADR-0031).
-            $itemId = (string) $c->scalar(
+            $itemId = $c->scalarString(
                 'INSERT INTO inventory_item
                    (sku, description, category, supplier_party_id, list_price, barcode,
                     on_hand, avg_cost, currency, reorder_point)
@@ -249,7 +260,7 @@ final class DbalRepository implements Repository
                 'SELECT receive_inventory(:item, :qty, :cost, current_date, :key, true)',
                 [
                     'item' => $itemId,
-                    'qty'  => (string) $qty,
+                    'qty'  => Value::str($qty),
                     'cost' => $cost,
                     'key'  => 'purchase:' . $itemId,
                 ],
@@ -291,10 +302,11 @@ final class DbalRepository implements Repository
         });
     }
 
+    /** @param array<string, mixed> $fields */
     public function saveItem(?string $id, array $fields): string
     {
         return $this->conn->transactional(function (Connection $c) use ($id, $fields): string {
-            $owner = (string) ($fields['owner'] ?? 'vendor');
+            $owner = Value::str($fields['owner'] ?? 'vendor');
 
             return $owner === 'store'
                 ? $this->saveOwnedItem($c, $id, $fields)
@@ -307,19 +319,20 @@ final class DbalRepository implements Repository
     public function sales(): array
     {
         return $this->conn->transactional(function (Connection $c): array {
-            $sales = $c->select(self::SALE_SELECT . " AND s.sale_date = current_date ORDER BY s.created_at DESC");
+            $sales = $c->select(self::SALE_SELECT . ' AND s.sale_date = current_date ORDER BY s.created_at DESC');
 
             if ($sales->isEmpty()) {
                 return [];
             }
 
-            $ids = array_map(static fn ($row): string => (string) $row->toArray()['id'], $sales->rows());
+            $ids = array_map(static fn ($row): string => Value::str($row->toArray()['id']), $sales->rows());
             $lines = $this->linesForSales($c, $ids);
 
             $out = [];
+
             foreach ($sales->rows() as $row) {
                 $r = $row->toArray();
-                $out[] = RowMapper::sale($r, $lines[(string) $r['id']] ?? []);
+                $out[] = RowMapper::sale($r, $lines[Value::str($r['id'])] ?? []);
             }
 
             return $out;
@@ -336,7 +349,7 @@ final class DbalRepository implements Repository
                     AND status IN ('completed','refunded','partially_refunded')
                     AND sale_date >= current_date - 13
                   GROUP BY sale_date
-                  ORDER BY sale_date"
+                  ORDER BY sale_date",
             );
 
             return array_map(static fn ($row): array => RowMapper::trendPoint($row->toArray()), $rows->rows());
@@ -363,11 +376,17 @@ final class DbalRepository implements Repository
         });
     }
 
+    /** @param array<string, mixed> $fields */
     public function saveRegister(?string $id, array $fields): string
     {
         return $this->conn->transactional(function (Connection $c) use ($id, $fields): string {
-            $name = (string) ($fields['name'] ?? 'Register');
-            $code = (string) ($fields['code'] ?? strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $name) ?: 'REG', 0, 8)));
+            $name = Value::str($fields['name'] ?? 'Register');
+            $code = Value::str($fields['code'] ?? '');
+
+            if ($code === '') {
+                $slug = preg_replace('/[^A-Za-z0-9]/', '', $name);
+                $code = strtoupper(substr($slug === null || $slug === '' ? 'REG' : $slug, 0, 8));
+            }
 
             if ($id !== null && $id !== '') {
                 $c->execute('UPDATE register SET name = :name, code = :code WHERE id = :id', ['name' => $name, 'code' => $code, 'id' => $id]);
@@ -375,7 +394,7 @@ final class DbalRepository implements Repository
                 return $id;
             }
 
-            return (string) $c->scalar(
+            return $c->scalarString(
                 'INSERT INTO register (code, name) VALUES (:code, :name) RETURNING id',
                 ['code' => $code, 'name' => $name],
             );
@@ -384,7 +403,7 @@ final class DbalRepository implements Repository
 
     public function openRegister(string $id, string $cashier, string $float): void
     {
-        $this->conn->transactional(function (Connection $c) use ($id, $cashier, $float): void {
+        $this->conn->transactional(function (Connection $c) use ($id, $float): void {
             $actor = $this->context->actorId();
 
             $c->execute(
@@ -415,9 +434,9 @@ final class DbalRepository implements Repository
             $c->scalar(
                 'SELECT post_shift_close(:shift, :counted, current_date, :key)',
                 [
-                    'shift'   => (string) $shiftId,
+                    'shift'   => Value::str($shiftId),
                     'counted' => RowMapper::money($counted),
-                    'key'     => 'shift_close:' . (string) $shiftId,
+                    'key'     => 'shift_close:' . Value::str($shiftId),
                 ],
             );
         });
@@ -433,7 +452,7 @@ final class DbalRepository implements Repository
                    FROM tax_rate tr
                    JOIN tax_jurisdiction tj ON tj.id = tr.jurisdiction_id
                   WHERE tr.effective_thru IS NULL AND tj.deleted_at IS NULL
-                  ORDER BY tj.name'
+                  ORDER BY tj.name',
             );
 
             return array_map(static fn ($row): array => RowMapper::taxRate($row->toArray()), $rows->rows());
@@ -449,7 +468,7 @@ final class DbalRepository implements Repository
                 "SELECT COALESCE(SUM(total), 0) FROM sale
                   WHERE deleted_at IS NULL
                     AND status IN ('completed','refunded','partially_refunded')
-                    AND sale_date = current_date"
+                    AND sale_date = current_date",
             );
 
             return RowMapper::money($total);
@@ -471,7 +490,7 @@ final class DbalRepository implements Repository
             $count = $c->scalar(
                 'SELECT COUNT(*) FROM inventory_item
                   WHERE deleted_at IS NULL AND is_active
-                    AND on_hand <= COALESCE(reorder_point, 0)'
+                    AND on_hand <= COALESCE(reorder_point, 0)',
             );
 
             return RowMapper::int($count);
@@ -483,22 +502,24 @@ final class DbalRepository implements Repository
         return $this->conn->transactional(function (Connection $c): string {
             $total = $c->scalar(
                 'SELECT COALESCE(SUM(avg_cost * on_hand), 0) FROM inventory_item
-                  WHERE deleted_at IS NULL AND is_active'
+                  WHERE deleted_at IS NULL AND is_active',
             );
 
             return RowMapper::money($total);
         });
     }
 
+    /** @return array<string, int> */
     public function spaceStatusCounts(): array
     {
         return $this->conn->transactional(function (Connection $c): array {
             $counts = ['available' => 0, 'leased' => 0, 'reserved' => 0, 'maintenance' => 0, 'inactive' => 0];
 
             $rows = $c->select('SELECT status, COUNT(*) AS n FROM space WHERE deleted_at IS NULL GROUP BY status');
+
             foreach ($rows->rows() as $row) {
                 $r = $row->toArray();
-                $counts[(string) $r['status']] = RowMapper::int($r['n']);
+                $counts[Value::str($r['status'])] = RowMapper::int($r['n']);
             }
 
             return $counts;
@@ -540,23 +561,25 @@ final class DbalRepository implements Repository
         );
 
         $grouped = [];
+
         foreach ($rows->rows() as $row) {
             $r = $row->toArray();
-            $grouped[(string) $r['sale_id']][] = $r;
+            $grouped[Value::str($r['sale_id'])][] = $r;
         }
 
         return $grouped;
     }
 
+    /** @param array<string, mixed> $fields */
     private function saveOwnedItem(Connection $c, ?string $id, array $fields): string
     {
-        $sku = (string) ($fields['sku'] ?? '');
-        $name = (string) ($fields['name'] ?? '');
-        $category = (string) ($fields['category'] ?? 'General');
+        $sku = Value::str($fields['sku'] ?? '');
+        $name = Value::str($fields['name'] ?? '');
+        $category = Value::str($fields['category'] ?? 'General');
         $price = RowMapper::money($fields['price'] ?? '0');
-        $reorder = (string) ($fields['reorder'] ?? '0');
-        $barcode = (string) ($fields['barcode'] ?? '');
-        $vendor = isset($fields['vendor_id']) && $fields['vendor_id'] !== null ? (string) $fields['vendor_id'] : null;
+        $reorder = Value::str($fields['reorder'] ?? '0');
+        $barcode = Value::str($fields['barcode'] ?? '');
+        $vendor = isset($fields['vendor_id']) ? Value::str($fields['vendor_id']) : null;
 
         if ($id !== null && $id !== '') {
             $c->execute(
@@ -571,7 +594,7 @@ final class DbalRepository implements Repository
             return $id;
         }
 
-        return (string) $c->scalar(
+        return $c->scalarString(
             'INSERT INTO inventory_item
                (sku, description, category, supplier_party_id, list_price, barcode, reorder_point)
              VALUES (:sku, :name, :category, :vendor, :price, :barcode, :reorder)
@@ -581,14 +604,15 @@ final class DbalRepository implements Repository
         );
     }
 
+    /** @param array<string, mixed> $fields */
     private function saveConsignedItem(Connection $c, ?string $id, array $fields): string
     {
-        $sku = (string) ($fields['sku'] ?? '');
-        $name = (string) ($fields['name'] ?? '');
-        $category = (string) ($fields['category'] ?? 'General');
+        $sku = Value::str($fields['sku'] ?? '');
+        $name = Value::str($fields['name'] ?? '');
+        $category = Value::str($fields['category'] ?? 'General');
         $price = RowMapper::money($fields['price'] ?? '0');
-        $barcode = (string) ($fields['barcode'] ?? '');
-        $vendor = isset($fields['vendor_id']) && $fields['vendor_id'] !== null ? (string) $fields['vendor_id'] : null;
+        $barcode = Value::str($fields['barcode'] ?? '');
+        $vendor = isset($fields['vendor_id']) ? Value::str($fields['vendor_id']) : null;
 
         if ($id !== null && $id !== '') {
             $c->execute(
@@ -605,7 +629,7 @@ final class DbalRepository implements Repository
 
         $agreementId = $this->agreementFor($c, $vendor);
 
-        return (string) $c->scalar(
+        return $c->scalarString(
             'INSERT INTO consignment_item
                (agreement_id, sku, description, category, agreed_price, barcode, status)
              VALUES (:agreement, :sku, :name, :category, :price, :barcode, \'available\')
@@ -618,7 +642,7 @@ final class DbalRepository implements Repository
     private function agreementFor(Connection $c, ?string $vendorId): string
     {
         if ($vendorId === null) {
-            throw new \InvalidArgumentException('A consigned item requires a consignor (vendor_id).');
+            throw new InvalidArgumentException('A consigned item requires a consignor (vendor_id).');
         }
 
         $existing = $c->scalar(
@@ -627,19 +651,20 @@ final class DbalRepository implements Repository
         );
 
         if ($existing !== null) {
-            return (string) $existing;
+            return Value::str($existing);
         }
 
-        return (string) $c->scalar(
+        return $c->scalarString(
             "INSERT INTO consignor_agreement (consignor_party_id, status) VALUES (:vendor, 'active') RETURNING id",
             ['vendor' => $vendorId],
         );
     }
 
+    /** @param array<string, mixed> $fields */
     private function upsertSpaceAttributes(Connection $c, string $spaceId, array $fields): void
     {
         foreach (['x', 'y', 'w', 'h'] as $key) {
-            if (!array_key_exists($key, $fields)) {
+            if (!\array_key_exists($key, $fields)) {
                 continue;
             }
 
@@ -647,7 +672,7 @@ final class DbalRepository implements Repository
                 'INSERT INTO space_attribute (space_id, attr_key, attr_value)
                  VALUES (:space, :key, :value)
                  ON CONFLICT (space_id, attr_key) DO UPDATE SET attr_value = EXCLUDED.attr_value',
-                ['space' => $spaceId, 'key' => $key, 'value' => (string) $fields[$key]],
+                ['space' => $spaceId, 'key' => $key, 'value' => Value::str($fields[$key])],
             );
         }
     }
@@ -676,8 +701,8 @@ final class DbalRepository implements Repository
         );
 
         if ($leaseId === null) {
-            $locationId = (string) $c->scalar('SELECT id FROM location ORDER BY code LIMIT 1');
-            $leaseId = (string) $c->scalar(
+            $locationId = Value::str($c->scalar('SELECT id FROM location ORDER BY code LIMIT 1'));
+            $leaseId = $c->scalarString(
                 "INSERT INTO lease (lessee_party_id, location_id, status, start_date)
                  VALUES (:vendor, :location, 'active', current_date) RETURNING id",
                 ['vendor' => $vendorId, 'location' => $locationId],
@@ -686,7 +711,7 @@ final class DbalRepository implements Repository
 
         $c->execute(
             'INSERT INTO lease_space (lease_id, space_id, from_date) VALUES (:lease, :space, current_date)',
-            ['lease' => (string) $leaseId, 'space' => $spaceId],
+            ['lease' => Value::str($leaseId), 'space' => $spaceId],
         );
 
         $c->execute("UPDATE space SET status = 'leased' WHERE id = :space", ['space' => $spaceId]);

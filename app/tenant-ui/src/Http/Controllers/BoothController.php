@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace NinjaEmp\TenantUi\Http\Controllers;
@@ -10,6 +11,9 @@ use NinjaEmp\TenantUi\Http\Controller;
  */
 final class BoothController extends Controller
 {
+    /**
+     * @param array<string,mixed> $params
+     */
     public function index(array $params = []): void
     {
         $this->require('booths.manage');
@@ -17,6 +21,7 @@ final class BoothController extends Controller
         $spaces = $this->repo->spaces();
         $vendors = $this->repo->vendors();
         $vendorNames = [];
+
         foreach ($vendors as $v) {
             $vendorNames[$v['id']] = $v['name'];
         }
@@ -29,12 +34,16 @@ final class BoothController extends Controller
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function map(array $params = []): void
     {
         $this->require('booths.manage');
 
         $vendors = $this->repo->vendors();
         $vendorNames = [];
+
         foreach ($vendors as $v) {
             $vendorNames[$v['id']] = $v['name'];
         }
@@ -47,6 +56,9 @@ final class BoothController extends Controller
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function create(array $params = []): void
     {
         $this->require('booths.manage');
@@ -57,6 +69,9 @@ final class BoothController extends Controller
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function store(array $params = []): void
     {
         $this->require('booths.manage');
@@ -65,13 +80,18 @@ final class BoothController extends Controller
         $this->redirect('/booths');
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function show(array $params): void
     {
         $this->require('booths.manage');
         $space = $this->repo->space($params['id'] ?? '');
+
         if ($space === null) {
             http_response_code(404);
             $this->render('errors/404', ['title' => 'Not found']);
+
             return;
         }
         $vendor = $space['vendor_id'] ? $this->repo->vendor($space['vendor_id']) : null;
@@ -83,6 +103,9 @@ final class BoothController extends Controller
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function update(array $params): void
     {
         $this->require('booths.manage');

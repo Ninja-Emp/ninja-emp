@@ -22,7 +22,11 @@ interface Repository
     /** @return array<string,mixed> */
     public function tenant(): array;
 
-    /** Update editable tenant settings (name, currency, timezone). */
+    /**
+     * Update editable tenant settings (name, currency, timezone).
+     *
+     * @param array<string, mixed> $fields
+     */
     public function updateTenant(array $fields): void;
 
     // ---- Spaces (booths) --------------------------------------------------
@@ -33,7 +37,11 @@ interface Repository
     /** @return array<string,mixed>|null */
     public function space(string $id): ?array;
 
-    /** Create or update a booth. Returns the space id. */
+    /**
+     * Create or update a booth. Returns the space id.
+     *
+     * @param array<string, mixed> $fields
+     */
     public function saveSpace(?string $id, array $fields): string;
 
     // ---- Vendors ----------------------------------------------------------
@@ -44,12 +52,18 @@ interface Repository
     /** @return array<string,mixed>|null */
     public function vendor(string $id): ?array;
 
-    /** Create or update a vendor. Returns the vendor id. */
+    /**
+     * Create or update a vendor. Returns the vendor id.
+     *
+     * @param array<string, mixed> $fields
+     */
     public function saveVendor(?string $id, array $fields): string;
 
     /**
      * Store buys goods from a vendor: creates a store-owned item and increases
      * what we owe the vendor (a vendor payable). Returns the new item id.
+     *
+     * @param array<string, mixed> $fields
      */
     public function purchaseFromVendor(string $vendorId, array $fields): string;
 
@@ -64,7 +78,11 @@ interface Repository
     /** @return array<string,mixed>|null */
     public function itemByBarcode(string $barcode): ?array;
 
-    /** Create or update an item. Returns the item id. */
+    /**
+     * Create or update an item. Returns the item id.
+     *
+     * @param array<string, mixed> $fields
+     */
     public function saveItem(?string $id, array $fields): string;
 
     // ---- Sales ------------------------------------------------------------
@@ -83,7 +101,11 @@ interface Repository
     /** @return array<string,mixed>|null */
     public function register(string $id): ?array;
 
-    /** Create or update a register. Returns the register id. */
+    /**
+     * Create or update a register. Returns the register id.
+     *
+     * @param array<string, mixed> $fields
+     */
     public function saveRegister(?string $id, array $fields): string;
 
     /** Open a register with an opening float. */
@@ -111,6 +133,10 @@ interface Repository
     /** Total inventory value at weighted-average cost. */
     public function inventoryValue(): string;
 
-    /** Count of spaces by status. @return array<string,int> */
+    /**
+     * Count of spaces by status.
+     *
+     * @return array<string, int>
+     */
     public function spaceStatusCounts(): array;
 }

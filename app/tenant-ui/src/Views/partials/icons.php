@@ -2,7 +2,8 @@
 /**
  * Inline SVG icon sprite. No icon-font dependency.
  * Usage: <svg class="icon"><use href="#i-dashboard"></use></svg>
- * @var \NinjaEmp\TenantUi\Support\View $this
+ *
+ * @var NinjaEmp\TenantUi\Support\View $this
  */
 ?>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">

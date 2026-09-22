@@ -55,7 +55,11 @@ final class ErrorRenderer
 
         $body = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 
-        return new Message\Response($status, $body ?: '{}', ['Content-Type' => 'application/json']);
+        return new Message\Response(
+            $status,
+            \is_string($body) ? $body : '{}',
+            ['Content-Type' => 'application/json'],
+        );
     }
 
     private function html(int $status, Throwable $error): ResponseInterface

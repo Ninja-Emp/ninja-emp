@@ -16,7 +16,7 @@ final class SaleRequest
 {
     /**
      * @param list<SaleLineInput> $lines
-     * @param list<TenderInput>   $tenders
+     * @param list<TenderInput> $tenders
      */
     public function __construct(
         public readonly array $lines,
@@ -32,11 +32,13 @@ final class SaleRequest
         if ($this->lines === []) {
             throw new InvalidArgumentException('A sale needs at least one line.');
         }
+
         if ($this->tenders === []) {
             throw new InvalidArgumentException('A sale needs at least one tender.');
         }
-        if (!in_array($channel, ['in_store', 'online', 'phone', 'event'], true)) {
-            throw new InvalidArgumentException(sprintf('Unknown sale channel: "%s".', $channel));
+
+        if (!\in_array($channel, ['in_store', 'online', 'phone', 'event'], true)) {
+            throw new InvalidArgumentException(\sprintf('Unknown sale channel: "%s".', $channel));
         }
     }
 }

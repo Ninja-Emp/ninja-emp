@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Http\Message;
 
+use NinjaEMP\Db\Sql\Value;
+
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\UriInterface;
 
@@ -20,19 +22,20 @@ class Request implements RequestInterface
 
     private ?string $requestTarget = null;
 
+    /** @param array<string, string|list<string>> $headers */
     public function __construct(
         string $method = 'GET',
         ?UriInterface $uri = null,
         ?string $body = null,
-        array $headers = []
+        array $headers = [],
     ) {
         $this->method = strtoupper($method);
         $this->uri = $uri ?? new Uri();
         $this->body = Stream::fromString($body ?? '');
 
         foreach ($headers as $name => $value) {
-            $this->headers[strtolower((string) $name)] = $this->normalizeValue($value);
-            $this->headerNames[strtolower((string) $name)] = (string) $name;
+            $this->headers[strtolower(Value::str($name))] = $this->normalizeValue($value);
+            $this->headerNames[strtolower(Value::str($name))] = Value::str($name);
         }
     }
 
@@ -43,9 +46,11 @@ class Request implements RequestInterface
         }
 
         $target = $this->uri->getPath();
+
         if ($target === '') {
             $target = '/';
         }
+
         if ($this->uri->getQuery() !== '') {
             $target .= '?' . $this->uri->getQuery();
         }

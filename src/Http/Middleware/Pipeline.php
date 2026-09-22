@@ -42,7 +42,7 @@ final class Pipeline implements RequestHandlerInterface
             $handler = new class ($middleware, $next) implements RequestHandlerInterface {
                 public function __construct(
                     private readonly MiddlewareInterface $middleware,
-                    private readonly RequestHandlerInterface $next
+                    private readonly RequestHandlerInterface $next,
                 ) {
                 }
 

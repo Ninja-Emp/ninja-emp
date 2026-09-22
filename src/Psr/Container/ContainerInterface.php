@@ -13,7 +13,7 @@ interface ContainerInterface
     /**
      * Finds an entry of the container by its identifier and returns it.
      *
-     * @throws NotFoundExceptionInterface  No entry was found for this identifier.
+     * @throws NotFoundExceptionInterface No entry was found for this identifier.
      * @throws ContainerExceptionInterface Error while retrieving the entry.
      */
     public function get(string $id);

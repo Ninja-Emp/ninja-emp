@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace NinjaEMP\Support\Log;
 
 use Psr\Log\AbstractLogger;
+use Stringable;
 
 /**
  * A no-op PSR-3 logger. The DBAL depends on the PSR-3 interface, not on Monolog,
@@ -12,7 +13,11 @@ use Psr\Log\AbstractLogger;
  */
 final class NullLogger extends AbstractLogger
 {
-    public function log($level, \Stringable|string $message, array $context = []): void
+    /**
+     * @param mixed $level
+     * @param array<mixed> $context
+     */
+    public function log($level, Stringable|string $message, array $context = []): void
     {
         // Intentionally does nothing.
     }

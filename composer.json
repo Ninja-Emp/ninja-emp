@@ -1,0 +1,76 @@
+{
+    "name": "ninja-emp/ninja-emp",
+    "description": "Ninja EMP — vendor mall + consignment store SaaS. DB-first; the double-entry ledger is the source of truth.",
+    "type": "project",
+    "license": "proprietary",
+    "keywords": ["accounting", "ledger", "consignment", "saas", "postgresql"],
+    "require": {
+        "php": ">=8.5",
+        "ext-bcmath": "*",
+        "ext-mbstring": "*",
+        "ext-pdo": "*",
+        "ext-pdo_pgsql": "*"
+    },
+    "require-dev": {
+        "deptrac/deptrac": "^3.0",
+        "friendsofphp/php-cs-fixer": "^3.64",
+        "infection/infection": "^0.29",
+        "phpmd/phpmd": "^2.15",
+        "phpstan/phpstan": "^2.1",
+        "phpstan/phpstan-strict-rules": "^2.0",
+        "phpunit/phpunit": "^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "NinjaEMP\\": "src/",
+            "NinjaEmp\\Api\\": "app/api/src/",
+            "NinjaEmp\\TenantUi\\": "app/tenant-ui/src/",
+            "Psr\\Container\\": "src/Psr/Container/",
+            "Psr\\Http\\Message\\": "src/Psr/Http/Message/",
+            "Psr\\Http\\Server\\": "src/Psr/Http/Server/",
+            "Psr\\Log\\": "src/Psr/Log/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "NinjaEMP\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "infection/extension-installer": true
+        },
+        "sort-packages": true
+    },
+    "scripts": {
+        "cs": "php-cs-fixer fix --dry-run --diff --verbose",
+        "cs:fix": "php-cs-fixer fix",
+        "stan": "phpstan analyse --no-progress --memory-limit=1G",
+        "phpmd": "phpmd src text phpmd.xml",
+        "deptrac": "deptrac analyse --no-progress",
+        "test": "php tests/run.php",
+        "test:unit": "phpunit --testsuite unit",
+        "infect": "infection --threads=max",
+        "audit": "composer audit --no-dev",
+        "gate": [
+            "@cs",
+            "@stan",
+            "@phpmd",
+            "@deptrac",
+            "@test",
+            "@infect"
+        ]
+    },
+    "scripts-descriptions": {
+        "cs": "Check code style (PSR-12) without modifying files.",
+        "cs:fix": "Auto-fix code style (PSR-12).",
+        "stan": "Run PHPStan at level 10.",
+        "phpmd": "Run PHPMD complexity/coupling rules.",
+        "deptrac": "Enforce architecture boundaries (bounded contexts).",
+        "test": "Run the zero-dependency unit suite.",
+        "test:unit": "Run the PHPUnit bridge (used by Infection).",
+        "infect": "Run mutation testing (primary gate, MSI >= 80%).",
+        "audit": "Audit runtime dependencies for known vulnerabilities.",
+        "gate": "Run the full local quality gate in CI order."
+    }
+}

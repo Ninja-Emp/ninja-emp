@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace NinjaEmp\Api\Http\Controllers;
 
 use NinjaEMP\Auth\User;
+use NinjaEMP\Db\TenantContext;
 use NinjaEMP\Http\Message\JsonResponse;
 use NinjaEMP\Http\Routing\Route;
 use NinjaEMP\OpenApi\ApiSchema;
@@ -16,6 +17,9 @@ use Psr\Http\Message\ServerRequestInterface;
  */
 final class MeController
 {
+    /**
+     * @param array<string,mixed> $params
+     */
     #[Route('GET', '/api/me', name: 'me', permission: 'dashboard.view')]
     #[ApiSchema(
         summary: 'Current principal',
@@ -28,6 +32,7 @@ final class MeController
     {
         /** @var User|null $user */
         $user = $request->getAttribute('user');
+        /** @var TenantContext|null $tenant */
         $tenant = $request->getAttribute('tenant');
 
         return JsonResponse::of([

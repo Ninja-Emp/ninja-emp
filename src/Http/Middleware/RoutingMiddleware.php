@@ -28,14 +28,14 @@ final class RoutingMiddleware implements MiddlewareInterface
     {
         $match = $this->router->match(
             $request->getMethod(),
-            $request->getUri()->getPath()
+            $request->getUri()->getPath(),
         );
 
         if ($match === null) {
-            throw new NotFoundException(sprintf(
+            throw new NotFoundException(\sprintf(
                 'No route matches %s %s.',
                 $request->getMethod(),
-                $request->getUri()->getPath()
+                $request->getUri()->getPath(),
             ));
         }
 

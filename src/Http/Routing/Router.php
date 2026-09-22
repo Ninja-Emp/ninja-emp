@@ -22,11 +22,12 @@ final class Router
         $path = $this->normalize($path);
 
         foreach ($this->routes->all() as $route) {
-            if (!in_array($method, $route['methods'], true)) {
+            if (!\in_array($method, $route['methods'], true)) {
                 continue;
             }
 
             $params = $this->matchPath($route['path'], $path);
+
             if ($params === null) {
                 continue;
             }
@@ -50,13 +51,15 @@ final class Router
     private function matchPath(string $pattern, string $path): ?array
     {
         $regex = $this->toRegex($pattern);
+
         if (preg_match($regex, $path, $matches) !== 1) {
             return null;
         }
 
         $params = [];
+
         foreach ($matches as $key => $value) {
-            if (is_string($key)) {
+            if (\is_string($key)) {
                 $params[$key] = $value;
             }
         }

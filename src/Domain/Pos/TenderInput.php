@@ -26,16 +26,16 @@ final class TenderInput
         public readonly ?string $processorRef = null,
     ) {
         if ($amount === '' || preg_match('/^\d+(\.\d+)?$/', $amount) !== 1) {
-            throw new InvalidArgumentException(sprintf('Malformed tender amount: "%s".', $amount));
+            throw new InvalidArgumentException(\sprintf('Malformed tender amount: "%s".', $amount));
         }
 
-        if (in_array($code, self::LIABILITY, true) && $partyId === null) {
-            throw new InvalidArgumentException(sprintf('Tender "%s" requires a party id.', $code));
+        if (\in_array($code, self::LIABILITY, true) && $partyId === null) {
+            throw new InvalidArgumentException(\sprintf('Tender "%s" requires a party id.', $code));
         }
     }
 
     public function isLiability(): bool
     {
-        return in_array($this->code, self::LIABILITY, true);
+        return \in_array($this->code, self::LIABILITY, true);
     }
 }

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace NinjaEMP\OpenApi;
 
+use NinjaEMP\Db\Sql\Value;
+
 use NinjaEMP\Http\Routing\Route;
-use NinjaEMP\Http\Routing\RouteCollection;
 use ReflectionClass;
 use ReflectionMethod;
+use stdClass;
 
 /**
  * Builds an OpenAPI 3.1 document from attribute-routed controllers.
@@ -41,6 +43,7 @@ final class OpenApiDocument
     public function server(string $url, string $description = ''): self
     {
         $server = ['url' => $url];
+
         if ($description !== '') {
             $server['description'] = $description;
         }
@@ -52,6 +55,7 @@ final class OpenApiDocument
     public function tag(string $name, string $description = ''): self
     {
         $tag = ['name' => $name];
+
         if ($description !== '') {
             $tag['description'] = $description;
         }
@@ -87,6 +91,7 @@ final class OpenApiDocument
             }
 
             $routeAttributes = $method->getAttributes(Route::class);
+
             if ($routeAttributes === []) {
                 continue;
             }
@@ -120,15 +125,19 @@ final class OpenApiDocument
                 if ($api->summary !== '') {
                     $operation['summary'] = $api->summary;
                 }
+
                 if ($api->description !== '') {
                     $operation['description'] = $api->description;
                 }
+
                 if ($api->tags !== []) {
                     $operation['tags'] = $api->tags;
                 }
+
                 if ($api->deprecated) {
                     $operation['deprecated'] = true;
                 }
+
                 if ($api->request !== null) {
                     $operation['requestBody'] = [
                         'required' => true,
@@ -142,6 +151,7 @@ final class OpenApiDocument
             }
 
             $parameters = $this->pathParameters($route->path);
+
             if ($parameters !== []) {
                 $operation['parameters'] = $parameters;
             }
@@ -155,7 +165,7 @@ final class OpenApiDocument
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<int|string, mixed>
      */
     private function responses(?ApiSchema $api): array
     {
@@ -171,12 +181,13 @@ final class OpenApiDocument
             ];
         }
 
-        $responses = ['200' => $success];
+        $responses = [];
+        $responses['200'] = $success;
 
         if ($api !== null) {
             foreach ($api->errors as $code) {
-                $responses[(string) $code] = [
-                    'description' => $this->errorDescription((int) $code),
+                $responses[Value::str($code)] = [
+                    'description' => $this->errorDescription(Value::int($code)),
                     'content' => [
                         'application/json' => [
                             'schema' => ['$ref' => '#/components/schemas/Error'],
@@ -199,6 +210,7 @@ final class OpenApiDocument
         }
 
         $parameters = [];
+
         foreach ($matches[1] as $name) {
             $parameters[] = [
                 'name' => $name,
@@ -253,11 +265,12 @@ final class OpenApiDocument
         if ($this->servers !== []) {
             $document['servers'] = $this->servers;
         }
+
         if ($this->tags !== []) {
             $document['tags'] = $this->tags;
         }
 
-        $document['paths'] = $this->paths === [] ? new \stdClass() : $this->paths;
+        $document['paths'] = $this->paths === [] ? new stdClass() : $this->paths;
 
         $document['components'] = [
             'schemas' => $this->schemas,
@@ -278,7 +291,7 @@ final class OpenApiDocument
     {
         $json = json_encode(
             $this->toArray(),
-            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
         );
 
         return $json === false ? '{}' : $json;

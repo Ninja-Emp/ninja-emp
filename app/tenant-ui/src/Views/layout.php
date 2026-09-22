@@ -2,7 +2,7 @@
 /**
  * App shell layout.
  *
- * @var \NinjaEmp\TenantUi\Support\View $this
+ * @var View $this
  * @var string $content
  * @var string $title
  * @var string $theme

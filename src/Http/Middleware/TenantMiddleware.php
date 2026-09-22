@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace NinjaEMP\Http\Middleware;
 
 use NinjaEMP\Http\Exception\TenantNotResolvedException;
-use NinjaEMP\Tenancy\TenantContextHolder;
 use NinjaEMP\Tenancy\TenantResolver;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -27,7 +26,6 @@ final class TenantMiddleware implements MiddlewareInterface
     public function __construct(
         private readonly TenantResolver $resolver,
         private readonly bool $required = true,
-        private readonly ?TenantContextHolder $holder = null,
     ) {
     }
 
@@ -52,6 +50,7 @@ final class TenantMiddleware implements MiddlewareInterface
     private function slug(ServerRequestInterface $request): ?string
     {
         $header = $request->getHeaderLine('X-Tenant');
+
         if ($header !== '') {
             return $header;
         }
@@ -59,6 +58,6 @@ final class TenantMiddleware implements MiddlewareInterface
         $query = $request->getQueryParams();
         $value = $query['tenant'] ?? null;
 
-        return is_string($value) && $value !== '' ? $value : null;
+        return \is_string($value) && $value !== '' ? $value : null;
     }
 }

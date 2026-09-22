@@ -10,6 +10,7 @@ use NinjaEMP\OpenApi\ApiSchema;
 use NinjaEMP\Repository\Repository;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use NinjaEMP\Db\Sql\Value;
 
 /**
  * Vendor (party) read surface. Demonstrates a container-injected dependency
@@ -21,6 +22,9 @@ final class VendorController
     {
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     #[Route('GET', '/api/vendors', name: 'vendors.index', permission: 'vendors.manage')]
     #[ApiSchema(
         summary: 'List vendors',
@@ -34,6 +38,9 @@ final class VendorController
         return JsonResponse::of(['data' => $this->repository->vendors()]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     #[Route('GET', '/api/vendors/{id}', name: 'vendors.show', permission: 'vendors.manage')]
     #[ApiSchema(
         summary: 'Get a vendor',
@@ -44,7 +51,7 @@ final class VendorController
     )]
     public function show(ServerRequestInterface $request, array $params): ResponseInterface
     {
-        $vendor = $this->repository->vendor((string) ($params['id'] ?? ''));
+        $vendor = $this->repository->vendor(Value::str($params['id'] ?? ''));
 
         if ($vendor === null) {
             return JsonResponse::error('Vendor not found.', 404);

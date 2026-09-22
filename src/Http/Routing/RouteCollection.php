@@ -61,13 +61,14 @@ final class RouteCollection
         string $action,
         ?string $name = null,
         ?string $permission = null,
-        bool $public = false
+        bool $public = false,
     ): void {
         if ($methods === []) {
             throw new InvalidArgumentException('A route must declare at least one HTTP method.');
         }
+
         if ($path === '' || $path[0] !== '/') {
-            throw new InvalidArgumentException(sprintf('Route path must start with "/": "%s".', $path));
+            throw new InvalidArgumentException(\sprintf('Route path must start with "/": "%s".', $path));
         }
 
         $this->routes[] = [
@@ -91,6 +92,6 @@ final class RouteCollection
 
     public function count(): int
     {
-        return count($this->routes);
+        return \count($this->routes);
     }
 }

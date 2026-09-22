@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace NinjaEMP\Http\Exception;
 
 use RuntimeException;
+use Throwable;
 
 /**
  * An exception that maps directly to an HTTP status code. The error-handling
@@ -15,7 +16,7 @@ class HttpException extends RuntimeException
     public function __construct(
         private readonly int $statusCode,
         string $message = '',
-        ?\Throwable $previous = null
+        ?Throwable $previous = null,
     ) {
         parent::__construct($message !== '' ? $message : self::defaultMessage($statusCode), $statusCode, $previous);
     }

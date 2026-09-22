@@ -11,6 +11,7 @@ use NinjaEMP\Http\Routing\Route;
 use NinjaEMP\OpenApi\ApiSchema;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use NinjaEMP\Db\Sql\Value;
 
 /**
  * Stored value surface: gift certificates and store credit (ADR-0032).
@@ -23,6 +24,9 @@ final class StoredValueController
     {
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     #[Route('POST', '/api/stored-value', name: 'stored_value.issue', permission: 'stored_value.manage')]
     #[ApiSchema(
         summary: 'Issue stored value',
@@ -36,14 +40,14 @@ final class StoredValueController
 
         try {
             $id = $this->storedValue->issue(
-                (string) ($body['instrument_kind'] ?? ''),
-                (string) ($body['code'] ?? ''),
-                (string) ($body['amount'] ?? ''),
-                isset($body['party_id']) ? (string) $body['party_id'] : null,
-                isset($body['entry_date']) ? (string) $body['entry_date'] : null,
+                Value::str($body['instrument_kind'] ?? ''),
+                Value::str($body['code'] ?? ''),
+                Value::str($body['amount'] ?? ''),
+                isset($body['party_id']) ? Value::str($body['party_id']) : null,
+                isset($body['entry_date']) ? Value::str($body['entry_date']) : null,
                 (bool) ($body['paid_with_cash'] ?? true),
-                isset($body['expires_date']) ? (string) $body['expires_date'] : null,
-                isset($body['idempotency_key']) ? (string) $body['idempotency_key'] : null,
+                isset($body['expires_date']) ? Value::str($body['expires_date']) : null,
+                isset($body['idempotency_key']) ? Value::str($body['idempotency_key']) : null,
             );
         } catch (InvalidArgumentException $e) {
             return JsonResponse::error($e->getMessage(), 422);
@@ -52,6 +56,9 @@ final class StoredValueController
         return JsonResponse::of(['data' => ['id' => $id]], 201);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     #[Route('GET', '/api/stored-value/{code}', name: 'stored_value.show', permission: 'stored_value.manage')]
     #[ApiSchema(
         summary: 'Get stored value',
@@ -61,7 +68,7 @@ final class StoredValueController
     )]
     public function show(ServerRequestInterface $request, array $params): ResponseInterface
     {
-        $instrument = $this->storedValue->find((string) ($params['code'] ?? ''));
+        $instrument = $this->storedValue->find(Value::str($params['code'] ?? ''));
 
         if ($instrument === null) {
             return JsonResponse::error('Stored value not found.', 404);
@@ -70,6 +77,9 @@ final class StoredValueController
         return JsonResponse::of(['data' => $instrument]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     #[Route('POST', '/api/stored-value/{code}/redeem', name: 'stored_value.redeem', permission: 'stored_value.manage')]
     #[ApiSchema(
         summary: 'Redeem stored value',
@@ -83,11 +93,11 @@ final class StoredValueController
 
         try {
             $entry = $this->storedValue->redeem(
-                (string) ($params['code'] ?? ''),
-                (string) ($body['amount'] ?? ''),
-                isset($body['entry_date']) ? (string) $body['entry_date'] : null,
-                isset($body['sale_id']) ? (string) $body['sale_id'] : null,
-                isset($body['entry_id']) ? (string) $body['entry_id'] : null,
+                Value::str($params['code'] ?? ''),
+                Value::str($body['amount'] ?? ''),
+                isset($body['entry_date']) ? Value::str($body['entry_date']) : null,
+                isset($body['sale_id']) ? Value::str($body['sale_id']) : null,
+                isset($body['entry_id']) ? Value::str($body['entry_id']) : null,
             );
         } catch (InvalidArgumentException $e) {
             return JsonResponse::error($e->getMessage(), 422);
@@ -96,6 +106,9 @@ final class StoredValueController
         return JsonResponse::of(['data' => ['journal_entry_id' => $entry]]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     #[Route('GET', '/api/stored-value/outstanding/{kind}', name: 'stored_value.outstanding', permission: 'stored_value.manage')]
     #[ApiSchema(
         summary: 'Outstanding stored value',
@@ -105,7 +118,7 @@ final class StoredValueController
     )]
     public function outstanding(ServerRequestInterface $request, array $params): ResponseInterface
     {
-        $kind = (string) ($params['kind'] ?? '');
+        $kind = Value::str($params['kind'] ?? '');
 
         return JsonResponse::of([
             'data' => [
@@ -122,6 +135,6 @@ final class StoredValueController
     {
         $body = $request->getParsedBody();
 
-        return is_array($body) ? $body : [];
+        return \is_array($body) ? $body : [];
     }
 }

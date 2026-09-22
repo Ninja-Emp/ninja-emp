@@ -11,6 +11,7 @@ use NinjaEMP\Http\Routing\Route;
 use NinjaEMP\OpenApi\ApiSchema;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use NinjaEMP\Db\Sql\Value;
 
 /**
  * Register and shift (cash-drawer session) surface.
@@ -24,6 +25,9 @@ final class ShiftController
     {
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     #[Route('POST', '/api/registers', name: 'registers.store', permission: 'registers.manage')]
     #[ApiSchema(
         summary: 'Create a register',
@@ -37,9 +41,9 @@ final class ShiftController
 
         try {
             $id = $this->shifts->createRegister(
-                (string) ($body['code'] ?? ''),
-                (string) ($body['name'] ?? ''),
-                isset($body['location_id']) ? (string) $body['location_id'] : null,
+                Value::str($body['code'] ?? ''),
+                Value::str($body['name'] ?? ''),
+                isset($body['location_id']) ? Value::str($body['location_id']) : null,
             );
         } catch (InvalidArgumentException $e) {
             return JsonResponse::error($e->getMessage(), 422);
@@ -48,6 +52,9 @@ final class ShiftController
         return JsonResponse::of(['data' => ['id' => $id]], 201);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     #[Route('POST', '/api/registers/{id}/shifts', name: 'shifts.open', permission: 'pos.use')]
     #[ApiSchema(
         summary: 'Open a shift',
@@ -61,10 +68,10 @@ final class ShiftController
 
         try {
             $id = $this->shifts->openShift(
-                (string) ($params['id'] ?? ''),
-                (string) ($body['opening_float'] ?? '0'),
-                isset($body['opened_by_party_id']) ? (string) $body['opened_by_party_id'] : null,
-                (string) ($body['currency'] ?? 'USD'),
+                Value::str($params['id'] ?? ''),
+                Value::str($body['opening_float'] ?? '0'),
+                isset($body['opened_by_party_id']) ? Value::str($body['opened_by_party_id']) : null,
+                Value::str($body['currency'] ?? 'USD'),
             );
         } catch (InvalidArgumentException $e) {
             return JsonResponse::error($e->getMessage(), 422);
@@ -73,6 +80,9 @@ final class ShiftController
         return JsonResponse::of(['data' => ['id' => $id]], 201);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     #[Route('GET', '/api/registers/{id}/shift', name: 'shifts.current', permission: 'pos.use')]
     #[ApiSchema(
         summary: 'Current shift',
@@ -82,11 +92,14 @@ final class ShiftController
     )]
     public function current(ServerRequestInterface $request, array $params): ResponseInterface
     {
-        $shift = $this->shifts->openShiftFor((string) ($params['id'] ?? ''));
+        $shift = $this->shifts->openShiftFor(Value::str($params['id'] ?? ''));
 
         return JsonResponse::of(['data' => $shift]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     #[Route('POST', '/api/shifts/{id}/close', name: 'shifts.close', permission: 'pos.use')]
     #[ApiSchema(
         summary: 'Close a shift',
@@ -97,17 +110,17 @@ final class ShiftController
     public function close(ServerRequestInterface $request, array $params): ResponseInterface
     {
         $body = $this->body($request);
-        $counted = (string) ($body['counted_cash'] ?? '');
+        $counted = Value::str($body['counted_cash'] ?? '');
 
         if ($counted === '') {
             return JsonResponse::error('counted_cash is required.', 422);
         }
 
         $entry = $this->shifts->closeShift(
-            (string) ($params['id'] ?? ''),
+            Value::str($params['id'] ?? ''),
             $counted,
-            isset($body['entry_date']) ? (string) $body['entry_date'] : null,
-            isset($body['idempotency_key']) ? (string) $body['idempotency_key'] : null,
+            isset($body['entry_date']) ? Value::str($body['entry_date']) : null,
+            isset($body['idempotency_key']) ? Value::str($body['idempotency_key']) : null,
         );
 
         return JsonResponse::of([
@@ -118,6 +131,9 @@ final class ShiftController
         ]);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     #[Route('GET', '/api/shifts/{id}/preview', name: 'shifts.preview', permission: 'pos.use')]
     #[ApiSchema(
         summary: 'Preview shift close',
@@ -129,7 +145,7 @@ final class ShiftController
     {
         $counted = $this->query($request, 'counted_cash') ?? '0';
 
-        return JsonResponse::of(['data' => $this->shifts->previewClose((string) ($params['id'] ?? ''), $counted)]);
+        return JsonResponse::of(['data' => $this->shifts->previewClose(Value::str($params['id'] ?? ''), $counted)]);
     }
 
     /**
@@ -139,7 +155,7 @@ final class ShiftController
     {
         $body = $request->getParsedBody();
 
-        return is_array($body) ? $body : [];
+        return \is_array($body) ? $body : [];
     }
 
     private function query(ServerRequestInterface $request, string $key): ?string
@@ -147,6 +163,6 @@ final class ShiftController
         $params = $request->getQueryParams();
         $value = $params[$key] ?? null;
 
-        return is_string($value) && $value !== '' ? $value : null;
+        return \is_string($value) && $value !== '' ? $value : null;
     }
 }

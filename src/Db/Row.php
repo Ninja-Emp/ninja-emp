@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace NinjaEMP\Db;
 
 use ArrayAccess;
+use ArrayIterator;
 use Countable;
 use IteratorAggregate;
-use ArrayIterator;
+use LogicException;
 use OutOfBoundsException;
 use Traversable;
 
@@ -32,7 +33,7 @@ final class Row implements ArrayAccess, Countable, IteratorAggregate
 
     public function has(string $column): bool
     {
-        return array_key_exists($column, $this->values);
+        return \array_key_exists($column, $this->values);
     }
 
     public function get(string $column, mixed $default = null): mixed
@@ -43,8 +44,8 @@ final class Row implements ArrayAccess, Countable, IteratorAggregate
     /** @throws OutOfBoundsException when the column is absent. */
     public function require(string $column): mixed
     {
-        if (!array_key_exists($column, $this->values)) {
-            throw new OutOfBoundsException(sprintf('Column "%s" not present in row.', $column));
+        if (!\array_key_exists($column, $this->values)) {
+            throw new OutOfBoundsException(\sprintf('Column "%s" not present in row.', $column));
         }
 
         return $this->values[$column];
@@ -52,7 +53,7 @@ final class Row implements ArrayAccess, Countable, IteratorAggregate
 
     public function count(): int
     {
-        return count($this->values);
+        return \count($this->values);
     }
 
     public function getIterator(): Traversable
@@ -62,7 +63,7 @@ final class Row implements ArrayAccess, Countable, IteratorAggregate
 
     public function offsetExists(mixed $offset): bool
     {
-        return is_string($offset) && array_key_exists($offset, $this->values);
+        return \is_string($offset) && \array_key_exists($offset, $this->values);
     }
 
     public function offsetGet(mixed $offset): mixed
@@ -72,11 +73,11 @@ final class Row implements ArrayAccess, Countable, IteratorAggregate
 
     public function offsetSet(mixed $offset, mixed $value): void
     {
-        throw new \LogicException('Row is immutable.');
+        throw new LogicException('Row is immutable.');
     }
 
     public function offsetUnset(mixed $offset): void
     {
-        throw new \LogicException('Row is immutable.');
+        throw new LogicException('Row is immutable.');
     }
 }

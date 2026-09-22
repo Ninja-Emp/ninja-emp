@@ -1,5 +1,5 @@
 <?php
-/** @var \NinjaEmp\TenantUi\Support\View $this */
+/** @var NinjaEmp\TenantUi\Support\View $this */
 ?>
 <div class="empty" style="padding-top:var(--space-12)">
   <svg aria-hidden="true"><use href="#i-search"></use></svg>

@@ -1,10 +1,11 @@
 <?php
 /**
  * Inventory item detail.
- * @var \NinjaEmp\TenantUi\Support\View $this
+ *
+ * @var View $this
  */
-use NinjaEmp\TenantUi\Support\View;
 use NinjaEmp\TenantUi\Support\Money;
+use NinjaEmp\TenantUi\Support\View;
 
 $cur = $tenant['currency'];
 $low = $item['on_hand'] <= $item['reorder'];

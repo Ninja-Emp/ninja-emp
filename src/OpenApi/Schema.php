@@ -24,9 +24,11 @@ final class Schema
     public static function string(?string $format = null, ?string $description = null): self
     {
         $schema = ['type' => 'string'];
+
         if ($format !== null) {
             $schema['format'] = $format;
         }
+
         if ($description !== null) {
             $schema['description'] = $description;
         }
@@ -66,7 +68,7 @@ final class Schema
         return new self([
             'type' => 'string',
             'pattern' => '^-?\\d+\\.\\d{4}$',
-            'description' => sprintf('Monetary amount in %s, 4 decimal places (string, never a float).', $currency),
+            'description' => \sprintf('Monetary amount in %s, 4 decimal places (string, never a float).', $currency),
             'examples' => ['0.0000', '19.9900'],
         ]);
     }
@@ -85,6 +87,7 @@ final class Schema
             'type' => 'array',
             'items' => $items instanceof self ? $items->toArray() : $items,
         ];
+
         if ($description !== null) {
             $schema['description'] = $description;
         }
@@ -99,14 +102,17 @@ final class Schema
     public static function object(array $properties, array $required = [], ?string $description = null): self
     {
         $props = [];
+
         foreach ($properties as $name => $property) {
             $props[$name] = $property instanceof self ? $property->toArray() : $property;
         }
 
         $schema = ['type' => 'object', 'properties' => $props];
+
         if ($required !== []) {
             $schema['required'] = $required;
         }
+
         if ($description !== null) {
             $schema['description'] = $description;
         }
@@ -120,6 +126,7 @@ final class Schema
     public static function enum(array $values, ?string $description = null): self
     {
         $schema = ['type' => 'string', 'enum' => $values];
+
         if ($description !== null) {
             $schema['description'] = $description;
         }

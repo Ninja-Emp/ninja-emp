@@ -27,7 +27,7 @@ final class Identifier
     public static function of(string $name): self
     {
         if (preg_match(self::PATTERN, $name) !== 1) {
-            throw new InvalidArgumentException(sprintf(
+            throw new InvalidArgumentException(\sprintf(
                 'Unsafe SQL identifier: "%s" (must match %s).',
                 $name,
                 self::PATTERN,

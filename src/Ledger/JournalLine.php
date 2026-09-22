@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Ledger;
 
+use NinjaEMP\Db\Sql\Value;
+
 use InvalidArgumentException;
 use NinjaEMP\Money\Money;
 
@@ -81,7 +83,7 @@ final class JournalLine
 
         if ($this->partyId !== null) {
             $line['party_id'] = $this->partyId;
-            $line['subledger_type_code'] = (string) $this->subledgerTypeCode;
+            $line['subledger_type_code'] = Value::str($this->subledgerTypeCode);
         }
 
         if ($this->memo !== null) {

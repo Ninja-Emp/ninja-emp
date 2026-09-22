@@ -8,6 +8,6 @@ namespace NinjaEMP\Db\Exception;
  * SQLSTATE 23514 — check_violation. Includes unbalanced journal entries and
  * period-lock violations.
  */
-final class ConstraintViolationException extends DatabaseException
+class ConstraintViolationException extends DatabaseException
 {
 }
