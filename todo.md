@@ -1,78 +1,70 @@
-# Ninja EMP — Application Layer (Part 6)
+# Ninja EMP — Settlement Defect Fixes (A) + EMP Idea Ports (B)
 
-DB is complete (222 assertions, 10 suites). PHP application layer underway.
-Delivered: DBAL (6.1), ledger engine (6.2), auth & tenancy (6.3). 118 unit assertions green.
+> **CONTINUING IN A NEW CHAT?** Read `HANDOFF_SETTLEMENT.md` first — it is
+> self-contained (environment, defect map, mutation map, design, order, gotchas).
+> Then read `docs/SETTLEMENT_INVARIANTS.md` and ADR-0039 in `docs/DECISIONS.md`.
 
-## A. DBAL (ADR-0025) — `src/Db/` — ✅
-- [x] Money value object (string-backed, bcmath) + Currency (ISO-4217)
-- [x] Core interfaces: Connection, TenantContext
-- [x] ResultSet + Row (typed values)
-- [x] PlaceholderRewriter (quote-aware named → positional, reuse legal, `::` casts)
-- [x] Identifier validator (`^[a-z_][a-z0-9_]*$`, quoted)
-- [x] TypeMapper (numeric→Money, uuid→string, timestamptz→DateTimeImmutable, jsonb→array, …)
-- [x] Typed exceptions + SQLSTATE error mapping
-- [x] PdoConnection (SET LOCAL tenant context, transactional, emulated prepares)
-- [x] ConnectionFactory (DSN, pooling flags)
-- [x] Unit tests (rewriter, type mapper, identifier, money)
+Governing lesson: **state the invariants BEFORE writing code.** No module is written
+until its invariants are written down and agreed.
 
-## B. Ledger engine (ADR-0020/0028/0029) — `src/Ledger/` — ✅
-- [x] LedgerService: idempotent post via `post_journal_entry`
-- [x] Account determination via `posting_map` (`posting_account`)
-- [x] Reversal via `reverse_journal_entry`
-- [x] Tender → posting map (ADR-0029)
-- [x] Unit tests (line building, balance check, idempotency key)
+## 0. Environment
+- [x] Install PostgreSQL 18.6 (PGDG) — native `uuidv7()`
+- [x] Provision `ninja_emp` + `ninja_control` (tenant_demo)
+- [x] Establish GREEN baseline: 222/222 assertions
 
-## C. Auth & tenancy — `src/Auth/`, `src/Tenancy/` — ✅
-- [x] Role permission matrix (server-side enforcement)
-- [x] PasswordHasher (Argon2id/bcrypt), Csrf (constant-time), SessionAuth (fixation-safe)
-- [x] TenantRegistry / TenantRecord / TenantResolver (schema-per-tenant)
-- [x] Unit tests
+## 1. Invariants (write first, code second)
+- [x] Write `docs/SETTLEMENT_INVARIANTS.md` — the exact, testable invariants for
+      the settlement layer (open items, payment application, reversal, allocation)
+- [x] Write ADR-0039 in `docs/DECISIONS.md` — the decisions that close F1–F6
 
-## D. Verify + ship — ✅
-- [x] Run unit tests green (118 assertions)
-- [x] Update ROADMAP + handoff docs + src/README
-- [x] Commit + push to feat/tenant-ui (5583120, bba948d)
+## 2. Fix F1 (CRITICAL) — reversal must un-apply settlement
+- [ ] Invariant: reversing a payment journal restores open_item.open_amount + status
+- [ ] Invariant: reversal is a document status, not a silent ledger mirror
+- [ ] Implement: reversal-aware un-apply (via reversal-as-status, see B3)
+- [ ] Regression test
 
-## E. Repository layer (swap the mock) — `src/Repository/` — ⏳
-- [x] `Repository` interface (mirrors MockRepository signatures exactly)
-- [x] `DbalRepository` — real SQL against the normalized schema
-- [x] Pure row-mappers (space/vendor/item/register/sale) — unit-testable
-- [x] `FakeConnection` test double + `RepositoryTest`
-- [x] `Allocator` — largest-remainder exact split (ADR-0009)
-- [x] `PosService` — ring up / refund / shift open+close / merchant settlement
-- [x] `InventoryService` — item master, receive, adjust, valuation (ADR-0031)
-- [x] `ConsignmentService` — agreements, items, sales, settlement+payout (ADR-0028)
-- [x] `VendorMallService` — leases, space allocation, rent, deposits
-- [x] `DomainServicesTest` (53 assertions)
+## 3. Fix F5 — payment_application append-only + tie-out invariant
+- [ ] Invariant: payment_application is append-only (no UPDATE/DELETE)
+- [ ] Invariant: sum(applied) per open_item == original - open (signed)
+- [ ] Implement: forbid_mutation trigger + reconciliation check
+- [ ] Regression test
 
-## F. Routing + middleware — ✅
-- [x] Vendor PSR-7/11/15 interfaces (no Composer)
-- [x] PSR-7 concrete: Stream, Uri, Request, Response, Emitter
-- [x] Attribute routing: #[Route], RouteCollection, Router, RouteMatch
-- [x] PSR-15 pipeline + middleware (error, tenant, auth, rbac, csrf)
-- [x] HttpKernel wiring SessionAuth + TenantResolver
-- [x] Wire SessionAuth + TenantResolver into the front controller (app/api)
-- [x] HttpKernelTest (54 assertions) — 319 total green
-- [x] Commit + push (7440606)
+## 4. Fix F3 — one allocator, not four
+- [ ] Invariant: every allocator filters item_kind='invoice'
+- [ ] Implement: single `allocate_payment()` used by apply_payment / payout / refund
+- [ ] Regression test
 
-## G. OpenAPI 3.1 surface — ✅
-- [x] OpenAPI 3.1 document builder (info/servers/paths/components)
-- [x] Schema builder (JSON Schema 2020-12 subset)
-- [x] Reflect #[Route] + #[ApiSchema] into paths/operations
-- [x] Serve /api/openapi.json + /api/docs (Swagger UI-free)
-- [x] OpenApiTest (369 assertions green)
+## 5. Fix F2 — directed payment (pay a specific invoice)
+- [ ] Invariant: caller may target a specific open_item; FIFO is the default
+- [ ] Implement: optional p_open_item_id on apply_payment
+- [ ] Regression test
 
-## H. Domain modules (handoff §E) — ✅
-- [x] `ShiftService` — register CRUD, open/close shift, over/short preview (ADR-0029)
-- [x] `OpenItemService` — AR/AP open items, FIFO apply, write-off, aging (ADR-0023)
-- [x] `StoredValueService` — gift certs / store credit, redeem, opt-in breakage (ADR-0032)
-- [x] `ReportingService` — P&L, balance sheet, sales, valuation, tax, vendor balances
-- [x] `DomainModulesTest` (38 assertions) — 407 total green
+## 6. Fix F4 — no silent cash drop
+- [ ] Invariant: unapplied remainder is either on-account or raises
+- [ ] Implement: on-account open item (item_kind='on_account') OR explicit raise
+- [ ] Regression test
 
-## I. Quality gate — ⏳
-- [ ] PHP-CS-Fixer, PHPStan L10, PHPMD, Deptrac, mutation MSI ≥ 80%
+## 7. Fix F6 — write-off race + sign-masking
+- [ ] Invariant: write_off locks the row (FOR UPDATE)
+- [ ] Invariant: control check compares signed sums, no abs()
+- [ ] Implement + regression test
 
-## Notes
-- No live PostgreSQL in this sandbox: functional DBAL tests auto-skip; repository
-  SQL is written against the verified schema and unit-tested via a fake Connection.
-- Push often to feat/tenant-ui.
+## 8. Port B1 — hash-chained journal
+- [ ] Invariant: each entry's entry_hash chains prev_hash; tamper is detectable
+- [ ] Implement: prev_hash/entry_hash + unique indexes + verify function
+- [ ] Regression test
+
+## 9. Port B2 — scale CHECK (no sub-cent posting)
+- [ ] Invariant: no amount with scale > currency scale can be posted
+- [ ] Implement: CHECK on journal_line + open_item + payment_application
+- [ ] Regression test
+
+## 10. Port B3 — reversal-as-document-status
+- [ ] Invariant: a reversed document cannot be re-reversed; status is authoritative
+- [ ] Implement: status + reversal_journal_id + CHECK
+- [ ] Regression test
+
+## 11. Verify + deliver
+- [ ] Full suite GREEN (222 + new assertions)
+- [ ] Update DB_AUDIT.md / DECISIONS.md / README.md
+- [ ] Commit

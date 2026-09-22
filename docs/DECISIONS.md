@@ -534,6 +534,86 @@ it hides the one real imbalance when it finally appears.
 
 ---
 
+## ADR-0039 — Settlement integrity: reversal un-applies, one allocator, no silent cash, hash-chained journal
+
+**Status:** Accepted.
+**Context:** A review of the settlement layer found six defects (F1–F6) that all
+share one property: **the trial balance still nets to zero while the detail
+lies.** They were not caught by the existing 222 assertions because those
+assertions were written after the code, against what the code does, rather than
+before it, against what it must do. The invariants are now written down first in
+`docs/SETTLEMENT_INVARIANTS.md`; this ADR records the decisions that enforce them.
+
+**F1 (critical) — reversing a payment did not un-apply it.** `reverse_journal_entry()`
+mirrored the journal lines and stopped. The `payment_application` rows and the
+`open_item.open_amount` they had reduced were left untouched. So after reversing
+a receipt, the GL control account was correct (the mirror entry restored it) but
+the open items still showed the invoice as paid. `open_item_control_check()`
+then failed by exactly the reversed amount — a real imbalance, produced by the
+system's own reversal path. **Decision:** reversal is a **document status**, and
+reversing a settlement entry calls `unapply_for_entry()`, which restores each
+affected open item and recomputes its status. The un-application is recorded
+append-only (PA-5), so history shows both the application and its reversal.
+
+**F2 (critical) — FIFO was mandatory.** A customer who wanted to pay one specific
+invoice could not; the allocator always consumed oldest-first. **Decision:**
+`allocate_payment()` takes an optional `p_open_item_id`; the named item is
+consumed first, then FIFO proceeds. FIFO remains the default (AL-3, AL-4).
+
+**F3 — four copies of the allocator, two of them wrong.** `apply_payment`,
+`post_consignor_payout`, and `post_refund` each re-implemented FIFO, and the
+latter two omitted the `item_kind = 'invoice'` filter, so a payout or refund
+could "settle" a credit memo. **Decision:** exactly one allocator,
+`allocate_payment()`; every entry point calls it (AL-1, AL-2).
+
+**F4 — two allocators silently swallowed unapplied cash.** `post_consignor_payout`
+and `post_refund` dropped any remainder on the floor: the cash left the bank, the
+control account moved, and the open items did not — a silent drift. **Decision:**
+`allocate_payment()` never drops a remainder. It either records an **on-account**
+open item (`item_kind = 'on_account'`) or raises; the default is to raise,
+because silently absorbing cash is how a subledger drifts from its control (AL-5).
+
+**F5 — `payment_application` was mutable, and stored-value redemption bypassed it.**
+The table had only an audit trigger, so applications could be edited or deleted,
+and `redeem_stored_value()` reduced `open_item.open_amount` directly with no
+application row at all. **Decision:** `payment_application` is append-only
+(`kernel.forbid_mutation`), and `open_item_application_check()` reconciles
+`original − open` against the net of applications (PA-2, PA-4).
+
+**F6 — write-off race and sign-masking.** `write_off_open_item()` read its target
+without `FOR UPDATE`, so a concurrent settlement could race it; and
+`open_item_control_check()` compared `abs()` of both sides, which masks a genuine
+sign error as a match. **Decision:** `FOR UPDATE` on the write-off read; the
+control check compares **signed** sums (CA-2, CA-4).
+
+**Ported from EMP (three ideas worth keeping):**
+
+- **B1 — hash-chained journal.** Each entry stores `prev_hash` (the previous
+  entry's `entry_hash` for the tenant) and `entry_hash` (a digest over the
+  entry's immutable content plus `prev_hash`). Tampering with history breaks the
+  chain and `verify_journal_chain()` reports the first broken link (JI-3).
+- **B2 — scale CHECK.** A `CHECK` rejects any amount whose scale exceeds the
+  currency's scale, so `1.005` cannot be posted to a USD ledger (MO-1). The
+  application layer already refuses floats; this closes the door at the database.
+- **B3 — reversal-as-document-status.** A reversed entry is reported as reversed
+  and **cannot be reversed again**; the status is authoritative rather than
+  inferred from the presence of a mirror (RV-4). This is the structural form of
+  the F1 fix.
+
+**Consequences:** The settlement layer now has one allocator, an append-only
+application history, a reversal path that keeps the subledger tied to the
+control, and a tamper-evident journal. The cost is a small amount of indirection
+(one allocator function) and one extra reconciliation query on the hot path of
+nothing — `open_item_application_check()` is a reporting check, not a trigger.
+The hash chain adds one digest per entry; it is computed in a `BEFORE INSERT`
+trigger and is not on the read path.
+
+**Related:** `docs/SETTLEMENT_INVARIANTS.md` (the normative statements),
+migration `0007_settlement_integrity.sql`, and the regression suite
+`db/tests/settlement.sql`.
+
+---
+
 ## Open decisions for you
 1. ~~**ADR-0006:** switch `journal_line.id` to `bigint`?~~ **DONE.**
 2. ~~**ADR-0007:** keep RLS on the hot `journal_line` path?~~ **DONE** — measured ~3× cost; RLS disabled on journal tables, kept elsewhere; `ninja_migrator` BYPASSRLS added.

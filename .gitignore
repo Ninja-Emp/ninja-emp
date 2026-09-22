@@ -38,3 +38,6 @@ Thumbs.db
 *~
 .idea/
 .vscode/
+
+# sandbox deploy key — never commit
+.ssh/
