@@ -1,5 +1,10 @@
 # HANDOFF — Ninja EMP Settlement Fixes (A) + EMP Idea Ports (B)
 
+> **STATUS: COMPLETE — committed at `1c15a0e`.** This document is retained as the
+> design record for the settlement workstream. The fixes below are implemented,
+> tested, and merged to `main`. See §0 for the closing summary; the remaining
+> sections are the original pre-code plan, kept for provenance.
+
 **Created:** end of the session that began the work. **Purpose:** let a fresh agent
 finish without re-deriving anything. Read this top to bottom before touching code.
 
@@ -14,19 +19,30 @@ The user asked: **"Do A and B."**
 - **B** = Port EMP's three good ideas: **hash chain**, **minor-unit/scale CHECK**,
   **reversal-as-document-status**.
 
-**Done so far (this session):**
+**DONE — committed at `1c15a0e`** (`fix(settlement): close F1-F6, port EMP B1-B3`),
+on top of `89b8b87` (`docs: settlement invariants + ADR-0039`).
+
 1. Installed PostgreSQL 18.6 and provisioned the DB; established a **GREEN baseline
    of 222/222 assertions**.
 2. Read the entire settlement layer in full (files listed in §3).
 3. **Wrote the invariants first** — `docs/SETTLEMENT_INVARIANTS.md` (normative).
 4. **Wrote ADR-0039** in `docs/DECISIONS.md` (the decisions that close F1–F6 + B1–B3).
-5. Wrote `todo.md` with the full task breakdown.
+5. Implemented `db/migrations/0007_settlement_integrity.sql` (976 lines): the single
+   `allocate_payment()` allocator, `unapply_for_entry()`, rewritten
+   `reverse_journal_entry()` (refuses re-reverse), 7-arg `apply_payment()`,
+   `post_consignor_payout()`, `post_refund()`, `write_off_open_item()` (FOR UPDATE),
+   signed `open_item_control_check()` (no `abs()`), the hash chain
+   (`journal_entry_digest`, `journal_entry_hash_chain` trigger,
+   `verify_journal_chain()`), scale CHECKs, and a self-verifying `DO $verify$` block.
+6. Wrote `db/tests/settlement.sql` (19 assertions, S1–S12, delta-based, wrapped in
+   BEGIN/ROLLBACK) and wired it into `scripts/run_tests.sh`.
+7. **Verified:** full suite **241/241 GREEN** (222 + 19) from a clean
+   `provision.sh` → `migrate.sh` → `run_tests.sh`. Proved *fails-before /
+   passes-after* by checking out the pre-fix commit `89b8b87` in a worktree and
+   reproducing F1/F5/B2/B1 as live defects. Confirmed the hash chain detects
+   tampering. No defects found in the implementation.
 
-**NOT done yet:** any code change. No migration written. No fix implemented. No test
-written. The workspace is otherwise the latest Ninja EMP (pulled earlier this session).
-
-**Next action:** write migration `db/migrations/0007_settlement_integrity.sql` and
-implement the fixes in the order in §6, each with a regression test.
+**Next workstream:** the quality gate (Part 6, step 9) — see `docs/ROADMAP.md`.
 
 ---
 
@@ -258,26 +274,27 @@ ADR-0039 in `docs/DECISIONS.md` records the decisions. **Read both before coding
 
 ---
 
-## 9. Files created/modified this session (uncommitted)
+## 9. Files created/modified (all committed at `1c15a0e`)
 
 - `docs/SETTLEMENT_INVARIANTS.md` — **NEW** (normative invariants).
 - `docs/DECISIONS.md` — **MODIFIED** (ADR-0039 appended before "Open decisions").
-- `todo.md` — **REWRITTEN** (full task breakdown; §0–1 done, §2–11 pending).
-- `docs/EMP_ASSESSMENT.md` — untracked (from earlier this session; the EMP review).
-- `db/migrations/0006_item_price_barcode.sql`, `src/`, `app/`, `ui/`, `tests/` —
-  untracked (from the earlier pull of latest Ninja EMP; not mine).
+- `db/migrations/0007_settlement_integrity.sql` — **NEW** (the fix; 976 lines).
+- `db/tests/settlement.sql` — **NEW** (19 assertions, S1–S12).
+- `scripts/run_tests.sh` — **MODIFIED** (`settlement` added to `DEFAULT_SUITES`).
+- `README.md`, `docs/ROADMAP.md` — **MODIFIED** (counts refreshed to 241/11).
 
-**Nothing has been committed.** Decide with the user whether to commit the invariants
-+ ADR first (recommended: yes — they are the design) before the code.
+Committed in two commits: `89b8b87` (invariants + ADR — the design) then `1c15a0e`
+(the code + tests). The design-before-code split was deliberate.
 
 ---
 
 ## 10. First three actions for the next agent
 
 1. Read `docs/SETTLEMENT_INVARIANTS.md` and ADR-0039 in `docs/DECISIONS.md`.
-2. Re-establish the environment (§2) and confirm **222/222 GREEN**.
-3. Write `db/migrations/0007_settlement_integrity.sql`, starting with **F1 + B3**
-   (reversal un-applies), then its regression test. Proceed in the §6 order.
+2. Re-establish the environment (§2) and confirm **241/241 GREEN**.
+3. Move to the next workstream: **the quality gate (Part 6, step 9)** — PHP-CS-Fixer,
+   PHPStan L10, PHPMD, Deptrac, Infection (MSI ≥ 80%), wired into CI alongside the
+   unit and database suites. See `docs/ROADMAP.md` → "Immediate next action".
 
 **Do not** write code before re-reading the invariants. That is the whole point of
 this handoff.

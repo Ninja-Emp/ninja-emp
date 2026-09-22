@@ -7,8 +7,9 @@ A greenfield **vendor mall + consignment store SaaS** with world-class double-en
 > statements, period/year-end close, AR write-off, inventory with weighted-average cost, stored
 > value, vendor draw, 1099-NEC, percentage-rent/CAM true-up, markdown engine, layaway, and
 > percentage-commission true-up — all built and proven on live PostgreSQL 18.6.
-> **222 assertions across 10 suites, all green**, from a clean provision → migrate → test run.
-> Application layer (Part 6) is the next build.
+> **241 assertions across 11 suites, all green**, from a clean provision → migrate → test run.
+> The settlement layer is hardened (ADR-0039): reversal un-applies settlement, one allocator,
+> no silent cash, hash-chained journal. Application layer (Part 6) is the next build.
 
 ---
 
@@ -30,8 +31,8 @@ DB backups are written into `backups/` and bundled into `dist/*.zip` for downloa
 ```
 db/                 PostgreSQL schema (DB-first). Numbered, idempotent, re-runnable.
   provision.sh      One-shot: creates both DBs, roles, kernel, tenant schema, seeds.
-  migrations/       Versioned, resumable, idempotent migrations (0001…0005).
-  tests/            Assertion suites (10 suites, 222 assertions).
+  migrations/       Versioned, resumable, idempotent migrations (0001…0007).
+  tests/            Assertion suites (11 suites, 241 assertions).
   scrub.sql         PII scrubbing for prod→dev sync.
 docs/               SRS, DECISIONS (ADRs), DATA_STANDARDS, ERD, DBAL, LOCAL_DEV, ROADMAP, DB_AUDIT.
 scripts/            run_tests.sh, migrate.sh, backup.sh, restore.sh, backup_tenant.sh,
@@ -85,7 +86,8 @@ bash scripts/run_tests.sh close    # just one suite
 | `tax1099.sql` | 19 | **19/19 PASS** |
 | `lease.sql` | 20 | **20/20 PASS** |
 | `retail.sql` | 37 | **37/37 PASS** |
-| **Total** | **222** | **GREEN** |
+| `settlement.sql` | 19 | **19/19 PASS** |
+| **Total** | **241** | **GREEN** |
 
 The suites are **delta-based and re-runnable** — they assert on the change they
 cause, not on absolute totals, so they can be run repeatedly without
@@ -94,7 +96,7 @@ reprovisioning. Verified from a clean `db/provision.sh` → `scripts/migrate.sh`
 
 ## GitHub
 
-**Repo:** https://github.com/Ninja-Emp/ninja-emp — **private**, default branch `main`.
+**Repo:** https://github.com/Ninja-Emp/ninja-emp — **public**, default branch `main`.
 
 Day-to-day sync (commits + pushes in one step):
 

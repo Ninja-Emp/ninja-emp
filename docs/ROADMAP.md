@@ -29,8 +29,9 @@ stable.
 | 6j | **Percentage-commission true-up** — rated marginally, monotonic (ADR-0037) | ✅ |
 | — | **Migrations runner** — versioned, resumable, idempotent, checksum drift detection | ✅ |
 | — | **Per-tenant backup/restore** + **scrubbed prod→dev sync** with leak test | ✅ |
+| — | **Settlement integrity** — reversal un-applies, one allocator, no silent cash, hash-chained journal (ADR-0039) | ✅ |
 
-**Proven:** **222 assertions across 10 suites**, all idempotent, from a clean
+**Proven:** **241 assertions across 11 suites**, all idempotent, from a clean
 `provision.sh` → `migrate.sh` → `run_tests.sh`, and verified after a
 backup→restore round-trip. The database is complete.
 
@@ -43,20 +44,24 @@ With the domain schema **complete and proven**, the PHP application layer is und
 | 6.1 | **DBAL** per ADR-0025 — bcmath + string money, savepoints, emulated prepares (PgBouncer) | ✅ |
 | 6.2 | **Ledger engine** — idempotent posting, posting_map account determination, reversal, tenders | ✅ |
 | 6.3 | **Auth & tenancy** — sessions, RBAC via party roles, schema-per-tenant resolution | ✅ |
-| 6.4 | **Feature modules + service contracts** (PHP 8.5, no frameworks, PSR-3/4/7/11/12/15) | ⏳ |
-5. **Routing + middleware**; wire auth into the request pipeline.
-6. **Vendor portal UI** — the realtime views from Part 5 are already built and proven.
-7. **API-first**: OpenAPI 3.1 spec generated from the contracts.
-8. **Server-rendered PHP templates** + a map island for the mall floor plan.
-9. **Quality gate**: PHP-CS-Fixer, PHPStan L10, PHPMD, Deptrac, mutation testing (MSI ≥ 80%).
+| 6.4 | **Feature modules + service contracts** (PHP 8.5, no frameworks, PSR-3/4/7/11/12/15) | ✅ |
+| 6.5 | **Routing + middleware** — PSR-7/11/15 kernel, attribute routing, auth in the pipeline | ✅ |
+| 6.6 | **Vendor portal UI** — the realtime views from Part 5 are already built and proven | ✅ |
+| 6.7 | **API-first** — OpenAPI 3.1 spec generated from the contracts | ✅ |
+| 6.8 | **Server-rendered PHP templates** + a map island for the mall floor plan | ✅ |
+| 6.9 | **Quality gate** — PHP-CS-Fixer, PHPStan L10, PHPMD, Deptrac, mutation testing (MSI ≥ 80%) | ⏳ |
 
-**Delivered so far (6.1–6.3):** `src/` now contains the DBAL (`NinjaEMP\Db\*`:
+**Delivered so far (6.1–6.8):** `src/` now contains the DBAL (`NinjaEMP\Db\*`:
 `Connection`, `PdoConnection`, `TenantContext`, `PlaceholderRewriter`, `TypeMapper`,
 `Identifier`, `ErrorMapper`, typed exceptions), the ledger engine
 (`NinjaEMP\Ledger\*`: `LedgerService`, `JournalEntry`, `JournalLine`, `Tender`),
-the `Money`/`Currency` value objects, and auth & tenancy (`NinjaEMP\Auth\*`,
-`NinjaEMP\Tenancy\*`). **118 unit assertions green** (`php tests/run.php`),
-zero dependencies. Functional DBAL tests auto-skip without a live database.
+the `Money`/`Currency` value objects, auth & tenancy (`NinjaEMP\Auth\*`,
+`NinjaEMP\Tenancy\*`), the repository layer (`NinjaEMP\Repository\*`), the domain
+services (`NinjaEMP\Domain\*`: Vendor Mall, Consignment, POS, Inventory, Open Item,
+Stored Value, Reporting), the HTTP kernel (`NinjaEMP\Http\*`: PSR-7/11/15 messages,
+attribute routing, middleware pipeline), and the OpenAPI 3.1 document builder
+(`NinjaEMP\OpenApi\*`). **118 unit assertions green** (`php tests/run.php`),
+zero runtime dependencies. Functional DBAL tests auto-skip without a live database.
 
 ## Deferred follow-ons (not blocking)
 
@@ -79,7 +84,9 @@ journal partitioning at the 20M-row threshold (ADR-0026) · PII envelope encrypt
 
 ## Immediate next action
 
-**Part 6, step 4: feature modules + service contracts.** The DBAL (6.1), ledger engine (6.2)
-and auth & tenancy (6.3) are delivered and unit-tested. Next: build the domain services
-(Vendor Mall, Consignment, POS, Inventory) on top of `LedgerService`, then routing + middleware,
-then the vendor portal UI and the OpenAPI 3.1 surface.
+**Part 6, step 9: the quality gate.** The DBAL (6.1), ledger engine (6.2), auth &
+tenancy (6.3), feature modules (6.4), routing + middleware (6.5), vendor portal UI
+(6.6), OpenAPI 3.1 surface (6.7) and server-rendered templates (6.8) are delivered
+and unit-tested. Next: stand up the static-analysis and mutation-testing gate
+(PHP-CS-Fixer, PHPStan L10, PHPMD, Deptrac, Infection with MSI ≥ 80%) and wire it
+into CI alongside the existing unit and database suites.
