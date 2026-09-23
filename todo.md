@@ -84,7 +84,7 @@ until its invariants are written down and agreed.
 - [ ] infection (MSI >= 80%) — re-measuring against the full suite
 
 ## 9. Commit + push final A
-- [ ] Commit and push
+- [x] Commit and push (fca4163)
 
 ---
 
@@ -113,7 +113,7 @@ until its invariants are written down and agreed.
 
 ## 13. Docs + commit
 - [x] Update README/ROADMAP/handoff with E2E layer + counts
-- [ ] Commit + push
+- [x] Commit + push (fca4163)
 
 ## 14. Latent DBAL bug found by enabling the functional test
 - [x] `PlaceholderRewriter` emitted `$1` placeholders — PDO pgsql binds those as
