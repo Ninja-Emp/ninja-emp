@@ -81,7 +81,7 @@ until its invariants are written down and agreed.
 - [x] phpmd (0 violations)
 - [x] deptrac (0 violations, 0 uncovered)
 - [x] unit tests (1459 assertions) + functional DBAL (real PG)
-- [ ] infection (MSI >= 80%) — re-measuring against the full suite
+- [x] infection (MSI 81%, Covered MSI 83% — 1487 killed / 1836)
 
 ## 9. Commit + push final A
 - [x] Commit and push (fca4163)
