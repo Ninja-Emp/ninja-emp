@@ -12,7 +12,7 @@ use NinjaEMP\Db\Sql\Value;
  * Serves real static files directly; forwards everything else to the front
  * controller. (Production uses a real web server with a rewrite rule.)
  */
-require dirname(__DIR__, 3) . '/vendor/autoload.php';
+require dirname(__DIR__, 3) . '/bootstrap/autoload.php';
 
 $path = parse_url(Value::str($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
 $path = $path === false || $path === null ? '/' : $path;

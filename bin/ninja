@@ -11,6 +11,8 @@ declare(strict_types=1);
  * tooling required. The Makefile is an optional convenience wrapper around it.
  *
  *   php bin/ninja              # list every task
+ *   php bin/ninja doctor       # check your local environment
+ *   php bin/ninja serve-ui     # run the Tenant UI (no database, no Composer)
  *   php bin/ninja serve        # run the API + Tenant UI dev servers
  *   php bin/ninja gate         # the full quality gate, in CI order
  *
@@ -52,6 +54,80 @@ $apiPort = getenv('NINJA_API_PORT') ?: '8092';
 $uiPort = getenv('NINJA_UI_PORT') ?: '8091';
 $tenant = getenv('NINJA_TENANT') ?: 'tenant_demo';
 
+// ---------------------------------------------------------------------------
+// Cross-platform process helpers.
+// ---------------------------------------------------------------------------
+
+/**
+ * Find an executable on PATH. On Windows the usual extensions are tried.
+ */
+function which(string $program): ?string
+{
+    $path = (string) getenv('PATH');
+
+    if (PHP_OS_FAMILY === 'Windows') {
+        $extensions = ['.exe', '.bat', '.cmd', '.com'];
+        foreach (explode(PATH_SEPARATOR, $path) as $dir) {
+            $dir = rtrim($dir, '\\/');
+            if ($dir === '') {
+                continue;
+            }
+            foreach ($extensions as $ext) {
+                $candidate = $dir . DIRECTORY_SEPARATOR . $program . $ext;
+                if (is_file($candidate)) {
+                    return $candidate;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    foreach (explode(PATH_SEPARATOR, $path) as $dir) {
+        $candidate = rtrim($dir, '/') . '/' . $program;
+        if (is_file($candidate) && is_executable($candidate)) {
+            return $candidate;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * On Windows, CreateProcess cannot launch .bat/.cmd shims directly, and the
+ * array form of proc_open() bypasses the shell. Resolve the program and, when
+ * it is a batch file, run it through cmd.exe /c.
+ *
+ * @param list<string> $argv
+ *
+ * @return list<string>
+ */
+function win_argv(array $argv): array
+{
+    $program = $argv[0];
+
+    // Already an explicit executable path (e.g. PHP_BINARY).
+    if (preg_match('/\.(exe|com)$/i', $program) === 1) {
+        return $argv;
+    }
+
+    $resolved = which($program);
+
+    if ($resolved === null) {
+        return $argv; // let it fail with a clear message
+    }
+
+    if (preg_match('/\.(bat|cmd)$/i', $resolved) === 1) {
+        $comspec = getenv('COMSPEC') ?: 'cmd.exe';
+
+        return array_merge([$comspec, '/c', $resolved], array_slice($argv, 1));
+    }
+
+    $argv[0] = $resolved;
+
+    return $argv;
+}
+
 /**
  * Run a command in the foreground, inheriting stdio. Returns the exit code.
  *
@@ -59,7 +135,12 @@ $tenant = getenv('NINJA_TENANT') ?: 'tenant_demo';
  */
 function run(array $argv): int
 {
+    if (PHP_OS_FAMILY === 'Windows') {
+        $argv = win_argv($argv);
+    }
+
     $proc = proc_open($argv, [STDIN, STDOUT, STDERR], $pipes);
+
     if (!is_resource($proc)) {
         fwrite(STDERR, 'Failed to start: ' . implode(' ', $argv) . PHP_EOL);
 
@@ -130,14 +211,74 @@ $tasks = [
 
         return 0;
     }],
-    'install' => ['Install dev tooling (composer install)', static fn (): int => run([$composer, 'install'])],
+    'doctor' => ['Check your local environment (PHP, extensions, Composer, .env)', static function () use ($root): int {
+        echo 'Ninja EMP environment check' . PHP_EOL . PHP_EOL;
+
+        $fatal = false;
+
+        $versionOk = version_compare(PHP_VERSION, '8.1.0', '>=');
+        printf("  %-14s %s%s\n", 'PHP', PHP_VERSION, $versionOk ? '' : '   <-- need >= 8.1');
+        $fatal = $fatal || !$versionOk;
+
+        // bcmath is used by the money layer (both apps); the rest are optional
+        // until you talk to the database.
+        $extensions = [
+            'bcmath' => 'required (money math)',
+            'mbstring' => 'recommended',
+            'pdo' => 'needed for the database-backed API only',
+            'pdo_pgsql' => 'needed for the database-backed API only',
+        ];
+        foreach ($extensions as $ext => $note) {
+            $has = extension_loaded($ext);
+            printf("  %-14s %s\n", 'ext-' . $ext, $has ? 'loaded' : 'not loaded (' . $note . ')');
+            if ($ext === 'bcmath') {
+                $fatal = $fatal || !$has;
+            }
+        }
+
+        $vendor = is_file($root . '/vendor/autoload.php');
+        printf("  %-14s %s\n", 'Composer', $vendor
+            ? 'installed (vendor/ present)'
+            : 'not installed — optional; the app runs without it');
+
+        $env = is_file($root . '/.env');
+        printf("  %-14s %s\n", '.env', $env ? 'present' : 'missing (copy .env.example to .env)');
+
+        echo PHP_EOL;
+        if ($fatal) {
+            echo 'PHP 8.1+ with the bcmath extension is required. Everything else is optional.' . PHP_EOL;
+
+            return 1;
+        }
+
+        echo 'Ready. Start the app with:  php bin/ninja serve-ui' . PHP_EOL;
+
+        return 0;
+    }],
+    'install' => ['Install dev tooling (composer install)', static function () use ($root, $composer): int {
+        if (is_file($root . '/vendor/autoload.php')) {
+            echo 'Dependencies already installed (vendor/autoload.php present).' . PHP_EOL;
+
+            return 0;
+        }
+
+        if (which($composer) === null) {
+            fwrite(STDERR, 'Composer was not found on your PATH.' . PHP_EOL);
+            echo 'You do not need Composer to run the app. Start it with:' . PHP_EOL;
+            echo '    php bin/ninja serve-ui' . PHP_EOL;
+
+            return 1;
+        }
+
+        return run([$composer, 'install']);
+    }],
     'up' => ['Start PostgreSQL 18 in Docker', static fn (): int => run(['docker', 'compose', 'up', '-d', 'db'])],
     'down' => ['Stop the Docker stack', static fn (): int => run(['docker', 'compose', 'down'])],
     'provision' => ['Create both databases + tenant schema + seeds (destructive)', static fn (): int => run(['bash', $root . '/db/provision.sh', $tenant])],
     'migrate' => ['Apply pending migrations to every tenant schema', static fn (): int => run(['bash', $root . '/scripts/migrate.sh'])],
     'serve' => ['Run the API + Tenant UI dev servers together', static fn (): int => serve($root, $php, $apiPort, $uiPort)],
     'serve-api' => ['Run only the API dev server', static fn (): int => run([$php, '-S', '127.0.0.1:' . $apiPort, '-t', $root . '/apps/api/public', $root . '/apps/api/public/router.php'])],
-    'serve-ui' => ['Run only the Tenant UI dev server', static fn (): int => run([$php, '-S', '127.0.0.1:' . $uiPort, '-t', $root . '/apps/tenant-ui/public', $root . '/apps/tenant-ui/public/router.php'])],
+    'serve-ui' => ['Run only the Tenant UI dev server (no database needed)', static fn (): int => run([$php, '-S', '127.0.0.1:' . $uiPort, '-t', $root . '/apps/tenant-ui/public', $root . '/apps/tenant-ui/public/router.php'])],
     'test' => ['Full PHPUnit suite (unit + functional + end-to-end)', static fn (): int => run([$php, $root . '/vendor/bin/phpunit'])],
     'test-unit' => ['Unit suite only', static fn (): int => run([$php, $root . '/vendor/bin/phpunit', '--testsuite', 'unit'])],
     'test-e2e' => ['End-to-end suite only', static fn (): int => run([$php, $root . '/vendor/bin/phpunit', '--testsuite', 'e2e'])],

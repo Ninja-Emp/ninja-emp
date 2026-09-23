@@ -11,10 +11,11 @@ accounting. **DB-first**: the PostgreSQL schema is the contract; application cod
 
 ---
 
-## Quick start (five minutes)
+## Quick start (two minutes, no Composer)
 
-**Requirements:** PHP **8.5** (with `bcmath`, `mbstring`, `pdo_pgsql`), **Composer**, and
-**Docker** (for PostgreSQL 18). On Windows, Laragon works too — see `docs/LOCAL_DEV.md`.
+**Requirements to run the app:** **PHP 8.1 or newer** — that's it. The application is
+**zero-dependency at runtime**: it needs no framework, no Composer, and no database to boot
+the Tenant UI. (PHP **8.5** is the production target; the code uses nothing newer than 8.1.)
 
 The task runner is **`php bin/ninja`** — pure PHP, so it works the same on Windows, macOS
 and Linux. **You do not need `make`** (a `Makefile` is provided as an optional wrapper for
@@ -24,19 +25,53 @@ those who prefer it).
 git clone https://github.com/Ninja-Emp/ninja-emp.git
 cd ninja-emp
 
-cp .env.example .env          # configuration; the defaults match the Docker database
-php bin/ninja install         # composer install (dev tooling)
+cp .env.example .env          # optional; sensible defaults are built in
+php bin/ninja doctor          # check your environment (PHP version, extensions)
+php bin/ninja serve-ui        # run the Tenant UI — no database, no Composer
+```
+
+Then open **<http://127.0.0.1:8091>** — the mall operator's back office. It is a fully
+interactive console (POS, registers, booths, vendors, inventory, reports, settings) backed by
+an in-memory mock repository, so it runs with nothing installed.
+
+To run the **API** as well (needs the PSR interfaces, which the bundled bootstrap provides):
+
+```bash
+php bin/ninja serve           # API on :8092 + Tenant UI on :8091
+```
+
+- **API** — <http://127.0.0.1:8092/api/health> — docs at `/api/docs`, contract at `/api/openapi.json`
+
+Run `php bin/ninja` on its own to list every task.
+
+### Windows / Laragon
+
+The runner is cross-platform: it resolves `composer`, `php` and other programs on `PATH` and
+launches `.bat`/`.cmd` shims through `cmd.exe`, so it works from **Git Bash**, **PowerShell**,
+**cmd.exe** or the Laragon terminal without any extra tooling.
+
+```powershell
+git clone https://github.com/Ninja-Emp/ninja-emp.git
+cd ninja-emp
+php bin\ninja doctor
+php bin\ninja serve-ui
+```
+
+You do **not** need Composer to run the app. `php bin/ninja install` is only for the
+development tooling (PHPUnit, PHPStan, …); if Composer is missing it now says so and points
+you at `serve-ui` instead of failing. See `docs/LOCAL_DEV.md` for adding PostgreSQL 18 to
+Laragon when you want the database-backed API.
+
+### With the database (Docker)
+
+For the full stack — PostgreSQL 18, provisioning, migrations — you also need **Docker**:
+
+```bash
+php bin/ninja install         # composer install (dev tooling; optional)
 php bin/ninja up              # start PostgreSQL 18 in Docker
 php bin/ninja provision       # create both databases + tenant schema + seeds
 php bin/ninja serve           # run the API + Tenant UI
 ```
-
-Then open:
-
-- **Tenant UI** — <http://127.0.0.1:8091> — the mall operator's back office
-- **API** — <http://127.0.0.1:8092/api/health> — docs at `/api/docs`, contract at `/api/openapi.json`
-
-Run `php bin/ninja` on its own to list every task.
 
 ### Without Docker
 
@@ -72,6 +107,7 @@ apps/                    the deployable applications — one directory per web-f
 db/                      PostgreSQL schema (DB-first). Numbered, idempotent, re-runnable.
   migrations/            versioned, resumable, checksum-verified migrations (0001…0007)
   tests/                 SQL assertion suites (11 suites, 241 assertions)
+bootstrap/               zero-dependency autoloader + PSR interface stubs (used when vendor/ is absent)
 bin/ninja                the developer task runner (pure PHP — no make, no bash)
 scripts/                 backup / restore / sync / migrate helpers
 tests/                   PHPUnit suite: Unit (harness bridge) + E2E (real front controllers)
@@ -86,6 +122,12 @@ The application is **zero-dependency PHP** at runtime: no framework, and the onl
 runtime packages are the PSR interfaces (`psr/log`, `psr/container`, `psr/http-message`,
 `psr/http-server-*`). Everything else under `require-dev` is tooling.
 
+Because the app depends only on the PSR *interfaces* (not on any concrete package), it can run
+**with or without Composer**. Every entry point requires `bootstrap/autoload.php`, which uses
+`vendor/autoload.php` when it exists and otherwise registers a tiny PSR-4 autoloader plus
+minimal PSR interface stubs (`bootstrap/psr-stubs.php`). That is what lets a fresh clone boot
+on a machine that has only PHP installed.
+
 ---
 
 ## Commands
@@ -96,12 +138,13 @@ optional alias for `php bin/ninja <task>`.
 | Command | What it does |
 |---------|--------------|
 | `php bin/ninja` | List every task |
-| `php bin/ninja install` | Install dev tooling (`composer install`) |
+| `php bin/ninja doctor` | Check your environment (PHP version, extensions, Composer, `.env`) |
+| `php bin/ninja install` | Install dev tooling (`composer install`; optional — the app runs without it) |
 | `php bin/ninja up` / `down` | Start / stop PostgreSQL 18 (Docker) |
 | `php bin/ninja provision` | Create both databases + tenant schema + seeds (destructive) |
 | `php bin/ninja migrate` | Apply pending migrations to every tenant schema |
 | `php bin/ninja serve` | Run the API + Tenant UI dev servers |
-| `php bin/ninja serve-api` / `serve-ui` | Run one app only |
+| `php bin/ninja serve-api` / `serve-ui` | Run one app only (`serve-ui` needs no database) |
 | `php bin/ninja test` | Full PHPUnit suite (unit + end-to-end) |
 | `php bin/ninja test-unit` / `test-e2e` | One suite only |
 | `php bin/ninja gate` | The whole quality gate, in CI order |

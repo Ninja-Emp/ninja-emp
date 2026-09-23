@@ -1,5 +1,21 @@
 # Local Development Setup (Windows + Laragon + PostgreSQL 18 + Navicat)
 
+## Run the app right now (no Composer, no database)
+
+You do **not** need Composer, Docker or PostgreSQL to see the app running. The Tenant UI is a
+self-contained console backed by an in-memory mock repository. From the repo root:
+
+```powershell
+php bin\ninja doctor      # confirms PHP >= 8.1 and the bcmath extension
+php bin\ninja serve-ui    # serves http://127.0.0.1:8091
+```
+
+Open <http://127.0.0.1:8091>. The runner is pure PHP and cross-platform: it resolves programs
+on `PATH` and launches `.bat`/`.cmd` shims through `cmd.exe`, so it works from Git Bash,
+PowerShell, cmd.exe or the Laragon terminal. `php bin\ninja install` (Composer) is only needed
+for the development tooling (PHPUnit, PHPStan, …) and degrades gracefully when Composer is
+absent. The sections below are for wiring up the **database-backed** API.
+
 ## Why local is faster
 
 The sandbox is a throwaway build/CI environment reached over the network. Your local machine

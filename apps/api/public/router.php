@@ -8,7 +8,7 @@ use NinjaEMP\Db\Sql\Value;
  * Router for PHP's built-in server (php -S). Serves static files directly and
  * forwards everything else to the front controller.
  */
-require dirname(__DIR__, 3) . '/vendor/autoload.php';
+require dirname(__DIR__, 3) . '/bootstrap/autoload.php';
 
 $path = parse_url(Value::str($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
 $path = $path === false || $path === null ? '/' : $path;

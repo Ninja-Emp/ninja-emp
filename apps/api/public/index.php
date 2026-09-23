@@ -44,7 +44,7 @@ use NinjaEMP\Tenancy\TenantResolver;
 use Psr\Log\LoggerInterface;
 
 $root = dirname(__DIR__, 3);
-require $root . '/vendor/autoload.php';
+require $root . '/bootstrap/autoload.php';
 
 // Load .env (if present) so configuration is not hard-coded.
 Env::load($root . '/.env');

@@ -30,7 +30,7 @@ use NinjaEmp\TenantUi\Support\Theme;
 use NinjaEmp\TenantUi\Support\View;
 
 $root = dirname(__DIR__);
-require dirname(__DIR__, 3) . '/vendor/autoload.php';
+require dirname(__DIR__, 3) . '/bootstrap/autoload.php';
 
 // Load .env (if present) so configuration is not hard-coded.
 Env::load(dirname(__DIR__, 3) . '/.env');
