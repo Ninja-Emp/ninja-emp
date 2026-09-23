@@ -39,4 +39,4 @@
 - [x] Infection MSI 81% / Covered MSI 83% (1,487 killed / 1,836)
 
 ## 6. Ship
-- [ ] Commit and push to `main`
+- [x] Commit and push to `main` (`4c4fb27`)
