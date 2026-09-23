@@ -1,8 +1,12 @@
 # Ninja EMP — Tenant UI
 
+> **Document root:** `apps/tenant-ui/public` · **Default port:** `8091` ·
+> **Serve:** `php bin/ninja serve-ui` (from the repo root).
+
 The **tenant-facing back-office console** for Ninja EMP: the mall operator's admin
 application. Clean, professional, and easy to navigate — deliberately distinct from the
-warm "grandma-friendly" vendor portal in `../../ui/` (which is left untouched).
+warm "grandma-friendly" vendor portal design prototype in
+`../../docs/prototypes/vendor-portal/` (which is left untouched).
 
 Built as **real PHP templates** (server-rendered) with a **thin mock data layer** so it
 runs standalone today and wires to the real DBAL (ADR-0025) later. **No framework**, PSR-12
@@ -13,7 +17,7 @@ style, zero Composer dependencies.
 ## Quick start
 
 ```bash
-# From this directory (app/tenant-ui)
+# From this directory (apps/tenant-ui)
 php -S localhost:8091 -t public public/router.php
 ```
 
@@ -101,7 +105,7 @@ The registry lives in `src/Support/Theme.php`; the tokens live in
 ## Architecture
 
 ```
-app/tenant-ui/
+apps/tenant-ui/
   public/
     index.php            ← front controller (all requests route here)
     router.php           ← dev-server router (static passthrough + front controller)

@@ -55,7 +55,7 @@ not ask to split it out; revisit if needed).
 ## 3. Architecture (how the PHP app is laid out)
 
 ```
-app/tenant-ui/                     ← the tenant UI application root
+apps/tenant-ui/                     ← the tenant UI application root
   public/
     index.php                      ← single front controller (all requests route here)
     assets/
@@ -156,7 +156,7 @@ items and block routes the role can't use. Document the permission matrix in `Au
 
 ## 7. Build order (do it in this sequence)
 
-1. **Scaffold** `app/tenant-ui/` structure + front controller + `View`/`Router`/`Auth`/`Theme`/`Money`.
+1. **Scaffold** `apps/tenant-ui/` structure + front controller + `View`/`Router`/`Auth`/`Theme`/`Money`.
 2. **Design system** `theme.css` (neutral + dark + dark-blue) + `app.css` shell.
 3. **App shell** `layout.php` + sidebar + topbar + theme switcher + search.
 4. **Mock data** `seed.php` + `MockRepository` (mall, floors, spaces, vendors, items, sales, users/roles).
@@ -173,7 +173,7 @@ items and block routes the role can't use. Document the permission matrix in `Au
 
 ## 8. Definition of done (quality gate)
 
-- Runs with `php -S localhost:8090 -t app/tenant-ui/public` and every route returns 200.
+- Runs with `php -S localhost:8090 -t apps/tenant-ui/public` and every route returns 200.
 - No PHP notices/warnings/errors in any request (check the server log).
 - All output escaped; money handled as strings; no floats.
 - Every theme (neutral, dark, dark-blue) passes AA contrast and looks intentional.
@@ -209,7 +209,7 @@ items and block routes the role can't use. Document the permission matrix in `Au
 - [x] Verify (all routes 200, no warnings, RBAC gating) + screenshots (light + dark)
 - [x] README + push + PR
 
-**Build complete.** All modules implemented and verified. See `app/tenant-ui/README.md`
+**Build complete.** All modules implemented and verified. See `apps/tenant-ui/README.md`
 for run instructions and the DBAL wiring guide.
 
 ---

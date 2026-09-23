@@ -1,0 +1,177 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Ninja EMP — dependency-free task runner.
+ *
+ * This is the canonical developer entrypoint. It is pure PHP, so it runs
+ * identically on Windows, macOS and Linux — no `make`, no bash, no extra
+ * tooling required. The Makefile is an optional convenience wrapper around it.
+ *
+ *   php bin/ninja              # list every task
+ *   php bin/ninja serve        # run the API + Tenant UI dev servers
+ *   php bin/ninja gate         # the full quality gate, in CI order
+ *
+ * Override any setting with an environment variable, e.g.
+ *   NINJA_UI_PORT=9000 php bin/ninja serve
+ */
+
+$root = dirname(__DIR__);
+
+// ---------------------------------------------------------------------------
+// Load .env (KEY=VALUE) into the environment without clobbering real env vars.
+// ---------------------------------------------------------------------------
+$envFile = $root . '/.env';
+if (is_file($envFile)) {
+    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines === false ? [] : $lines as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#' || !str_contains($line, '=')) {
+            continue;
+        }
+        [$key, $value] = explode('=', $line, 2);
+        $key = trim($key);
+        $value = trim($value);
+        $len = strlen($value);
+        if ($len >= 2 && ($value[0] === '"' || $value[0] === "'") && $value[$len - 1] === $value[0]) {
+            $value = substr($value, 1, -1);
+        }
+        if (getenv($key) === false) {
+            putenv($key . '=' . $value);
+            $_ENV[$key] = $value;
+        }
+    }
+}
+
+$php = getenv('PHP') ?: PHP_BINARY;
+$composer = getenv('COMPOSER') ?: 'composer';
+
+$apiPort = getenv('NINJA_API_PORT') ?: '8092';
+$uiPort = getenv('NINJA_UI_PORT') ?: '8091';
+$tenant = getenv('NINJA_TENANT') ?: 'tenant_demo';
+
+/**
+ * Run a command in the foreground, inheriting stdio. Returns the exit code.
+ *
+ * @param list<string> $argv
+ */
+function run(array $argv): int
+{
+    $proc = proc_open($argv, [STDIN, STDOUT, STDERR], $pipes);
+    if (!is_resource($proc)) {
+        fwrite(STDERR, 'Failed to start: ' . implode(' ', $argv) . PHP_EOL);
+
+        return 1;
+    }
+
+    return proc_close($proc);
+}
+
+/**
+ * Run the two PHP built-in dev servers side by side until interrupted.
+ */
+function serve(string $root, string $php, string $apiPort, string $uiPort): int
+{
+    $servers = [
+        'API      ' => [$php, '-S', '127.0.0.1:' . $apiPort, '-t', $root . '/apps/api/public', $root . '/apps/api/public/router.php'],
+        'Tenant UI' => [$php, '-S', '127.0.0.1:' . $uiPort, '-t', $root . '/apps/tenant-ui/public', $root . '/apps/tenant-ui/public/router.php'],
+    ];
+
+    echo '>> API       http://127.0.0.1:' . $apiPort . '   (health: /api/health, docs: /api/docs)' . PHP_EOL;
+    echo '>> Tenant UI http://127.0.0.1:' . $uiPort . PHP_EOL;
+    echo '>> Ctrl-C to stop.' . PHP_EOL;
+
+    $procs = [];
+    foreach ($servers as $proc) {
+        $handle = proc_open($proc, [STDIN, STDOUT, STDERR], $pipes);
+        if (is_resource($handle)) {
+            $procs[] = $handle;
+        }
+    }
+
+    // Make sure children die with the parent (best effort on every platform).
+    register_shutdown_function(static function () use ($procs): void {
+        foreach ($procs as $handle) {
+            if (is_resource($handle)) {
+                proc_terminate($handle);
+            }
+        }
+    });
+
+    do {
+        $running = false;
+        foreach ($procs as $handle) {
+            $status = proc_get_status($handle);
+            if ($status['running']) {
+                $running = true;
+            }
+        }
+        usleep(200000);
+    } while ($running);
+
+    foreach ($procs as $handle) {
+        proc_close($handle);
+    }
+
+    return 0;
+}
+
+// ---------------------------------------------------------------------------
+// Task table.
+// ---------------------------------------------------------------------------
+$tasks = [
+    'help' => ['Show this help', static function () use (&$tasks): int {
+        echo 'Ninja EMP task runner — php bin/ninja <task>' . PHP_EOL . PHP_EOL;
+        foreach ($tasks as $name => $entry) {
+            printf("  %-12s %s\n", $name, $entry[0]);
+        }
+
+        return 0;
+    }],
+    'install' => ['Install dev tooling (composer install)', static fn (): int => run([$composer, 'install'])],
+    'up' => ['Start PostgreSQL 18 in Docker', static fn (): int => run(['docker', 'compose', 'up', '-d', 'db'])],
+    'down' => ['Stop the Docker stack', static fn (): int => run(['docker', 'compose', 'down'])],
+    'provision' => ['Create both databases + tenant schema + seeds (destructive)', static fn (): int => run(['bash', $root . '/db/provision.sh', $tenant])],
+    'migrate' => ['Apply pending migrations to every tenant schema', static fn (): int => run(['bash', $root . '/scripts/migrate.sh'])],
+    'serve' => ['Run the API + Tenant UI dev servers together', static fn (): int => serve($root, $php, $apiPort, $uiPort)],
+    'serve-api' => ['Run only the API dev server', static fn (): int => run([$php, '-S', '127.0.0.1:' . $apiPort, '-t', $root . '/apps/api/public', $root . '/apps/api/public/router.php'])],
+    'serve-ui' => ['Run only the Tenant UI dev server', static fn (): int => run([$php, '-S', '127.0.0.1:' . $uiPort, '-t', $root . '/apps/tenant-ui/public', $root . '/apps/tenant-ui/public/router.php'])],
+    'test' => ['Full PHPUnit suite (unit + functional + end-to-end)', static fn (): int => run([$php, $root . '/vendor/bin/phpunit'])],
+    'test-unit' => ['Unit suite only', static fn (): int => run([$php, $root . '/vendor/bin/phpunit', '--testsuite', 'unit'])],
+    'test-e2e' => ['End-to-end suite only', static fn (): int => run([$php, $root . '/vendor/bin/phpunit', '--testsuite', 'e2e'])],
+    'cs' => ['Check code style (PSR-12), no changes', static fn (): int => run([$php, $root . '/vendor/bin/php-cs-fixer', 'fix', '--dry-run', '--diff'])],
+    'cs-fix' => ['Auto-fix code style', static fn (): int => run([$php, $root . '/vendor/bin/php-cs-fixer', 'fix'])],
+    'stan' => ['Static analysis (PHPStan level 10)', static fn (): int => run([$php, $root . '/vendor/bin/phpstan', 'analyse', '--no-progress', '--memory-limit=1G'])],
+    'phpmd' => ['Mess detection (complexity/coupling)', static fn (): int => run([$php, $root . '/vendor/bin/phpmd', 'src', 'text', $root . '/phpmd.xml'])],
+    'deptrac' => ['Architecture boundaries (bounded contexts)', static fn (): int => run([$php, $root . '/vendor/bin/deptrac', 'analyse', '--no-progress', '--fail-on-uncovered'])],
+    'infect' => ['Mutation testing (primary gate, MSI >= 80%)', static fn (): int => run([$php, $root . '/vendor/bin/infection', '--threads=max', '--test-framework-options=--testsuite=unit', '--only-covering-test-cases'])],
+    'audit' => ['Audit runtime dependencies for known vulnerabilities', static fn (): int => run([$composer, 'audit', '--no-dev'])],
+    'gate' => ['Run the full quality gate in CI order', static function () use (&$tasks): int {
+        $order = ['cs', 'stan', 'phpmd', 'deptrac', 'test', 'infect'];
+        foreach ($order as $name) {
+            echo PHP_EOL . '=== ' . $name . ' ===' . PHP_EOL;
+            $code = $tasks[$name][1]();
+            if ($code !== 0) {
+                fwrite(STDERR, PHP_EOL . 'Quality gate failed at: ' . $name . PHP_EOL);
+
+                return $code;
+            }
+        }
+        echo PHP_EOL . 'Quality gate: GREEN' . PHP_EOL;
+
+        return 0;
+    }],
+];
+
+$task = $argv[1] ?? 'help';
+
+if (!isset($tasks[$task])) {
+    fwrite(STDERR, 'Unknown task: ' . $task . PHP_EOL . PHP_EOL);
+    $tasks['help'][1]();
+
+    exit(1);
+}
+
+exit($tasks[$task][1]());

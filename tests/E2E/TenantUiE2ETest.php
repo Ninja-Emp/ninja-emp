@@ -21,8 +21,8 @@ final class TenantUiE2ETest extends TestCase
     {
         $root = \dirname(__DIR__, 2);
         self::$server = new AppServer(
-            $root . '/app/tenant-ui/public',
-            $root . '/app/tenant-ui/public/router.php',
+            $root . '/apps/tenant-ui/public',
+            $root . '/apps/tenant-ui/public/router.php',
         );
         self::$server->start();
     }

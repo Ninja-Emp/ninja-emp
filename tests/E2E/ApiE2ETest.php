@@ -21,8 +21,8 @@ final class ApiE2ETest extends TestCase
     {
         $root = \dirname(__DIR__, 2);
         self::$server = new AppServer(
-            $root . '/app/api/public',
-            $root . '/app/api/public/router.php',
+            $root . '/apps/api/public',
+            $root . '/apps/api/public/router.php',
         );
         self::$server->start();
     }

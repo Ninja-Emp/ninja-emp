@@ -16,15 +16,19 @@ accounting. **DB-first**: the PostgreSQL schema is the contract; application cod
 **Requirements:** PHP **8.5** (with `bcmath`, `mbstring`, `pdo_pgsql`), **Composer**, and
 **Docker** (for PostgreSQL 18). On Windows, Laragon works too — see `docs/LOCAL_DEV.md`.
 
+The task runner is **`php bin/ninja`** — pure PHP, so it works the same on Windows, macOS
+and Linux. **You do not need `make`** (a `Makefile` is provided as an optional wrapper for
+those who prefer it).
+
 ```bash
 git clone https://github.com/Ninja-Emp/ninja-emp.git
 cd ninja-emp
 
-cp .env.example .env      # configuration; the defaults match the Docker database
-make install              # composer install (dev tooling)
-make up                   # start PostgreSQL 18 in Docker
-make provision            # create both databases + tenant schema + seeds
-make serve                # run the API + Tenant UI
+cp .env.example .env          # configuration; the defaults match the Docker database
+php bin/ninja install         # composer install (dev tooling)
+php bin/ninja up              # start PostgreSQL 18 in Docker
+php bin/ninja provision       # create both databases + tenant schema + seeds
+php bin/ninja serve           # run the API + Tenant UI
 ```
 
 Then open:
@@ -32,34 +36,49 @@ Then open:
 - **Tenant UI** — <http://127.0.0.1:8091> — the mall operator's back office
 - **API** — <http://127.0.0.1:8092/api/health> — docs at `/api/docs`, contract at `/api/openapi.json`
 
-Run `make` on its own to list every target.
+Run `php bin/ninja` on its own to list every task.
 
 ### Without Docker
 
-Point `.env` at any PostgreSQL 18 instance and run `make provision` / `make serve`. The
-provisioning scripts honour a `PSQL` override, e.g.
+Point `.env` at any PostgreSQL 18 instance and run `php bin/ninja provision` /
+`php bin/ninja serve`. The provisioning scripts honour a `PSQL` override, e.g.
 `PSQL="psql -h 127.0.0.1 -U postgres" bash db/provision.sh`.
 
 ---
 
+## Applications (entry points)
+
+There are exactly **two deployable applications**, each with its own document root under
+`apps/`. A document root is the directory a web server points at; keeping one per
+deployable is what lets the API and the UI scale, deploy and be secured independently.
+
+| App | Namespace | Document root | Default port | Serve |
+|-----|-----------|---------------|--------------|-------|
+| **API** | `NinjaEmp\Api\*` | `apps/api/public` | `8092` | `php bin/ninja serve-api` |
+| **Tenant UI** | `NinjaEmp\TenantUi\*` | `apps/tenant-ui/public` | `8091` | `php bin/ninja serve-ui` |
+
+Both are served together with `php bin/ninja serve`. Each app has its own README
+(`apps/api/README.md`, `apps/tenant-ui/README.md`) stating its document root and how to run it.
+
 ## Repository layout
 
 ```
-src/                     the library (NinjaEMP\*): DBAL, ledger, money, auth, tenancy, HTTP, OpenAPI
-app/
+src/                     the shared library (NinjaEMP\*): DBAL, ledger, money, auth, tenancy, HTTP, OpenAPI
+apps/                    the deployable applications — one directory per web-facing app
   api/                   the API application (NinjaEmp\Api\*) — OpenAPI 3.1 surface
-    public/              front controller + dev-server router (the web root)
+    public/              front controller + dev-server router (the document root)
   tenant-ui/             the Tenant UI application (NinjaEmp\TenantUi\*) — server-rendered templates
-    public/              front controller + dev-server router (the web root)
+    public/              front controller + dev-server router (the document root)
 db/                      PostgreSQL schema (DB-first). Numbered, idempotent, re-runnable.
   migrations/            versioned, resumable, checksum-verified migrations (0001…0007)
   tests/                 SQL assertion suites (11 suites, 241 assertions)
-bin/                     developer entrypoints (migrate, serve)
+bin/ninja                the developer task runner (pure PHP — no make, no bash)
 scripts/                 backup / restore / sync / migrate helpers
 tests/                   PHPUnit suite: Unit (harness bridge) + E2E (real front controllers)
 docs/                    SRS, DECISIONS (ADRs), handoffs, ERD, DBAL, LOCAL_DEV, ROADMAP
+  prototypes/            design prototypes (not deployable) — e.g. the vendor-portal mock-up
 docker-compose.yml       PostgreSQL 18 for local development
-Makefile                 the developer entrypoints
+Makefile                 optional wrapper around `php bin/ninja`
 .env.example             configuration template (copy to .env)
 ```
 
@@ -71,15 +90,21 @@ runtime packages are the PSR interfaces (`psr/log`, `psr/container`, `psr/http-m
 
 ## Commands
 
+Every command is a task on the pure-PHP runner, so it works on any OS. `make <task>` is an
+optional alias for `php bin/ninja <task>`.
+
 | Command | What it does |
 |---------|--------------|
-| `make up` / `make down` | Start / stop PostgreSQL 18 (Docker) |
-| `make provision` | Create both databases + tenant schema + seeds (destructive) |
-| `make migrate` | Apply pending migrations to every tenant schema |
-| `make serve` | Run the API + Tenant UI dev servers |
-| `make test` | Full PHPUnit suite (unit + end-to-end) |
-| `make test-unit` / `make test-e2e` | One suite only |
-| `make gate` | The whole quality gate, in CI order |
+| `php bin/ninja` | List every task |
+| `php bin/ninja install` | Install dev tooling (`composer install`) |
+| `php bin/ninja up` / `down` | Start / stop PostgreSQL 18 (Docker) |
+| `php bin/ninja provision` | Create both databases + tenant schema + seeds (destructive) |
+| `php bin/ninja migrate` | Apply pending migrations to every tenant schema |
+| `php bin/ninja serve` | Run the API + Tenant UI dev servers |
+| `php bin/ninja serve-api` / `serve-ui` | Run one app only |
+| `php bin/ninja test` | Full PHPUnit suite (unit + end-to-end) |
+| `php bin/ninja test-unit` / `test-e2e` | One suite only |
+| `php bin/ninja gate` | The whole quality gate, in CI order |
 
 ---
 
@@ -88,9 +113,9 @@ runtime packages are the PSR interfaces (`psr/log`, `psr/container`, `psr/http-m
 The PHP suite runs under **PHPUnit**:
 
 ```bash
-make test          # unit (harness bridge) + end-to-end
-make test-unit     # unit only
-make test-e2e      # end-to-end only (boots the real front controllers over HTTP)
+php bin/ninja test       # unit (harness bridge) + end-to-end
+php bin/ninja test-unit  # unit only
+php bin/ninja test-e2e   # end-to-end only (boots the real front controllers over HTTP)
 ```
 
 - **Unit** — the pure domain (money, ledger, DBAL, HTTP, OpenAPI). Written against a tiny
@@ -139,7 +164,7 @@ Every commit must pass, in CI, in order (`docs/HANDOFF.md` §4):
 8. **End-to-end tests** — the critical journeys
 9. **Smoke** — the app boots
 
-Run it all locally with `make gate`.
+Run it all locally with `php bin/ninja gate`.
 
 ---
 
@@ -154,6 +179,7 @@ Run it all locally with `make gate`.
 - `docs/DBAL.md` — database abstraction layer design.
 - `docs/LOCAL_DEV.md` — set up PostgreSQL 18 alongside Laragon + Navicat.
 - `docs/ROADMAP.md` — what's next (Part 6 onward).
+- `docs/prototypes/` — design prototypes (not deployable), e.g. the vendor-portal mock-up.
 
 ---
 

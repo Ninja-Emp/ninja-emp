@@ -1,7 +1,7 @@
 deptrac:
   paths:
     - ./src
-    - ./app
+    - ./apps
   exclude_files:
     - '#.*Test\.php$#'
   layers:
@@ -10,7 +10,7 @@ deptrac:
       collectors:
         - type: classNameRegex
           value: '#^Psr\\#i'
-    # --- library layers (namespace-anchored so app/ never collides) ---------
+    # --- library layers (namespace-anchored so apps/ never collides) --------
     - name: Money
       collectors:
         - type: classNameRegex

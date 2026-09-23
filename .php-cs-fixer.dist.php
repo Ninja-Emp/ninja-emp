@@ -18,7 +18,7 @@ $finder = PhpCsFixer\Finder::create()
     ->in([
         __DIR__ . '/src',
         __DIR__ . '/tests',
-        __DIR__ . '/app',
+        __DIR__ . '/apps',
     ])
     ->name('*.php')
     ->exclude([

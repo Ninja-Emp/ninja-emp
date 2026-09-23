@@ -1,4 +1,11 @@
-# Ninja EMP — Grandma-Friendly Vendor Portal UI
+# Ninja EMP — Grandma-Friendly Vendor Portal UI (design prototype)
+
+> **Status: design prototype.** This is a static, dependency-free mock-up of the
+> **vendor-facing** portal (the mall's *vendors* checking what sold and what they are owed).
+> It is **not** a deployable application and has no `public/` web root. The running
+> applications live under `apps/` — `apps/api` (the API) and `apps/tenant-ui` (the mall
+> operator's back office). When the vendor portal is built for real it will become a third
+> app under `apps/`, reusing this design.
 
 A warm, accessible, plain-language **vendor portal** for the Ninja EMP mall + consignment
 platform. This is the Part 6 "Vendor portal UI" + "map island" from `docs/ROADMAP.md`,
@@ -39,7 +46,7 @@ reader may be a first-time computer user, may have low vision, and may be nervou
 ## Structure
 
 ```
-ui/
+docs/prototypes/vendor-portal/
   index.html      Home / dashboard
   sales.html      What sold today
   money.html      My money
@@ -64,7 +71,7 @@ ui/
 It is plain static HTML/CSS/JS — no build step. Open `index.html` directly, or serve it:
 
 ```bash
-cd ui
+cd docs/prototypes/vendor-portal
 python3 -m http.server 8090
 # then visit http://localhost:8090/
 ```

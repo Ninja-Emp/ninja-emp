@@ -28,8 +28,8 @@
     "autoload": {
         "psr-4": {
             "NinjaEMP\\": "src/",
-            "NinjaEmp\\Api\\": "app/api/src/",
-            "NinjaEmp\\TenantUi\\": "app/tenant-ui/src/"
+            "NinjaEmp\\Api\\": "apps/api/src/",
+            "NinjaEmp\\TenantUi\\": "apps/tenant-ui/src/"
         }
     },
     "autoload-dev": {

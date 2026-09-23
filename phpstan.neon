@@ -5,11 +5,11 @@ parameters:
     level: 10
     paths:
         - src
-        - app
+        - apps
     excludePaths:
         # Server-rendered PHP templates: they consume loosely-typed view data
         # (extracted arrays) and are exercised by the functional/E2E suites,
         # not statically analysable at level 10.
-        - app/tenant-ui/src/Views
+        - apps/tenant-ui/src/Views
     treatPhpDocTypesAsCertain: false
     reportUnmatchedIgnoredErrors: true

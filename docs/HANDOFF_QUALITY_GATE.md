@@ -37,9 +37,11 @@ The app did **not** run locally: both `public/router.php` scripts referenced
 That is fixed (both front controllers now `require vendor/autoload.php` first). On top
 of that:
 
-- **Standard layout + runnability** — `docker-compose.yml`, `.env.example`, `Makefile`,
-  `bin/serve`, `bin/migrate`, `src/Support/Env.php` (a tiny `.env` loader). `make up &&
-  make provision && make serve` gets a developer running in minutes.
+- **Standard layout + runnability** — `docker-compose.yml`, `.env.example`, `bin/ninja`
+  (a pure-PHP task runner — no `make`/bash needed, so it works on Windows), `Makefile`
+  (an optional wrapper), `src/Support/Env.php` (a tiny `.env` loader).
+  `php bin/ninja up && php bin/ninja provision && php bin/ninja serve` gets a developer
+  running in minutes.
 - **Real PSR packages** — the 16 vendored `src/Psr/*` interfaces were deleted and
   replaced with the real Composer packages (`psr/http-message`, `psr/http-server-handler`,
   `psr/http-server-middleware`, `psr/container`, `psr/log`). The hand-rolled
@@ -73,7 +75,7 @@ of that:
   `deptrac/deptrac ^3.0`, `friendsofphp/php-cs-fixer ^3.64`, `infection/infection ^0.29`,
   `phpmd/phpmd ^2.15`, `phpstan/phpstan ^2.1`, `phpstan/phpstan-strict-rules ^2.0`,
   `phpunit/phpunit ^12.0`. PSR-4 autoload for `NinjaEMP\`→`src/`,
-  `NinjaEmp\Api\`→`app/api/src/`, `NinjaEmp\TenantUi\`→`app/tenant-ui/src/`, plus the
+  `NinjaEmp\Api\`→`apps/api/src/`, `NinjaEmp\TenantUi\`→`apps/tenant-ui/src/`, plus the
   vendored `Psr\*` namespaces. Scripts: `cs`, `cs:fix`, `stan`, `phpmd`, `deptrac`,
   `test`, `test:unit`, `infect`, `audit`, `gate`.
 - **`composer.lock`** — committed (dependency policy, HANDOFF.md §5).
@@ -114,7 +116,7 @@ of that:
   `Repository/RowMapper.php`, `Auth/*`, `Support/Log/NullLogger.php`,
   `Domain/Consignment|Inventory|Pos/*`, `Db/Exception/ConstraintViolationException.php`
   (made non-final so `LedgerBalanceException` can extend it).
-- **`app/` partial fixes**: `app/tenant-ui/src/Data/MockRepository.php` fully typed
+- **`apps/` partial fixes**: `apps/tenant-ui/src/Data/MockRepository.php` fully typed
   (was 108 errors → 0) via a `@phpstan-type Store` shape and `Value::*` money ops;
   `@param array<string,mixed> $params` docblocks added to **58 controller methods**
   (placed *above* the attribute block — PHPStan ignores docblocks that sit between
@@ -130,25 +132,25 @@ of that:
 | Check | Command | Result |
 | --- | --- | --- |
 | PHPStan L10 — `src/` | `vendor/bin/phpstan analyse src --level=10` | **`[OK] No errors`** |
-| PHPStan L10 — `app/` | `vendor/bin/phpstan analyse app --level=10` | **656 errors** (592 Views + 64 logic) |
+| PHPStan L10 — `apps/` | `vendor/bin/phpstan analyse app --level=10` | **656 errors** (592 Views + 64 logic) |
 | Unit suite | `php tests/run.php` | **407 assertions, 407 passed, 0 failed** |
 | PHP | `php -v` | 8.5.10 (cli) |
 | Composer | `composer --version` | 2.10.3 |
 | Coverage driver | `php -m \| grep pcov` | `pcov` present |
 
-### Remaining `app/` logic errors (64) — by file
+### Remaining `apps/` logic errors (64) — by file
 ```
-21  app/tenant-ui/src/Http/Controllers/VendorController.php
-15  app/tenant-ui/src/Http/Controllers/InventoryController.php
- 7  app/tenant-ui/src/Http/Controllers/BoothController.php
- 5  app/tenant-ui/src/Http/Controllers/RegisterController.php
- 4  app/tenant-ui/src/Support/Auth.php
- 3  app/tenant-ui/src/Http/Controller.php
- 3  app/tenant-ui/src/Http/Controllers/ReportController.php
- 2  app/tenant-ui/src/Support/Flash.php
- 2  app/tenant-ui/src/Support/View.php
- 1  app/tenant-ui/src/Http/Controllers/SettingsController.php
- 1  app/tenant-ui/src/Support/Nav.php
+21  apps/tenant-ui/src/Http/Controllers/VendorController.php
+15  apps/tenant-ui/src/Http/Controllers/InventoryController.php
+ 7  apps/tenant-ui/src/Http/Controllers/BoothController.php
+ 5  apps/tenant-ui/src/Http/Controllers/RegisterController.php
+ 4  apps/tenant-ui/src/Support/Auth.php
+ 3  apps/tenant-ui/src/Http/Controller.php
+ 3  apps/tenant-ui/src/Http/Controllers/ReportController.php
+ 2  apps/tenant-ui/src/Support/Flash.php
+ 2  apps/tenant-ui/src/Support/View.php
+ 1  apps/tenant-ui/src/Http/Controllers/SettingsController.php
+ 1  apps/tenant-ui/src/Support/Nav.php
 ```
 Dominant identifiers: `argument.type` (narrow `$params['id']` / `$fields` to
 `Value::str(...)` / `array<string,mixed>`), `binaryOp.invalid` (string concat with
@@ -156,9 +158,9 @@ Dominant identifiers: `argument.type` (narrow `$params['id']` / `$fields` to
 `missingType.iterableValue`, `return.type`, `match.alwaysTrue` (Auth.php role match),
 `ternary.condNotBoolean`, `if.condNotBoolean`.
 
-### Remaining `app/` Views errors (592)
-`app/tenant-ui/src/Views/**` — server-rendered HTML/PHP templates. **Recommendation:
-exclude `app/tenant-ui/src/Views` from PHPStan** (they are presentation templates, not
+### Remaining `apps/` Views errors (592)
+`apps/tenant-ui/src/Views/**` — server-rendered HTML/PHP templates. **Recommendation:
+exclude `apps/tenant-ui/src/Views` from PHPStan** (they are presentation templates, not
 typed library code) and instead cover them with the E2E/smoke layer. If the owner wants
 them analysed, they need per-file `@var` annotations on the `$data` extract() variables —
 a large, low-value effort. **This is a decision to confirm with the owner.**
@@ -167,7 +169,7 @@ a large, low-value effort. **This is a decision to confirm with the owner.**
 
 ## 3. What remains (ordered)
 
-1. **Finish the 64 `app/` logic errors** (list above). Mostly mechanical: narrow
+1. **Finish the 64 `apps/` logic errors** (list above). Mostly mechanical: narrow
    `$params['id']` with `Value::str(...)`, type `$fields` as `array<string,mixed>`,
    guard `foreach`/`offsetAccess` with `is_array(...)`, fix the `Auth.php` role `match`.
 2. **Decide + implement the `Views/` scope** (exclude vs annotate). If excluding, add to
@@ -175,7 +177,7 @@ a large, low-value effort. **This is a decision to confirm with the owner.**
 3. **Author the five missing configs:**
    - `phpmd.xml` — complexity/coupling rules (no god classes), zero violations.
    - `deptrac.yaml` — bounded-context boundaries (e.g. `Domain` must not depend on
-     `Http`; `Money`/`Db` are shared kernel; `app/*` may depend on `src/*`, not vice
+     `Http`; `Money`/`Db` are shared kernel; `apps/*` may depend on `src/*`, not vice
      versa).
    - `phpunit.xml` — a PHPUnit bridge that drives the existing zero-dependency harness
      (`tests/run.php` / `tests/TestHarness.php`) so **Infection can mutate** it. The
