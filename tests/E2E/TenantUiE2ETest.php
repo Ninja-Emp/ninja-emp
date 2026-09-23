@@ -138,4 +138,32 @@ final class TenantUiE2ETest extends TestCase
         self::assertIsArray($json['item']);
         self::assertSame('E2E Test Widget', $json['item']['name']);
     }
+
+    public function testSettingsRendersAppearanceControls(): void
+    {
+        $response = self::$server->get('/settings?role=owner');
+
+        self::assertSame(200, $response->status);
+        self::assertTrue($response->contains('data-appearance'), 'appearance form is marked for the instant-apply script');
+        self::assertTrue($response->contains('name="theme"'), 'theme radios are present');
+        self::assertTrue($response->contains('name="mode"'), 'mode radios are present');
+        self::assertTrue($response->contains('is-selected'), 'the current theme/mode is marked selected');
+    }
+
+    public function testThemeQueryOverrideAppliesToTheShell(): void
+    {
+        $response = self::$server->get('/settings?role=owner&theme=dark-blue&mode=dark');
+
+        self::assertSame(200, $response->status);
+        self::assertTrue($response->contains('data-theme="dark-blue"'), 'the shell reflects the chosen theme');
+        self::assertTrue($response->contains('data-mode="dark"'), 'the shell reflects the chosen mode');
+    }
+
+    public function testSettingsAppearancePostRedirects(): void
+    {
+        $response = self::$server->post('/settings', ['theme' => 'dark-blue', 'mode' => 'dark']);
+
+        self::assertSame(302, $response->status);
+        self::assertSame('/settings', $response->header('Location'));
+    }
 }

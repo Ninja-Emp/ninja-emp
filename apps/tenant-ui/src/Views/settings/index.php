@@ -22,13 +22,13 @@ $permLabels = [
 <div class="grid cols-2">
   <div class="card">
     <div class="card-head"><div class="h3">Appearance</div></div>
-    <form method="post" action="/settings">
+    <form method="post" action="/settings" data-appearance>
       <div class="card-body grid" style="gap:var(--space-5)">
         <div class="field">
           <label>Theme</label>
           <div class="grid cols-2" style="gap:var(--space-3)">
             <?php foreach ($themes as $key => $meta): ?>
-              <label class="theme-option" style="border-color: <?= $key === $theme ? 'var(--accent)' : 'var(--border)' ?>">
+              <label class="theme-option<?= $key === $theme ? ' is-selected' : '' ?>">
                 <input type="radio" name="theme" value="<?= View::e($key) ?>" <?= $key === $theme ? 'checked' : '' ?>>
                 <span class="swatch" style="width:22px;height:22px;background:<?= View::e($meta['swatch']) ?>"></span>
                 <span class="strong"><?= View::e($meta['label']) ?></span>
@@ -40,9 +40,9 @@ $permLabels = [
           <label>Mode</label>
           <div class="segmented">
             <?php foreach ($modes as $m): ?>
-              <label style="cursor:pointer">
+              <label class="seg-btn<?= $m === $mode ? ' is-selected' : '' ?>">
                 <input type="radio" name="mode" value="<?= View::e($m) ?>" <?= $m === $mode ? 'checked' : '' ?> class="sr-only">
-                <span class="seg-btn" style="display:inline-block;padding:5px 12px;border-radius:6px;<?= $m === $mode ? 'background:var(--surface);box-shadow:var(--shadow-xs)' : 'color:var(--text-muted)' ?>"><?= View::e(ucfirst($m)) ?></span>
+                <span><?= View::e(ucfirst($m)) ?></span>
               </label>
             <?php endforeach; ?>
           </div>
@@ -129,27 +129,40 @@ $permLabels = [
 </div>
 
 <script>
-  // Keep localStorage in sync with the settings form so the pre-paint theme
-  // script in the layout (which reads localStorage) agrees with the session.
+  // Appearance applies instantly (like the topbar switcher) and is remembered.
+  // The form still POSTs so the choice is also persisted server-side.
   (function () {
-    var form = document.querySelector('form[action="/settings"]');
+    var form = document.querySelector('form[data-appearance]');
     if (!form) return;
+
+    var root = document.documentElement;
+
+    function markSelected(name, value) {
+      form.querySelectorAll('input[name="' + name + '"]').forEach(function (input) {
+        var option = input.closest('.theme-option, .seg-btn');
+        if (option) option.classList.toggle('is-selected', input.value === value);
+      });
+    }
+
+    function apply(name, value) {
+      root.setAttribute(name === 'theme' ? 'data-theme' : 'data-mode', value);
+      try { localStorage.setItem(name === 'theme' ? 'nem-theme' : 'nem-mode', value); } catch (e) {}
+      markSelected(name, value);
+    }
 
     // Reflect the actually-applied theme/mode (localStorage wins at paint time).
     try {
       var lt = localStorage.getItem('nem-theme');
       var lm = localStorage.getItem('nem-mode');
-      if (lt) { var rt = form.querySelector('input[name="theme"][value="' + lt + '"]'); if (rt) rt.checked = true; }
-      if (lm) { var rm = form.querySelector('input[name="mode"][value="' + lm + '"]'); if (rm) rm.checked = true; }
+      if (lt) { var rt = form.querySelector('input[name="theme"][value="' + lt + '"]'); if (rt) { rt.checked = true; markSelected('theme', lt); } }
+      if (lm) { var rm = form.querySelector('input[name="mode"][value="' + lm + '"]'); if (rm) { rm.checked = true; markSelected('mode', lm); } }
     } catch (e) {}
 
-    form.addEventListener('submit', function () {
-      try {
-        var t = form.querySelector('input[name="theme"]:checked');
-        var m = form.querySelector('input[name="mode"]:checked');
-        if (t) localStorage.setItem('nem-theme', t.value);
-        if (m) localStorage.setItem('nem-mode', m.value);
-      } catch (e) {}
+    form.querySelectorAll('input[name="theme"]').forEach(function (input) {
+      input.addEventListener('change', function () { apply('theme', input.value); });
+    });
+    form.querySelectorAll('input[name="mode"]').forEach(function (input) {
+      input.addEventListener('change', function () { apply('mode', input.value); });
     });
   })();
 </script>

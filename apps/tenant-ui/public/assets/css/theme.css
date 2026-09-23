@@ -440,6 +440,21 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--text-base
   color: var(--text);
   box-shadow: var(--shadow-xs);
 }
+.segmented .seg-btn {
+  display: inline-block;
+  padding: 5px var(--space-3);
+  border-radius: calc(var(--radius) - 3px);
+  font-size: var(--text-sm);
+  font-weight: 550;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.segmented .seg-btn.is-selected,
+.segmented .seg-btn:has(input:checked) {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-xs);
+}
 
 /* ---- Utility ----------------------------------------------------------- */
 .row { display: flex; align-items: center; }

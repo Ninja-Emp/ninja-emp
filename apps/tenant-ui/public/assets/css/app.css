@@ -389,3 +389,5 @@
 }
 .theme-option input { position: absolute; opacity: 0; }
 .theme-option:hover { background: var(--surface-2); }
+.theme-option.is-selected,
+.theme-option:has(input:checked) { border-color: var(--accent); }
