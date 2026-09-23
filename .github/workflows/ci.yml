@@ -7,9 +7,10 @@ name: CI
 #   2. PHPStan        (level 10, zero errors, no baseline)
 #   3. PHPMD          (zero violations)
 #   4. Deptrac        (layer boundaries, no uncovered deps)
-#   5. Unit tests     (PHPUnit bridge over the assertion harness)
+#   5. Unit tests     (PHPUnit bridge over the assertion harness, incl. functional DBAL)
 #   6. Functional SQL (real PostgreSQL 18, all db/tests suites)
 #   7. Infection      (mutation testing — PRIMARY gate, MSI >= 80%)
+#   8. End-to-end     (real front controllers over HTTP)
 
 on:
   push:
@@ -45,8 +46,8 @@ jobs:
 
     env:
       NINJA_EMP_DSN: 'pgsql:host=127.0.0.1;port=5432;dbname=ninja_emp'
-      NINJA_EMP_USER: ninja_app
-      NINJA_EMP_PASSWORD: ninja_app
+      NINJA_EMP_DB_USER: ninja_app
+      NINJA_EMP_DB_PASSWORD: ninja_app
       NINJA_EMP_TENANT_ID: '11111111-1111-7111-8111-111111111111'
       NINJA_EMP_SCHEMA: tenant_demo
 
@@ -72,6 +73,13 @@ jobs:
       - name: Audit dependencies
         run: composer audit --no-dev
 
+      # --- Provision (needed by the functional DBAL tests and the SQL suites) ---
+      - name: Provision databases
+        run: |
+          sudo -u postgres psql -c "CREATE ROLE ninja_app LOGIN PASSWORD 'ninja_app' SUPERUSER;" || true
+          sudo -u postgres psql -c "CREATE ROLE ninja_control LOGIN PASSWORD 'ninja_control';" || true
+          bash db/provision.sh tenant_demo
+
       # --- 1. Style ---------------------------------------------------------
       - name: PHP-CS-Fixer (PSR-12)
         run: composer cs
@@ -88,17 +96,11 @@ jobs:
       - name: Deptrac
         run: composer deptrac
 
-      # --- 5. Unit tests ----------------------------------------------------
+      # --- 5. Unit tests (incl. functional DBAL against real PG) -----------
       - name: Unit tests (PHPUnit)
         run: composer test:unit
 
       # --- 6. Functional SQL suites on real PostgreSQL ----------------------
-      - name: Provision databases
-        run: |
-          sudo -u postgres psql -c "CREATE ROLE ninja_app LOGIN PASSWORD 'ninja_app' SUPERUSER;" || true
-          sudo -u postgres psql -c "CREATE ROLE ninja_control LOGIN PASSWORD 'ninja_control';" || true
-          bash db/provision.sh tenant_demo
-
       - name: Functional SQL suites
         run: bash scripts/run_tests.sh
 
@@ -116,3 +118,7 @@ jobs:
             infection-summary.log
             infection.html
           if-no-files-found: ignore
+
+      # --- 8. End-to-end (real front controllers over HTTP) -----------------
+      - name: End-to-end tests
+        run: composer test:e2e

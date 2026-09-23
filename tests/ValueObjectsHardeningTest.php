@@ -179,7 +179,7 @@ return static function (TestHarness $t): void {
 
     $t->suite('ControllerResolver');
 
-    $container = new class implements ContainerInterface {
+    $container = new class () implements ContainerInterface {
         /** @var array<string, object> */
         public array $items = [];
 
@@ -194,7 +194,7 @@ return static function (TestHarness $t): void {
         }
     };
 
-    $controller = new class {
+    $controller = new class () {
         public function ping(): string
         {
             return 'pong';
@@ -206,7 +206,7 @@ return static function (TestHarness $t): void {
     $t->assertSame($controller, $resolver->resolve('NinjaEMP\\Tests\\FakeController'), 'the container is asked first');
 
     // A container that has the id but returns a non-object falls through to instantiation.
-    $badContainer = new class implements ContainerInterface {
+    $badContainer = new class () implements ContainerInterface {
         public function get(string $id): mixed
         {
             return 'not-an-object';
@@ -263,6 +263,7 @@ return static function (TestHarness $t): void {
     $t->assertSame(2, \count($rows->rows()), 'rows returns the raw list');
 
     $seen = [];
+
     foreach ($rows as $row) {
         $seen[] = $row->get('a');
     }

@@ -16,6 +16,9 @@ final class NullLogger extends AbstractLogger
     /**
      * @param mixed $level
      * @param array<mixed> $context
+     *
+     * @SuppressWarnings("PHPMD.UnusedFormalParameter") parameters are mandated
+     *   by the PSR-3 interface; a no-op logger cannot use them.
      */
     public function log($level, Stringable|string $message, array $context = []): void
     {

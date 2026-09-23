@@ -7,7 +7,6 @@ parameters:
         - src
         - app
     excludePaths:
-        - src/Psr
         # Server-rendered PHP templates: they consume loosely-typed view data
         # (extracted arrays) and are exercised by the functional/E2E suites,
         # not statically analysable at level 10.

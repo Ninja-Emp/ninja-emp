@@ -1,6 +1,6 @@
 # Ninja EMP — Settlement Defect Fixes (A) + EMP Idea Ports (B)
 
-> **CONTINUING IN A NEW CHAT?** Read `HANDOFF_SETTLEMENT.md` first — it is
+> **CONTINUING IN A NEW CHAT?** Read `docs/HANDOFF_SETTLEMENT.md` first — it is
 > self-contained (environment, defect map, mutation map, design, order, gotchas).
 > Then read `docs/SETTLEMENT_INVARIANTS.md` and ADR-0039 in `docs/DECISIONS.md`.
 
@@ -60,7 +60,7 @@ until its invariants are written down and agreed.
 
 # Quality Gate (Part 6, Step 9) — Task A
 
-> Continuation handoff: `HANDOFF_QUALITY_GATE.md`. Definition of Done: `HANDOFF.md` §4.
+> Continuation handoff: `docs/HANDOFF_QUALITY_GATE.md`. Definition of Done: `docs/HANDOFF.md` §4.
 
 ## 6. PHPStan level 10
 - [x] src/ library: 0 errors
@@ -76,12 +76,49 @@ until its invariants are written down and agreed.
 - [x] .github/workflows/ci.yml
 
 ## 8. Run every tool to GREEN
-- [x] php-cs-fixer
-- [x] phpstan
-- [x] phpmd
-- [x] deptrac
-- [x] unit tests (876 assertions)
-- [ ] infection (MSI >= 80%) — currently 66.96% scoped; hardening in progress
+- [x] php-cs-fixer (0 of 184 files)
+- [x] phpstan (L10, 0 errors)
+- [x] phpmd (0 violations)
+- [x] deptrac (0 violations, 0 uncovered)
+- [x] unit tests (1459 assertions) + functional DBAL (real PG)
+- [ ] infection (MSI >= 80%) — re-measuring against the full suite
 
 ## 9. Commit + push final A
 - [ ] Commit and push
+
+---
+
+# E2E + Full PHPUnit (structural follow-up)
+
+> The app did not run locally: both `public/router.php` scripts used
+> `NinjaEMP\Db\Sql\Value` before the autoloader was loaded → every request 500'd.
+> Fix that, then build a real end-to-end acceptance layer and make PHPUnit the
+> single umbrella runner.
+
+## 10. Make the app runnable (front-controller bug)
+- [x] Fix `app/tenant-ui/public/router.php` — require `src/autoload.php` first
+- [x] Fix `app/api/public/router.php` — require `src/autoload.php` first
+- [x] Smoke: UI `/`,`/pos`,`/inventory`,`/reports` = 200; API `/api/health` = 200
+
+## 11. E2E acceptance layer (docs/HANDOFF.md §4 step 8)
+- [x] `tests/E2E/HttpResponse.php` — response value object
+- [x] `tests/E2E/AppServer.php` — boots `php -S` on a free port, waits, GET/POST
+- [x] `tests/E2E/TenantUiE2ETest.php` — critical journeys + RBAC + 404 + POS JSON
+- [x] `tests/E2E/ApiE2ETest.php` — health, OpenAPI contract, auth 401, 404
+
+## 12. Full PHPUnit umbrella
+- [x] `phpunit.xml` — add `e2e` testsuite (unit + e2e run together)
+- [x] `composer.json` — `test:e2e` script; wire E2E into `gate`
+- [x] Run full `phpunit` (unit bridge + E2E) to GREEN (47 tests)
+
+## 13. Docs + commit
+- [x] Update README/ROADMAP/handoff with E2E layer + counts
+- [ ] Commit + push
+
+## 14. Latent DBAL bug found by enabling the functional test
+- [x] `PlaceholderRewriter` emitted `$1` placeholders — PDO pgsql binds those as
+      NULL. Rewrite to unique named placeholders (`:p1`, `:p2`, …).
+- [x] Update `PlaceholderRewriterTest` + `PlaceholderRewriterHardeningTest`
+- [x] Load `.env` in the test bootstrap so functional tests actually run
+- [x] Unify env var names (`NINJA_EMP_DB_USER`/`NINJA_EMP_DB_PASSWORD`)
+- [x] Add `tests/EnvTest.php` + `tests/NullLoggerTest.php` (new files, no coverage)

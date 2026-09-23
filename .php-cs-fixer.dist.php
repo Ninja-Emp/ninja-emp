@@ -36,7 +36,7 @@ return (new PhpCsFixer\Config())
     ->setRules([
         '@PSR12' => true,
         '@PSR12:risky' => true,
-        '@PHP84Migration' => true,
+        '@PHP8x4Migration' => true,
 
         // Keep parentheses around `new` even when chaining. The PHP 8.4
         // "new without parentheses" form is valid but PDepend (PHPMD's parser)

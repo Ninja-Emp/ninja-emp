@@ -37,28 +37,17 @@ use NinjaEMP\Http\Middleware\RbacMiddleware;
 use NinjaEMP\Http\Middleware\TenantMiddleware;
 use NinjaEMP\Http\Routing\RouteCollection;
 use NinjaEMP\Http\Routing\Router;
+use NinjaEMP\Support\Env;
 use NinjaEMP\Tenancy\InMemoryTenantRegistry;
 use NinjaEMP\Tenancy\TenantRecord;
 use NinjaEMP\Tenancy\TenantResolver;
 use Psr\Log\LoggerInterface;
 
 $root = dirname(__DIR__, 3);
-require $root . '/src/autoload.php';
+require $root . '/vendor/autoload.php';
 
-// ---- PSR-4 autoloader for NinjaEmp\Api\ -> app/api/src/ --------------------
-spl_autoload_register(static function (string $class) use ($root): void {
-    $prefix = 'NinjaEmp\\Api\\';
-
-    if (!str_starts_with($class, $prefix)) {
-        return;
-    }
-    $relative = substr($class, strlen($prefix));
-    $file = $root . '/app/api/src/' . str_replace('\\', '/', $relative) . '.php';
-
-    if (is_file($file)) {
-        require $file;
-    }
-});
+// Load .env (if present) so configuration is not hard-coded.
+Env::load($root . '/.env');
 
 error_reporting(E_ALL);
 ini_set('display_errors', '0');

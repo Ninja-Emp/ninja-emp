@@ -79,6 +79,7 @@ return static function (TestHarness $t): void {
         422 => 'Validation failed',
         500 => 'Error',
     ];
+
     foreach ($expectedErrors as $code => $description) {
         $t->assertTrue(isset($legacy['responses'][(string) $code]), "declared {$code} response present");
         $t->assertSame($description, $legacy['responses'][(string) $code]['description'], "error description for {$code}");

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace NinjaEMP\Tests;
 
+use InvalidArgumentException;
 use NinjaEMP\Auth\Role;
 use NinjaEMP\Auth\SessionAuth;
 use NinjaEMP\Auth\User;
@@ -247,6 +248,7 @@ return static function (TestHarness $t): void {
     $parts = Allocator::allocate(Money::of('10.00', $usd), [1, 1, 1]);
     $t->assertSame(['3.3334', '3.3333', '3.3333'], array_map(static fn (Money $m): string => $m->amount(), $parts), 'an even split sums exactly');
     $sum = Money::zero($usd);
+
     foreach ($parts as $p) {
         $sum = $sum->plus($p);
     }
@@ -269,22 +271,22 @@ return static function (TestHarness $t): void {
     $t->assertSame(['0.0001', '0.0001', '0.0000'], array_map(static fn (Money $m): string => $m->amount(), $parts), 'equal remainders break by index');
 
     $t->assertThrows(
-        \InvalidArgumentException::class,
+        InvalidArgumentException::class,
         static fn () => Allocator::allocate(Money::of('1.00', $usd), []),
         'allocating across zero parts is rejected',
     );
     $t->assertThrows(
-        \InvalidArgumentException::class,
+        InvalidArgumentException::class,
         static fn () => Allocator::allocate(Money::of('1.00', $usd), [1, -1]),
         'a negative weight is rejected',
     );
     $t->assertThrows(
-        \InvalidArgumentException::class,
+        InvalidArgumentException::class,
         static fn () => Allocator::allocate(Money::of('1.00', $usd), [0, 0]),
         'weights summing to zero are rejected',
     );
     $t->assertThrows(
-        \InvalidArgumentException::class,
+        InvalidArgumentException::class,
         static fn () => Allocator::allocate(Money::of('1.00', $usd), ['abc']),
         'a malformed weight is rejected',
     );

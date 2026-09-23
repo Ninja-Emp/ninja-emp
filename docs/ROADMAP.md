@@ -60,8 +60,9 @@ the `Money`/`Currency` value objects, auth & tenancy (`NinjaEMP\Auth\*`,
 services (`NinjaEMP\Domain\*`: Vendor Mall, Consignment, POS, Inventory, Open Item,
 Stored Value, Reporting), the HTTP kernel (`NinjaEMP\Http\*`: PSR-7/11/15 messages,
 attribute routing, middleware pipeline), and the OpenAPI 3.1 document builder
-(`NinjaEMP\OpenApi\*`). **118 unit assertions green** (`php tests/run.php`),
-zero runtime dependencies. Functional DBAL tests auto-skip without a live database.
+(`NinjaEMP\OpenApi\*`). **1,447 unit assertions green** (`php tests/run.php`),
+zero runtime dependencies. Functional DBAL tests run against a live PostgreSQL
+when `.env` is present (they auto-skip otherwise).
 
 ## Deferred follow-ons (not blocking)
 
@@ -84,9 +85,12 @@ journal partitioning at the 20M-row threshold (ADR-0026) · PII envelope encrypt
 
 ## Immediate next action
 
-**Part 6, step 9: the quality gate.** The DBAL (6.1), ledger engine (6.2), auth &
-tenancy (6.3), feature modules (6.4), routing + middleware (6.5), vendor portal UI
-(6.6), OpenAPI 3.1 surface (6.7) and server-rendered templates (6.8) are delivered
-and unit-tested. Next: stand up the static-analysis and mutation-testing gate
-(PHP-CS-Fixer, PHPStan L10, PHPMD, Deptrac, Infection with MSI ≥ 80%) and wire it
-into CI alongside the existing unit and database suites.
+**Part 6 is complete.** The DBAL (6.1), ledger engine (6.2), auth & tenancy (6.3),
+feature modules (6.4), routing + middleware (6.5), vendor portal UI (6.6), OpenAPI 3.1
+surface (6.7), server-rendered templates (6.8) and the quality gate (6.9) are all
+delivered. The gate runs green in CI order (`composer gate`): PHP-CS-Fixer, PHPStan L10,
+PHPMD, Deptrac, unit + functional tests, Infection (MSI ≥ 80%), and the end-to-end
+acceptance layer. The app runs locally with `make up && make provision && make serve`.
+
+Next: **Part 7 — Integrations & Reporting** (QuickBooks/Xero export mapping, reporting
+depth, dashboards), and the deferred follow-ons below.

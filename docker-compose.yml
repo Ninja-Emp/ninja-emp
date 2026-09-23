@@ -1,0 +1,32 @@
+# Ninja EMP — local development stack.
+#
+#   docker compose up -d db      # PostgreSQL 18 (the only hard dependency)
+#   make provision               # create both databases + tenant schema + seeds
+#   make serve                   # run the API + Tenant UI on the host
+#
+# The application itself is zero-dependency PHP 8.5 — it does not need a
+# container. Only PostgreSQL is containerised so every machine (Windows/Laragon,
+# macOS, Linux, CI) runs the exact same database version.
+services:
+  db:
+    image: postgres:18
+    container_name: ninja-emp-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ninja_emp
+      # Deterministic collation so ORDER BY is stable across machines.
+      POSTGRES_INITDB_ARGS: "--locale=C --encoding=UTF8"
+    ports:
+      - "${NINJA_PG_PORT:-5432}:5432"
+    volumes:
+      - ninja-emp-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ninja_emp"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  ninja-emp-pgdata:

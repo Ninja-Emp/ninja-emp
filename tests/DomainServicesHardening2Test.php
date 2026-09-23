@@ -9,7 +9,6 @@ use NinjaEMP\Domain\Inventory\InventoryService;
 use NinjaEMP\Domain\OpenItem\OpenItemService;
 use NinjaEMP\Domain\StoredValue\StoredValueService;
 use NinjaEMP\Tests\Support\FakeConnection;
-use RuntimeException;
 
 require_once __DIR__ . '/Support/FakeConnection.php';
 

@@ -12,9 +12,12 @@ use NinjaEMP\Tests\TestHarness;
  *
  * To run: provision the DB (db/provision.sh), then
  *   NINJA_EMP_DSN="pgsql:host=127.0.0.1;dbname=ninja_emp" \
- *   NINJA_EMP_USER=ninja_app NINJA_EMP_PASSWORD=... \
+ *   NINJA_EMP_DB_USER=ninja_app NINJA_EMP_DB_PASSWORD=... \
  *   NINJA_EMP_TENANT_ID=11111111-1111-7111-8111-111111111111 \
  *   NINJA_EMP_SCHEMA=tenant_demo php tests/run.php
+ *
+ * In practice these come from `.env` (loaded by tests/bootstrap.php and
+ * tests/run.php), so a provisioned checkout runs them with no extra setup.
  */
 return static function (TestHarness $t): void {
     $t->suite('DBAL (functional)');
@@ -29,8 +32,8 @@ return static function (TestHarness $t): void {
 
     $factory = new ConnectionFactory(
         $dsn,
-        (string) getenv('NINJA_EMP_USER'),
-        (string) getenv('NINJA_EMP_PASSWORD'),
+        (string) getenv('NINJA_EMP_DB_USER'),
+        (string) getenv('NINJA_EMP_DB_PASSWORD'),
     );
 
     $tenant = Tenant::of(

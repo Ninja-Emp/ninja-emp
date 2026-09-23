@@ -9,7 +9,12 @@
         "ext-bcmath": "*",
         "ext-mbstring": "*",
         "ext-pdo": "*",
-        "ext-pdo_pgsql": "*"
+        "ext-pdo_pgsql": "*",
+        "psr/container": "^2.0",
+        "psr/http-message": "^2.0",
+        "psr/http-server-handler": "^1.0",
+        "psr/http-server-middleware": "^1.0",
+        "psr/log": "^3.0"
     },
     "require-dev": {
         "deptrac/deptrac": "^3.0",
@@ -24,11 +29,7 @@
         "psr-4": {
             "NinjaEMP\\": "src/",
             "NinjaEmp\\Api\\": "app/api/src/",
-            "NinjaEmp\\TenantUi\\": "app/tenant-ui/src/",
-            "Psr\\Container\\": "src/Psr/Container/",
-            "Psr\\Http\\Message\\": "src/Psr/Http/Message/",
-            "Psr\\Http\\Server\\": "src/Psr/Http/Server/",
-            "Psr\\Log\\": "src/Psr/Log/"
+            "NinjaEmp\\TenantUi\\": "app/tenant-ui/src/"
         }
     },
     "autoload-dev": {
@@ -48,10 +49,12 @@
         "stan": "phpstan analyse --no-progress --memory-limit=1G",
         "phpmd": "phpmd src text phpmd.xml",
         "deptrac": "deptrac analyse --no-progress --fail-on-uncovered",
-        "test": "php tests/run.php",
+        "test": "phpunit",
         "test:unit": "phpunit --testsuite unit",
-        "infect": "infection --threads=max",
-        "audit": "composer audit --no-dev",
+        "test:e2e": "phpunit --testsuite e2e",
+        "test:harness": "php tests/run.php",
+        "infect": "infection --threads=max --test-framework-options=\"--testsuite=unit\" --only-covering-test-cases",
+        "audit:deps": "composer audit --no-dev",
         "gate": [
             "@cs",
             "@stan",
@@ -67,10 +70,12 @@
         "stan": "Run PHPStan at level 10.",
         "phpmd": "Run PHPMD complexity/coupling rules.",
         "deptrac": "Enforce architecture boundaries (bounded contexts).",
-        "test": "Run the zero-dependency unit suite.",
-        "test:unit": "Run the PHPUnit bridge (used by Infection).",
+        "test": "Run the full PHPUnit suite (unit + end-to-end).",
+        "test:unit": "Run the unit suite (the harness bridge, used by Infection).",
+        "test:e2e": "Run the end-to-end suite (real front controllers over HTTP).",
+        "test:harness": "Run the zero-dependency harness directly (no PHPUnit).",
         "infect": "Run mutation testing (primary gate, MSI >= 80%).",
-        "audit": "Audit runtime dependencies for known vulnerabilities.",
+        "audit:deps": "Audit runtime dependencies for known vulnerabilities.",
         "gate": "Run the full local quality gate in CI order."
     }
 }

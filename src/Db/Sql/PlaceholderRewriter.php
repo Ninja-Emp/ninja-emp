@@ -7,12 +7,14 @@ namespace NinjaEMP\Db\Sql;
 use InvalidArgumentException;
 
 /**
- * Rewrites named parameters (`:name`) into unique positional placeholders
- * (`$1`, `$2`, …) and builds the ordered bind array (ADR-0025 §5).
+ * Rewrites named parameters (`:name`) into unique, PDO-safe named placeholders
+ * (`:p1`, `:p2`, …) and builds the ordered bind map (ADR-0025 §5).
  *
- * Why: PDO named parameters cannot be reused in one statement (`:x` twice fails).
- * Rewriting to positional placeholders makes reuse legal and removes the
- * limitation, while the public API stays named.
+ * Why: PDO's PostgreSQL driver does not recognise literal `$1` placeholders —
+ * it binds them as NULL — and it cannot reuse a named parameter (`:x` twice
+ * fails). Emitting a fresh `:pN` per occurrence makes reuse legal while staying
+ * on PDO's native, quote-aware named-parameter path. (We deliberately avoid `?`
+ * placeholders: PostgreSQL's jsonb `?`/`?|`/`?&` operators would collide.)
  *
  * The scanner is quote-aware: it ignores `:name` inside single-quoted strings,
  * double-quoted identifiers, dollar-quoted strings, line comments and block
@@ -23,7 +25,7 @@ final class PlaceholderRewriter
     /**
      * @param array<string, mixed> $params named parameters as supplied by the caller
      *
-     * @return array{sql: string, params: list<mixed>} positional SQL + ordered bind values
+     * @return array{sql: string, params: array<string, mixed>} rewritten SQL + bind map
      *
      * @SuppressWarnings("CyclomaticComplexity") hand-written SQL tokenizer: one
      *   branch per lexical state (quotes, dollar-quotes, comments, casts, params).
@@ -33,8 +35,9 @@ final class PlaceholderRewriter
     public function rewrite(string $sql, array $params): array
     {
         $out = '';
-        $orderedNames = [];
-        $indexByName = [];
+        $bind = [];
+        $used = [];
+        $counter = 0;
         $length = \strlen($sql);
         $i = 0;
 
@@ -100,12 +103,15 @@ final class PlaceholderRewriter
                 }
                 $name = substr($sql, $i + 1, $j - $i - 1);
 
-                if (!\array_key_exists($name, $indexByName)) {
-                    $indexByName[$name] = \count($orderedNames) + 1;
-                    $orderedNames[] = $name;
+                if (!\array_key_exists($name, $params)) {
+                    throw new InvalidArgumentException(\sprintf('Missing value for named parameter ":%s".', $name));
                 }
 
-                $out .= '$' . $indexByName[$name];
+                $counter++;
+                $placeholder = 'p' . $counter;
+                $out .= ':' . $placeholder;
+                $bind[$placeholder] = $params[$name];
+                $used[$name] = true;
                 $i = $j;
                 continue;
             }
@@ -114,30 +120,7 @@ final class PlaceholderRewriter
             $i++;
         }
 
-        return [
-            'sql' => $out,
-            'params' => $this->bindValues($orderedNames, $params),
-        ];
-    }
-
-    /**
-     * @param list<string> $orderedNames
-     * @param array<string, mixed> $params
-     *
-     * @return list<mixed>
-     */
-    private function bindValues(array $orderedNames, array $params): array
-    {
-        $values = [];
-
-        foreach ($orderedNames as $name) {
-            if (!\array_key_exists($name, $params)) {
-                throw new InvalidArgumentException(\sprintf('Missing value for named parameter ":%s".', $name));
-            }
-            $values[] = $params[$name];
-        }
-
-        $unused = array_diff(array_keys($params), $orderedNames);
+        $unused = array_diff(array_keys($params), array_keys($used));
 
         if ($unused !== []) {
             throw new InvalidArgumentException(\sprintf(
@@ -146,7 +129,10 @@ final class PlaceholderRewriter
             ));
         }
 
-        return $values;
+        return [
+            'sql' => $out,
+            'params' => $bind,
+        ];
     }
 
     /**

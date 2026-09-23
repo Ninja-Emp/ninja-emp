@@ -22,6 +22,7 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use Psr\Log\AbstractLogger;
 use RuntimeException;
+use Stringable;
 
 require_once __DIR__ . '/Support/TestController.php';
 
@@ -32,7 +33,7 @@ final class CapturingLogger extends AbstractLogger
     public array $records = [];
 
     /** @param array<string, mixed> $context */
-    public function log($level, string|\Stringable $message, array $context = []): void
+    public function log($level, string|Stringable $message, array $context = []): void
     {
         $this->records[] = ['level' => $level, 'message' => (string) $message, 'context' => $context];
     }
@@ -155,7 +156,7 @@ return static function (TestHarness $t): void {
     $t->assertSame(200, $res->getStatusCode(), 'a clean request passes through');
     $t->assertSame([], $logger->records, 'a clean request logs nothing');
 
-    $boom = new class implements RequestHandlerInterface {
+    $boom = new class () implements RequestHandlerInterface {
         public function handle(ServerRequestInterface $request): ResponseInterface
         {
             throw new RuntimeException('kaboom');

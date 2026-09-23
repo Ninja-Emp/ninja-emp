@@ -1,7 +1,7 @@
 # Ninja EMP — Application Source (`src/`)
 
 The real application layer (Part 6 of the roadmap). **No framework, zero Composer
-dependencies** (HANDOFF.md §2). PSR-12, strict types, PHP 8.2+ (target 8.5).
+dependencies** (../docs/HANDOFF.md §2). PSR-12, strict types, PHP 8.2+ (target 8.5).
 
 This is the foundation every domain module sits on. It is being built bottom-up:
 the **DBAL** first (ADR-0025), then the **ledger engine** (ADR-0020/0028/0029).

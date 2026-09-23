@@ -155,7 +155,12 @@ final class ShiftController
     {
         $body = $request->getParsedBody();
 
-        return \is_array($body) ? $body : [];
+        if (!\is_array($body)) {
+            return [];
+        }
+
+        /** @var array<string,mixed> $body */
+        return $body;
     }
 
     private function query(ServerRequestInterface $request, string $key): ?string

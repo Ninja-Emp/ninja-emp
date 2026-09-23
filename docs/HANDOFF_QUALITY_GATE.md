@@ -1,6 +1,6 @@
 # HANDOFF — Quality Gate (Part 6, Step 9)
 
-**STATUS: IN PROGRESS — checkpoint pushed at `f9a368b`**
+**STATUS: COMPLETE — the full gate is green (see §0)**
 **Repo:** `git@github.com:Ninja-Emp/ninja-emp.git` (branch `main`)
 **Purpose of this doc:** seed the next agent with the exact state of the quality-gate
 workstream so no context is lost. Chat history is volatile; this file is the durable memory.
@@ -10,14 +10,49 @@ workstream so no context is lost. Chat history is volatile; this file is the dur
 ## 0. TL;DR
 
 Task **B** (refresh stale docs) is **COMPLETE** and pushed (`479eddd`).
-Task **A** (build the quality gate, HANDOFF.md §4) is **~60% done** and pushed as a
-checkpoint (`f9a368b`). The hard part — **PHPStan level 10 clean on the entire `src/`
-library** — is finished. What remains is: finish ~64 PHPStan errors in the tenant-UI
-controllers/support classes, decide the `Views/` scope, author the five missing tool
-configs, run every tool to GREEN, and add the CI workflow.
+Task **A** (build the quality gate, HANDOFF.md §4) is **COMPLETE**. Every gate step runs
+green locally, in CI order:
 
-**Nothing is broken.** The unit suite is green (407/407). The pushed checkpoint is a
-safe, working state.
+| # | Step | Command | Result |
+|---|------|---------|--------|
+| 1 | PHP-CS-Fixer (PSR-12) | `composer cs` | 0 of 184 files |
+| 2 | PHPStan level 10 | `composer stan` | 0 errors |
+| 3 | PHPMD | `composer phpmd` | 0 violations |
+| 4 | Deptrac | `composer deptrac` | 0 violations, 0 uncovered |
+| 5 | Unit tests | `composer test:unit` | 1,459 assertions |
+| 6 | Functional (real PG) | `composer test` | DBAL functional green |
+| 7 | Mutation (Infection) | `composer infect` | **MSI 81%**, Covered MSI 83% (1,487 killed / 1,836) |
+| 8 | End-to-end | `composer test:e2e` | 16 tests, real front controllers |
+| 9 | Smoke | `make serve` | both apps boot, 200s |
+
+The whole gate is one command: `composer gate` (or `make gate`).
+
+**Nothing is broken.** The unit suite is green (1,459 assertions) and the full PHPUnit
+suite (unit bridge + E2E) is green (47 tests).
+
+### Structural follow-up (this session)
+
+The app did **not** run locally: both `public/router.php` scripts referenced
+`NinjaEMP\Db\Sql\Value` *before* any autoloader was loaded, so every request 500'd.
+That is fixed (both front controllers now `require vendor/autoload.php` first). On top
+of that:
+
+- **Standard layout + runnability** — `docker-compose.yml`, `.env.example`, `Makefile`,
+  `bin/serve`, `bin/migrate`, `src/Support/Env.php` (a tiny `.env` loader). `make up &&
+  make provision && make serve` gets a developer running in minutes.
+- **Real PSR packages** — the 16 vendored `src/Psr/*` interfaces were deleted and
+  replaced with the real Composer packages (`psr/http-message`, `psr/http-server-handler`,
+  `psr/http-server-middleware`, `psr/container`, `psr/log`). The hand-rolled
+  `src/autoload.php` was deleted; everything uses `vendor/autoload.php`.
+- **End-to-end layer** — `tests/E2E/` boots the real front controllers over HTTP
+  (`AppServer` on a free port) and asserts the observable contract (health, OpenAPI,
+  auth 401, RBAC 403, 404, POS JSON, checkout receipt, barcode scan).
+- **One umbrella runner** — `composer test` runs the full PHPUnit suite (unit bridge +
+  E2E). `phpunit.xml` has two testsuites (`unit`, `e2e`).
+- **Latent DBAL bug fixed** — `PlaceholderRewriter` emitted `$1` placeholders, which
+  PDO's pgsql driver binds as **NULL**. It now emits unique named placeholders
+  (`:p1`, `:p2`, …). This was invisible until the functional DBAL test was actually
+  run against a live database (it had always auto-skipped).
 
 ---
 

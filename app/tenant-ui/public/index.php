@@ -12,6 +12,7 @@ declare(strict_types=1);
  */
 
 use NinjaEMP\Db\Sql\Value;
+use NinjaEMP\Support\Env;
 use NinjaEmp\TenantUi\Data\MockRepository;
 use NinjaEmp\TenantUi\Http\Controllers\AuthController;
 use NinjaEmp\TenantUi\Http\Controllers\BoothController;
@@ -29,21 +30,10 @@ use NinjaEmp\TenantUi\Support\Theme;
 use NinjaEmp\TenantUi\Support\View;
 
 $root = dirname(__DIR__);
+require dirname(__DIR__, 3) . '/vendor/autoload.php';
 
-// ---- PSR-4 autoloader for NinjaEmp\TenantUi\ -> src/ ----------------------
-spl_autoload_register(static function (string $class) use ($root): void {
-    $prefix = 'NinjaEmp\\TenantUi\\';
-
-    if (!str_starts_with($class, $prefix)) {
-        return;
-    }
-    $relative = substr($class, strlen($prefix));
-    $file = $root . '/src/' . str_replace('\\', '/', $relative) . '.php';
-
-    if (is_file($file)) {
-        require $file;
-    }
-});
+// Load .env (if present) so configuration is not hard-coded.
+Env::load(dirname(__DIR__, 3) . '/.env');
 
 // ---- Error reporting: surface everything in dev, log to stderr ------------
 error_reporting(E_ALL);

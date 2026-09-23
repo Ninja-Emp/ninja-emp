@@ -8,7 +8,9 @@
 # Usage: ./provision.sh [tenant_schema]   (default: tenant_demo)
 # ============================================================================
 set -euo pipefail
-PSQL="sudo -u postgres psql -v ON_ERROR_STOP=1 -q"
+# Override PSQL to target a remote/Docker PostgreSQL, e.g.
+#   PSQL="psql -h 127.0.0.1 -U postgres" bash db/provision.sh
+PSQL="${PSQL:-sudo -u postgres psql -v ON_ERROR_STOP=1 -q}"
 CONTROL_DB="ninja_control"
 TENANT_DB="ninja_emp"
 TENANT="${1:-tenant_demo}"

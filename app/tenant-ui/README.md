@@ -25,7 +25,7 @@ Then open <http://localhost:8091>.
 
 ### Requirements
 
-- **PHP 8.1+** (production target is 8.5 per `HANDOFF.md`).
+- **PHP 8.1+** (production target is 8.5 per `../../docs/HANDOFF.md`).
 - **bcmath** extension — required by `src/Support/Money.php`:
   ```bash
   sudo apt-get install -y php-bcmath
@@ -181,7 +181,7 @@ Then bind `Repository` → `DbalRepository` in `public/index.php` and delete the
 ## Related docs
 
 - `../../docs/TENANT_UI_HANDOFF.md` — the build handoff (decisions, build order, progress).
-- `../../HANDOFF.md` — locked technical decisions (PHP 8.5, no frameworks, PSR set).
+- `../../docs/HANDOFF.md` — locked technical decisions (PHP 8.5, no frameworks, PSR set).
 - `../../docs/DECISIONS.md` — ADR-0002 (money), ADR-0020 (posting_map), ADR-0025 (DBAL),
   ADR-0028 (accrual), ADR-0029 (tenders).
 - `../../docs/SRS.md` — Parts 3–5 (Vendor Mall, Consignment, POS domains).

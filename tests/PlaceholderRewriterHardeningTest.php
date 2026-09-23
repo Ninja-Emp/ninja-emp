@@ -42,21 +42,21 @@ return static function (TestHarness $t): void {
 
     // ---- a `$` that is not a dollar-quote opener is left alone ------------
     $out = $r->rewrite('SELECT $foo, :a', ['a' => 1]);
-    $t->assertSame('SELECT $foo, $1', $out['sql'], 'bare $ is not treated as a delimiter');
-    $t->assertSame([1], $out['params'], 'bare $ binds nothing');
+    $t->assertSame('SELECT $foo, :p1', $out['sql'], 'bare $ is not treated as a delimiter');
+    $t->assertSame(['p1' => 1], $out['params'], 'bare $ binds nothing');
 
     // ---- empty dollar-quote tag ($$) --------------------------------------
     $out = $r->rewrite('SELECT $$ :x $$, :y', ['y' => 2]);
-    $t->assertSame('SELECT $$ :x $$, $1', $out['sql'], 'empty dollar-quote tag ignored');
+    $t->assertSame('SELECT $$ :x $$, :p1', $out['sql'], 'empty dollar-quote tag ignored');
 
     // ---- parameter at the very end of the statement -----------------------
     $out = $r->rewrite('SELECT :a', ['a' => 9]);
-    $t->assertSame('SELECT $1', $out['sql'], 'trailing parameter rewritten');
-    $t->assertSame([9], $out['params'], 'trailing parameter bound');
+    $t->assertSame('SELECT :p1', $out['sql'], 'trailing parameter rewritten');
+    $t->assertSame(['p1' => 9], $out['params'], 'trailing parameter bound');
 
     // ---- cast operator at the very end ------------------------------------
     $out = $r->rewrite('SELECT :a::', ['a' => 1]);
-    $t->assertSame('SELECT $1::', $out['sql'], 'trailing cast preserved');
+    $t->assertSame('SELECT :p1::', $out['sql'], 'trailing cast preserved');
 
     // ---- a lone colon is not a parameter ----------------------------------
     $out = $r->rewrite('SELECT a : b', []);
@@ -90,8 +90,8 @@ return static function (TestHarness $t): void {
         $t->assertTrue(str_contains($e->getMessage(), ':a') && str_contains($e->getMessage(), ':b'), 'all unused parameters listed');
     }
 
-    // ---- a name reused many times binds once ------------------------------
+    // ---- a name reused many times gets a fresh placeholder each time ------
     $out = $r->rewrite('SELECT :x, :x, :x', ['x' => 'v']);
-    $t->assertSame('SELECT $1, $1, $1', $out['sql'], 'repeated name reuses one placeholder');
-    $t->assertSame(['v'], $out['params'], 'repeated name binds once');
+    $t->assertSame('SELECT :p1, :p2, :p3', $out['sql'], 'repeated name gets fresh placeholders');
+    $t->assertSame(['p1' => 'v', 'p2' => 'v', 'p3' => 'v'], $out['params'], 'repeated name binds per occurrence');
 };

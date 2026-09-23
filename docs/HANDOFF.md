@@ -81,12 +81,12 @@ Every commit must pass, in CI, in order:
 5.  **Unit tests** — fast, on the shared kernel
 6.  **Functional tests** — against **real PostgreSQL** (never SQLite), incl. ledger invariants
 7.  **Mutation testing (Infection)** — **primary gate**
-8.  **Codeception E2E** — critical money journeys (the "grandma can use it" acceptance layer)
+8.  **End-to-end (E2E)** — critical money journeys over HTTP against the **real front controllers** (the "grandma can use it" acceptance layer). Implemented as a PHPUnit suite (`tests/E2E/`) that boots `php -S` on a free port and drives the real app — no extra runtime dependency.
 9.  **Smoke** — app boots, login works
 
 **Coverage policy (user's call):** **100% coverage everywhere**, with **mutation testing as the real gate that counts more than coverage.** Note: equivalent mutants make literal 100% MSI theoretically impossible; document exceptions rather than silently lowering the bar.
 
-**Test pyramid:** unit (pure domain, no DB) → functional (real PG, proves the ledger) → contract (API vs OpenAPI spec) → E2E (critical journeys only, not every button) → smoke.
+**Test pyramid:** unit (pure domain, no DB) → functional (real PG, proves the ledger) → contract (API vs OpenAPI spec) → E2E (critical journeys only, not every button) → smoke. The unit and E2E layers both run under one umbrella: `composer test` (PHPUnit).
 
 * * *
 

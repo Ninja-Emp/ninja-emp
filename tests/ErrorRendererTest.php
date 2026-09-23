@@ -91,6 +91,7 @@ return static function (TestHarness $t): void {
         429 => 'Too many requests',
         500 => 'Something went wrong',
     ];
+
     foreach ($titles as $status => $title) {
         $res = $renderer->render($htmlReq, new HttpException($status));
         $body = (string) $res->getBody();
