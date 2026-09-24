@@ -76,6 +76,24 @@ final class JournalRulesTest extends TestCase
         }
     }
 
+    public function testRelabelingAFeeStillCannotTouchPayable(): void
+    {
+        try {
+            JournalRules::assert($this->posting('owner_capital', [
+                $this->line('6170', '10', '0'),
+                $this->line('2000', '0', '10', 'party', '018f0000-0000-7000-8000-000000000020'),
+            ]));
+            self::fail('relabel');
+        } catch (LedgerError $error) {
+            self::assertSame('JOURNAL_LINE_INVALID', $error->errorCode());
+        }
+        JournalRules::assert($this->posting('sale', [
+            $this->line('1000', '110', '0'),
+            $this->line('2000', '0', '100', 'party', '018f0000-0000-7000-8000-000000000020'),
+            $this->line('6150', '0', '10'),
+        ]));
+    }
+
     public function testHashIsStable(): void
     {
         $lines = [[

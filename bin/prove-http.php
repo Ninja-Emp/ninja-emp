@@ -122,6 +122,14 @@ if ($receipt->status() !== 400 || ($receipt->body()['errorCode'] ?? '') !== 'JOU
     fail('Rent receipt touching payable was accepted ' . json_encode($receipt->body()));
 }
 
+$relabel = journal($app, $headers, $cookies, 'je:contract:fee-label', 'owner_capital', [
+    ['accountCode' => '6170', 'debitMinor' => '10', 'creditMinor' => '0'],
+    ['accountCode' => '2000', 'debitMinor' => '0', 'creditMinor' => '10', 'subledgerType' => 'party', 'subledgerRef' => $house],
+]);
+if ($relabel->status() !== 400 || ($relabel->body()['errorCode'] ?? '') !== 'JOURNAL_LINE_INVALID') {
+    fail('A relabeled fee against payable was accepted ' . json_encode($relabel->body()));
+}
+
 $apply = journal($app, $headers, $cookies, 'je:contract:fake-apply', 'owner_capital', [
     ['accountCode' => '2000', 'debitMinor' => '50', 'creditMinor' => '0', 'subledgerType' => 'party', 'subledgerRef' => $house],
     ['accountCode' => '1300', 'debitMinor' => '0', 'creditMinor' => '50', 'subledgerType' => 'party', 'subledgerRef' => $house],

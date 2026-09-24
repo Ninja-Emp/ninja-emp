@@ -8,9 +8,11 @@ final class JournalRules
 {
     private const array RENT_RECEIPT_DEBITS = ['1000', '1100', '1200'];
 
-    private const array FEE_SOURCES = ['rent_late_fee', 'processor_fee', 'cash_rounding', 'register_over_short'];
+    private const array FEE_ACCOUNTS = ['4200', '6150', '6170'];
 
     private const array TAX_ACCOUNTS = ['2100'];
+
+    private const array SALE_SOURCES = ['sale', 'sale_return'];
 
     public static function assert(Posting $posting): void
     {
@@ -80,9 +82,24 @@ final class JournalRules
      */
     private static function assertFee(string $sourceType, array $codes): void
     {
-        if (!in_array($sourceType, self::FEE_SOURCES, true)) {
+        if (in_array($sourceType, ['rent_late_fee', 'processor_fee', 'cash_rounding', 'register_over_short'], true)) {
+            self::rejectPayableOrTax($codes);
+        }
+        if (in_array($sourceType, self::SALE_SOURCES, true)) {
             return;
         }
+        foreach (self::FEE_ACCOUNTS as $fee) {
+            if (in_array($fee, $codes, true)) {
+                self::rejectPayableOrTax($codes);
+            }
+        }
+    }
+
+    /**
+     * @param list<string> $codes
+     */
+    private static function rejectPayableOrTax(array $codes): void
+    {
         if (in_array('2000', $codes, true)) {
             throw new LedgerError('JOURNAL_LINE_INVALID', 'A fee, rounding, or till difference never touches payable');
         }
