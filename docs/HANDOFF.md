@@ -60,6 +60,7 @@ php bin/migrate.php tenant <schema>
 php bin/seed-demo.php
 php bin/prove-catalog.php
 php bin/prove-database.php
+php bin/prove-ledger.php
 ```
 
 `prove-database.php` runs against `emp_pos` only. Each case is a transaction that rolls back. The demo store stays at status `demo` with its ten journals. A live status refuses the wipe.
@@ -75,7 +76,7 @@ ACH is listed as a payout method and the check constraint `holder_payouts_cash_r
 One chat each:
 
 1. Base install. Done.
-2. Ledger. `postJournal` in one transaction. Balanced, append-only, idempotent `posting_key`. Trial balance fails closed.
+2. Ledger. Done. `postJournal` posts in the caller’s transaction. The same `posting_key` returns the existing journal. A drifted trial balance throws. `php bin/prove-ledger.php` rolls back on `emp_pos`.
 3. Tenancy and identity. Signup creates a schema. Cookie session. CSRF on HTML POST.
 4. Saturday kernel. Sale, void, return with clawback, rent charge, rent receipt, apply-payable-to-rent, check payout, open and close till.
 5. Catalog, party, booth. Items, vendors, House, booth list. Map is Canvas 2D.
