@@ -92,6 +92,71 @@ final class JournalRulesTest extends TestCase
             $this->line('2000', '0', '100', 'party', '018f0000-0000-7000-8000-000000000020'),
             $this->line('6150', '0', '10'),
         ]));
+        foreach (['4200', '6170', '6180'] as $fee) {
+            try {
+                JournalRules::assert($this->posting('sale', [
+                    $this->line($fee, '10', '0'),
+                    $this->line('2000', '0', '10', 'party', '018f0000-0000-7000-8000-000000000020'),
+                ]));
+                self::fail('sale label ' . $fee);
+            } catch (LedgerError $error) {
+                self::assertSame('JOURNAL_LINE_INVALID', $error->errorCode());
+            }
+        }
+    }
+
+    public function testDebitingPayableCannotCreditIncome(): void
+    {
+        foreach (['4000', '4100', '4300', '5100', '6160'] as $income) {
+            try {
+                JournalRules::assert($this->posting('rent_charge', [
+                    $this->line('2000', '10', '0', 'party', '018f0000-0000-7000-8000-000000000020'),
+                    $this->line($income, '0', '10'),
+                ]));
+                self::fail($income);
+            } catch (LedgerError $error) {
+                self::assertSame('JOURNAL_LINE_INVALID', $error->errorCode());
+            }
+        }
+        try {
+            JournalRules::assert($this->posting('owner_capital', [
+                $this->line('6160', '10', '0'),
+                $this->line('2000', '0', '10', 'party', '018f0000-0000-7000-8000-000000000020'),
+            ]));
+            self::fail('expense to payable');
+        } catch (LedgerError $error) {
+            self::assertSame('JOURNAL_LINE_INVALID', $error->errorCode());
+        }
+        try {
+            JournalRules::assert($this->posting('rent_receipt', [
+                $this->line('1000', '10', '0'),
+                $this->line('4100', '0', '10'),
+            ]));
+            self::fail('cash to rent income');
+        } catch (LedgerError $error) {
+            self::assertSame('JOURNAL_LINE_INVALID', $error->errorCode());
+        }
+        JournalRules::assert($this->posting('rent_charge', [
+            $this->line('1300', '10', '0', 'party', '018f0000-0000-7000-8000-000000000020'),
+            $this->line('4100', '0', '10'),
+        ]));
+    }
+
+    public function testRawJournalRouteOnlyPostsOwnerCapital(): void
+    {
+        JournalRules::assertManual($this->posting('owner_capital', [
+            $this->line('1010', '100', '0'),
+            $this->line('3000', '0', '100'),
+        ]));
+        try {
+            JournalRules::assertManual($this->posting('sale', [
+                $this->line('1000', '100', '0'),
+                $this->line('4000', '0', '100'),
+            ]));
+            self::fail('sale on the raw route');
+        } catch (LedgerError $error) {
+            self::assertSame('JOURNAL_LINE_INVALID', $error->errorCode());
+        }
     }
 
     public function testHashIsStable(): void

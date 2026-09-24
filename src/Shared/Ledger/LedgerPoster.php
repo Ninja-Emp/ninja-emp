@@ -122,6 +122,7 @@ final class LedgerPoster
             throw new LedgerError('JOURNAL_UNBALANCED', 'A journal needs at least two lines');
         }
         JournalRules::assert($posting);
+        JournalRules::assertManual($posting);
         if ($posting->reversal() && ($posting->reversesJournalId() === null || $posting->reversesJournalId() === '')) {
             throw new LedgerError('JOURNAL_INVALID', 'A reversal must name the journal it reverses');
         }

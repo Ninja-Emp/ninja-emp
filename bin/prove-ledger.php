@@ -180,7 +180,7 @@ try {
             new JournalLine('3000', Money::zero('USD'), Money::of(100, 'USD')),
         ],
     )));
-    expectCode($poster, 'ACCOUNT_MISSING', static fn (): mixed => $poster->post(new Posting(
+    expectCode($poster, 'JOURNAL_LINE_INVALID', static fn (): mixed => $poster->post(new Posting(
         'je:proof:missing',
         '2026-09-12',
         '2026-09-12T18:00:00.000Z',
@@ -216,7 +216,7 @@ try {
             new JournalLine('3000', Money::zero('CAD'), Money::of(100, 'CAD')),
         ],
     )));
-    $poster->post(new Posting(
+    expectCode($poster, 'JOURNAL_LINE_INVALID', static fn (): mixed => $poster->post(new Posting(
         'je:proof:payable-credit',
         '2026-09-12',
         '2026-09-12T18:01:00.000Z',
@@ -227,8 +227,8 @@ try {
             new JournalLine('1010', Money::of(100, 'USD'), Money::zero('USD')),
             new JournalLine('2000', Money::zero('USD'), Money::of(100, 'USD'), 'party', $party),
         ],
-    ));
-    $posted = $poster->post(new Posting(
+    )));
+    expectCode($poster, 'JOURNAL_LINE_INVALID', static fn (): mixed => $poster->post(new Posting(
         'je:proof:party',
         '2026-09-12',
         '2026-09-12T18:02:00.000Z',
@@ -239,11 +239,8 @@ try {
             new JournalLine('2000', Money::of(100, 'USD'), Money::zero('USD'), 'party', $party),
             new JournalLine('1300', Money::zero('USD'), Money::of(100, 'USD'), 'party', $party),
         ],
-    ));
-    if ($posted->reused() || (int) $posted->journalNo() <= (int) $first->journalNo()) {
-        throw new RuntimeException('Party lines did not post');
-    }
-    expectCode($poster, 'PAYABLE_NEGATIVE', static fn (): mixed => $poster->post(new Posting(
+    )));
+    expectCode($poster, 'JOURNAL_LINE_INVALID', static fn (): mixed => $poster->post(new Posting(
         'je:proof:negative',
         '2026-09-12',
         '2026-09-12T18:03:00.000Z',
@@ -253,6 +250,43 @@ try {
         [
             new JournalLine('2000', Money::of(1, 'USD'), Money::zero('USD'), 'party', $party),
             new JournalLine('1010', Money::zero('USD'), Money::of(1, 'USD')),
+        ],
+    )));
+    expectCode($poster, 'JOURNAL_LINE_INVALID', static fn (): mixed => $poster->post(new Posting(
+        'je:proof:receipt',
+        '2026-09-12',
+        '2026-09-12T18:04:00.000Z',
+        'USD',
+        'rent_receipt',
+        'Receipt with no receipt row',
+        [
+            new JournalLine('1000', Money::of(10, 'USD'), Money::zero('USD')),
+            new JournalLine('1300', Money::zero('USD'), Money::of(10, 'USD'), 'party', $party),
+        ],
+    )));
+    expectCode($poster, 'JOURNAL_LINE_INVALID', static fn (): mixed => $poster->post(new Posting(
+        'je:proof:sale-label',
+        '2026-09-12',
+        '2026-09-12T18:05:00.000Z',
+        'USD',
+        'sale',
+        'Sale label with no ticket',
+        [
+            new JournalLine('1000', Money::of(110, 'USD'), Money::zero('USD')),
+            new JournalLine('2000', Money::zero('USD'), Money::of(100, 'USD'), 'party', $party),
+            new JournalLine('6150', Money::zero('USD'), Money::of(10, 'USD')),
+        ],
+    )));
+    expectCode($poster, 'JOURNAL_LINE_INVALID', static fn (): mixed => $poster->post(new Posting(
+        'je:proof:cash-income',
+        '2026-09-12',
+        '2026-09-12T18:06:00.000Z',
+        'USD',
+        'owner_capital',
+        'Cash to income',
+        [
+            new JournalLine('1000', Money::of(10, 'USD'), Money::zero('USD')),
+            new JournalLine('4000', Money::zero('USD'), Money::of(10, 'USD')),
         ],
     )));
     $trial->assertBalanced();

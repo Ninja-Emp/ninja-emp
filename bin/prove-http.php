@@ -138,19 +138,27 @@ if ($apply->status() !== 400 || ($apply->body()['errorCode'] ?? '') !== 'JOURNAL
     fail('Unnamed apply was accepted ' . json_encode($apply->body()));
 }
 
+$saleLabel = journal($app, $headers, $cookies, 'je:contract:sale-label', 'sale', [
+    ['accountCode' => '6170', 'debitMinor' => '10', 'creditMinor' => '0'],
+    ['accountCode' => '2000', 'debitMinor' => '0', 'creditMinor' => '10', 'subledgerType' => 'party', 'subledgerRef' => $house],
+]);
+if ($saleLabel->status() !== 400 || ($saleLabel->body()['errorCode'] ?? '') !== 'JOURNAL_LINE_INVALID') {
+    fail('A sale-labeled fee against payable was accepted ' . json_encode($saleLabel->body()));
+}
+
 $credit = journal($app, $headers, $cookies, 'je:contract:payable', 'owner_capital', [
     ['accountCode' => '1010', 'debitMinor' => '40', 'creditMinor' => '0'],
     ['accountCode' => '2000', 'debitMinor' => '0', 'creditMinor' => '40', 'subledgerType' => 'party', 'subledgerRef' => $house],
 ]);
-if ($credit->status() !== 201) {
-    fail('Payable credit was refused ' . json_encode($credit->body()));
+if ($credit->status() !== 400 || ($credit->body()['errorCode'] ?? '') !== 'JOURNAL_LINE_INVALID') {
+    fail('The raw journal route posted payable ' . json_encode($credit->body()));
 }
 $overpay = journal($app, $headers, $cookies, 'je:contract:overpay', 'holder_payout', [
     ['accountCode' => '2000', 'debitMinor' => '50', 'creditMinor' => '0', 'subledgerType' => 'party', 'subledgerRef' => $house],
     ['accountCode' => '1010', 'debitMinor' => '0', 'creditMinor' => '50'],
 ]);
-if ($overpay->status() !== 400 || ($overpay->body()['errorCode'] ?? '') !== 'PAYABLE_NEGATIVE') {
-    fail('Negative payable was accepted ' . json_encode($overpay->body()));
+if ($overpay->status() !== 400 || ($overpay->body()['errorCode'] ?? '') !== 'JOURNAL_LINE_INVALID') {
+    fail('The raw journal route posted a payout ' . json_encode($overpay->body()));
 }
 
 $cashierHash = password_hash('practice1', PASSWORD_ARGON2ID, ['memory_cost' => 19456, 'time_cost' => 2, 'threads' => 1]);

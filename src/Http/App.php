@@ -6,6 +6,7 @@ namespace EmpPos\Http;
 
 use EmpPos\Feature\Identity\IdentityService;
 use EmpPos\Shared\Ledger\JournalLine;
+use EmpPos\Shared\Ledger\JournalRules;
 use EmpPos\Shared\Ledger\LedgerError;
 use EmpPos\Shared\Ledger\LedgerPoster;
 use EmpPos\Shared\Ledger\Money;
@@ -105,7 +106,7 @@ final class App
             $this->pdo->beginTransaction();
         }
         try {
-        $posted = (new LedgerPoster($this->pdo))->post(new Posting(
+        $posting = new Posting(
             Scalar::string($body['postingKey'] ?? '', 'postingKey'),
             Scalar::string($body['postingDate'] ?? '', 'postingDate'),
             Scalar::string($body['occurredAt'] ?? '', 'occurredAt'),
@@ -116,7 +117,9 @@ final class App
             isset($body['sourceReference']) ? Scalar::string($body['sourceReference'], 'sourceReference') : null,
             ($body['reversal'] ?? false) === true,
             isset($body['reversesJournalId']) ? Scalar::string($body['reversesJournalId'], 'reversesJournalId') : null,
-        ));
+        );
+        JournalRules::assertManual($posting);
+        $posted = (new LedgerPoster($this->pdo))->post($posting);
         } catch (LedgerError $error) {
             if ($ownsTransaction && $this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
