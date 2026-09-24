@@ -55,8 +55,8 @@ final class App
         $this->pdo->exec('SET search_path TO "' . $this->schema($member['schema']) . '", public');
         try {
             if ($request->method() === 'POST' && $path === '/api/v1/journals') {
-                if ($member['role'] === 'cashier') {
-                    return Response::json(403, ['errorCode' => 'FORBIDDEN', 'message' => 'A cashier cannot post a journal']);
+                if ($member['role'] !== 'owner' && $member['role'] !== 'manager') {
+                    return Response::json(403, ['errorCode' => 'FORBIDDEN', 'message' => 'This role cannot post a journal']);
                 }
                 return $this->postJournal($request, $member);
             }
@@ -90,7 +90,7 @@ final class App
         $lines = [];
         foreach ($rawLines as $line) {
             if (!is_array($line)) {
-                continue;
+                throw new LedgerError('JOURNAL_LINE_INVALID', 'Each journal line must be an object');
             }
             $lines[] = new JournalLine(
                 Scalar::string($line['accountCode'] ?? '', 'accountCode'),
@@ -120,13 +120,13 @@ final class App
         );
         JournalRules::assertManual($posting);
         $posted = (new LedgerPoster($this->pdo))->post($posting);
-        } catch (LedgerError $error) {
+        $this->audit($member, $posted->journalId(), $posted->reused());
+        } catch (\Throwable $error) {
             if ($ownsTransaction && $this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
             throw $error;
         }
-        $this->audit($member, $posted->journalId(), $posted->reused());
         if ($ownsTransaction) {
             $this->pdo->commit();
         }

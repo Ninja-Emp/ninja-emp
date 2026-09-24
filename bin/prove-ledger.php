@@ -73,6 +73,78 @@ try {
         throw new RuntimeException('The same posting key appended a second journal');
     }
     expectCode($poster, 'JOURNAL_INVALID', static fn (): mixed => $poster->post(new Posting(
+        'je:proof:poster',
+        '2026-09-12',
+        '2026-09-12T18:00:00.000Z',
+        'USD',
+        'owner_capital',
+        'Different body',
+        [
+            new JournalLine('1010', Money::of(50, 'USD'), Money::zero('USD')),
+            new JournalLine('3000', Money::zero('USD'), Money::of(50, 'USD')),
+        ],
+    )));
+    $reversed = $poster->post(new Posting(
+        'je:proof:reverse',
+        '2026-09-12',
+        '2026-09-12T18:07:00.000Z',
+        'USD',
+        'owner_capital',
+        'Reverse the proof journal',
+        [
+            new JournalLine('1010', Money::zero('USD'), Money::of(100, 'USD')),
+            new JournalLine('3000', Money::of(100, 'USD'), Money::zero('USD')),
+        ],
+        null,
+        true,
+        $first->journalId(),
+    ));
+    if ($reversed->reused()) {
+        throw new RuntimeException('Reversal was treated as a replay');
+    }
+    expectCode($poster, 'JOURNAL_LINE_INVALID', static fn (): mixed => $poster->post(new Posting(
+        'je:proof:reverse-again',
+        '2026-09-12',
+        '2026-09-12T18:08:00.000Z',
+        'USD',
+        'owner_capital',
+        'Reverse twice',
+        [
+            new JournalLine('1010', Money::of(100, 'USD'), Money::zero('USD')),
+            new JournalLine('3000', Money::zero('USD'), Money::of(100, 'USD')),
+        ],
+        null,
+        true,
+        $first->journalId(),
+    )));
+    expectCode($poster, 'JOURNAL_LINE_INVALID', static fn (): mixed => $poster->post(new Posting(
+        'je:proof:fake-reversal',
+        '2026-09-12',
+        '2026-09-12T18:09:00.000Z',
+        'USD',
+        'owner_capital',
+        'Fake reversal',
+        [
+            new JournalLine('1010', Money::of(100, 'USD'), Money::zero('USD')),
+            new JournalLine('3000', Money::zero('USD'), Money::of(100, 'USD')),
+        ],
+        null,
+        true,
+        '018f0000-0000-7000-8000-000000000099',
+    )));
+    expectCode($poster, 'JOURNAL_LINE_INVALID', static fn (): mixed => $poster->post(new Posting(
+        'je:proof:overdraw',
+        '2026-09-12',
+        '2026-09-12T18:10:00.000Z',
+        'USD',
+        'owner_capital',
+        'Overdraw the bank',
+        [
+            new JournalLine('3000', Money::of(100000000000, 'USD'), Money::zero('USD')),
+            new JournalLine('1010', Money::zero('USD'), Money::of(100000000000, 'USD')),
+        ],
+    )));
+    expectCode($poster, 'JOURNAL_INVALID', static fn (): mixed => $poster->post(new Posting(
         '',
         '2026-09-12',
         '2026-09-12T18:00:00.000Z',

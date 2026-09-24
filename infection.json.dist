@@ -3,6 +3,7 @@
         "directories": ["src/Shared/Ledger"],
         "excludes": [
             "JournalRules.php",
+            "JournalGuard.php",
             "JournalLine.php",
             "Posting.php",
             "PostedJournal.php",

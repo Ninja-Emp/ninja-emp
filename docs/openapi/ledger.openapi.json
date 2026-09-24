@@ -32,7 +32,7 @@
             }
           },
           "200": {
-            "description": "The same posting key returns the existing journal",
+            "description": "The same posting key and the same journal return the existing row. A different body for that key is refused.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/PostedJournal" }
@@ -119,7 +119,7 @@
     "schemas": {
       "MoneyMinor": {
         "type": "string",
-        "pattern": "^[0-9]+$"
+        "pattern": "^(0|[1-9][0-9]*)$"
       },
       "Currency": {
         "type": "string",
@@ -147,7 +147,7 @@
           "postingDate": { "type": "string", "format": "date" },
           "occurredAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$" },
           "currency": { "$ref": "#/components/schemas/Currency" },
-          "sourceType": { "type": "string" },
+          "sourceType": { "type": "string", "enum": ["owner_capital"] },
           "sourceReference": { "type": "string" },
           "description": { "type": "string", "minLength": 1 },
           "reversal": { "type": "boolean" },

@@ -23,6 +23,7 @@ final class LedgerPoster
         $book = $this->primaryBook($posting->currency());
         $existing = $this->findByPostingKey($book['book_id'], $posting->postingKey());
         if ($existing !== null) {
+            $this->guard()->assertSamePosting($existing, $posting);
             return $existing;
         }
         $prepared = $this->prepare($posting);
@@ -60,7 +61,7 @@ final class LedgerPoster
             $this->insertLines($journalId, $prepared['rows']);
             $this->pdo->exec('SET CONSTRAINTS ALL IMMEDIATE');
         } catch (PDOException $error) {
-            $raced = $this->recoverRace($book['book_id'], $posting->postingKey(), $error);
+            $raced = $this->recoverRace($book['book_id'], $posting, $error);
             if ($raced !== null) {
                 return $raced;
             }
@@ -123,6 +124,7 @@ final class LedgerPoster
         }
         JournalRules::assert($posting);
         JournalRules::assertManual($posting);
+        $this->guard()->assertReversal($posting);
         if ($posting->reversal() && ($posting->reversesJournalId() === null || $posting->reversesJournalId() === '')) {
             throw new LedgerError('JOURNAL_INVALID', 'A reversal must name the journal it reverses');
         }
@@ -145,8 +147,8 @@ final class LedgerPoster
                     throw new LedgerError('JOURNAL_LINE_INVALID', 'Rent, payable, and clawback lines need a vendor');
                 }
             }
-            $debit += $line->debit()->minor();
-            $credit += $line->credit()->minor();
+            $debit = JournalGuard::addMinor($debit, $line->debit()->minor());
+            $credit = JournalGuard::addMinor($credit, $line->credit()->minor());
             $hashLines[] = [
                 'accountCode' => $line->accountCode(),
                 'debitMinor' => $line->debit()->minorString(),
@@ -167,6 +169,7 @@ final class LedgerPoster
             throw new LedgerError('JOURNAL_UNBALANCED', 'Debits must equal credits');
         }
         $this->assertPayable($posting);
+        $this->guard()->assertBank($posting);
         return ['debit' => $debit, 'credit' => $credit, 'hashLines' => $hashLines, 'rows' => $rows];
     }
 
@@ -391,12 +394,22 @@ final class LedgerPoster
         }
     }
 
-    private function recoverRace(string $bookId, string $postingKey, PDOException $error): ?PostedJournal
+    private function recoverRace(string $bookId, Posting $posting, PDOException $error): ?PostedJournal
     {
         if ((string) $error->getCode() !== '23505' || !str_contains($error->getMessage(), 'journals_posting_key_key')) {
             return null;
         }
-        return $this->findByPostingKey($bookId, $postingKey);
+        $existing = $this->findByPostingKey($bookId, $posting->postingKey());
+        if ($existing === null) {
+            return null;
+        }
+        $this->guard()->assertSamePosting($existing, $posting);
+        return $existing;
+    }
+
+    private function guard(): JournalGuard
+    {
+        return new JournalGuard($this->pdo);
     }
 
     private function pgBool(mixed $value): bool

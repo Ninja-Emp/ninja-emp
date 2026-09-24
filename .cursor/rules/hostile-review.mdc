@@ -14,7 +14,9 @@ Do not ship a change that a hostile reviewer can use as a second writer or a ren
 - `4100`, `5100`, and `6160` never share a journal with `2000`. A credit to `4100` debits `1300`. A debit to `2000` never credits `4000` or `4300`.
 - `4200`, `6170`, and `6180` never share a journal with `2000` or `2100`, under any source type.
 - `6150` may share a journal with `2000` or `2100` only when the source type is `sale` or `sale_return`.
-- `LedgerPoster::post` posts owner capital only: source `owner_capital`, accounts `1010` and `3000`. A payout, rent receipt, rent charge, labeled sale, or cash-to-income journal does not post. Widen that only in the same change that inserts the sale, receipt, or payout row.
+- `LedgerPoster::post` posts owner capital only: source `owner_capital`, accounts `1010` and `3000`, with no subledger. A payout, rent receipt, rent charge, labeled sale, or cash-to-income journal does not post. Widen that only in the same change that inserts the sale, receipt, or payout row.
+- A reversal must swap the named owner-capital journal and that journal is not already reversed. The flag alone does not enter a soft-closed month.
+- The same posting key with a different body is refused. The bank `1010` never goes negative. Only an owner or a manager can post.
 - The journal insert and its audit row commit together. A cashier cannot post.
 
 ## Before done

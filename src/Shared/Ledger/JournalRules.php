@@ -135,6 +135,9 @@ final class JournalRules
             if ($line->accountCode() !== '1010' && $line->accountCode() !== '3000') {
                 throw new LedgerError('JOURNAL_LINE_INVALID', 'This route only posts owner capital');
             }
+            if ($line->subledgerType() !== null || $line->subledgerRef() !== null) {
+                throw new LedgerError('JOURNAL_LINE_INVALID', 'Owner capital has no subledger');
+            }
         }
     }
 
