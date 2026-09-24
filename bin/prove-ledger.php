@@ -84,6 +84,57 @@ try {
             new JournalLine('3000', Money::zero('USD'), Money::of(50, 'USD')),
         ],
     )));
+    expectCode($poster, 'JOURNAL_INVALID', static fn (): mixed => $poster->post(new Posting(
+        'je:proof:poster',
+        '2026-09-12',
+        '2026-09-12T18:00:01.000Z',
+        'USD',
+        'owner_capital',
+        'Proof poster',
+        [
+            new JournalLine('1010', Money::of(100, 'USD'), Money::zero('USD')),
+            new JournalLine('3000', Money::zero('USD'), Money::of(100, 'USD')),
+        ],
+    )));
+    expectCode($poster, 'JOURNAL_INVALID', static fn (): mixed => $poster->post(new Posting(
+        'je:proof:poster',
+        '2026-09-12',
+        '2026-09-12T18:00:00.000Z',
+        'USD',
+        'owner_capital',
+        'Proof poster',
+        [
+            new JournalLine('1010', Money::of(100, 'USD'), Money::zero('USD'), null, null, 'note'),
+            new JournalLine('3000', Money::zero('USD'), Money::of(100, 'USD')),
+        ],
+    )));
+    expectCode($poster, 'JOURNAL_INVALID', static fn (): mixed => $poster->post(new Posting(
+        'je:proof:bad-date',
+        '2026-02-31',
+        '2026-02-28T18:00:00.000Z',
+        'USD',
+        'owner_capital',
+        'Impossible day',
+        [
+            new JournalLine('1010', Money::of(100, 'USD'), Money::zero('USD')),
+            new JournalLine('3000', Money::zero('USD'), Money::of(100, 'USD')),
+        ],
+    )));
+    expectCode($poster, 'JOURNAL_INVALID', static fn (): mixed => $poster->post(new Posting(
+        'je:proof:not-uuid',
+        '2026-09-12',
+        '2026-09-12T18:11:00.000Z',
+        'USD',
+        'owner_capital',
+        'Bad reversal id',
+        [
+            new JournalLine('1010', Money::of(100, 'USD'), Money::zero('USD')),
+            new JournalLine('3000', Money::zero('USD'), Money::of(100, 'USD')),
+        ],
+        null,
+        true,
+        'not-a-uuid',
+    )));
     $reversed = $poster->post(new Posting(
         'je:proof:reverse',
         '2026-09-12',
@@ -163,6 +214,18 @@ try {
         'USD',
         'owner_capital',
         '',
+        [
+            new JournalLine('1010', Money::of(100, 'USD'), Money::zero('USD')),
+            new JournalLine('3000', Money::zero('USD'), Money::of(100, 'USD')),
+        ],
+    )));
+    expectCode($poster, 'JOURNAL_INVALID', static fn (): mixed => $poster->post(new Posting(
+        'je:proof:spaces',
+        '2026-09-12',
+        '2026-09-12T18:00:00.000Z',
+        'USD',
+        'owner_capital',
+        '   ',
         [
             new JournalLine('1010', Money::of(100, 'USD'), Money::zero('USD')),
             new JournalLine('3000', Money::zero('USD'), Money::of(100, 'USD')),

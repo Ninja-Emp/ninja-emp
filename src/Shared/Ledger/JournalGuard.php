@@ -17,7 +17,9 @@ final class JournalGuard
     public function assertSamePosting(PostedJournal $existing, Posting $posting): void
     {
         $select = $this->pdo->prepare(
-            'SELECT posting_date::text AS posting_date, currency, source_type, source_reference, description, is_reversal, reverses_journal_id::text AS reverses_journal_id
+            'SELECT posting_date::text AS posting_date,
+                    to_char(occurred_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS occurred_at,
+                    currency, source_type, source_reference, description, is_reversal, reverses_journal_id::text AS reverses_journal_id
              FROM journals WHERE journal_id = ?',
         );
         $select->execute([$existing->journalId()]);
@@ -32,6 +34,7 @@ final class JournalGuard
             && Scalar::text($row, 'source_type') === $posting->sourceType()
             && Scalar::text($row, 'description') === $posting->description()
             && Scalar::text($row, 'posting_date') === $posting->postingDate()
+            && Scalar::text($row, 'occurred_at') === $posting->occurredAt()
             && Scalar::nullableText($row, 'source_reference') === $posting->sourceReference()
             && $this->pgBool($row['is_reversal']) === $posting->reversal()
             && $reverses === (($named === null || $named === '') ? null : $named);
@@ -51,6 +54,9 @@ final class JournalGuard
             return;
         }
         if (!$named) {
+            throw new LedgerError('JOURNAL_INVALID', 'A reversal must name the journal it reverses');
+        }
+        if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $reverses) !== 1) {
             throw new LedgerError('JOURNAL_INVALID', 'A reversal must name the journal it reverses');
         }
         $select = $this->pdo->prepare('SELECT source_type FROM journals WHERE journal_id = ?');
@@ -105,6 +111,11 @@ final class JournalGuard
         if ($delta >= 0) {
             return;
         }
+        $lock = $this->pdo->prepare("SELECT account_id FROM accounts WHERE code = '1010' FOR UPDATE");
+        $lock->execute();
+        if ($lock->fetch() === false) {
+            throw new LedgerError('ACCOUNT_MISSING', 'Account 1010 is not on the chart');
+        }
         $select = $this->pdo->prepare(
             "SELECT (COALESCE(SUM(l.debit_minor - l.credit_minor), 0) + ?::bigint)::text AS balance
              FROM journal_lines l JOIN accounts a ON a.account_id = l.account_id WHERE a.code = '1010'",
@@ -127,7 +138,8 @@ final class JournalGuard
     private function sameLines(string $journalId, Posting $posting): bool
     {
         $select = $this->pdo->prepare(
-            'SELECT a.code, l.debit_minor::text AS debit_minor, l.credit_minor::text AS credit_minor
+            'SELECT a.code, l.debit_minor::text AS debit_minor, l.credit_minor::text AS credit_minor, l.memo,
+                    l.subledger_type, l.subledger_ref::text AS subledger_ref
              FROM journal_lines l JOIN accounts a ON a.account_id = l.account_id
              WHERE l.journal_id = ? ORDER BY l.line_no',
         );
@@ -144,7 +156,10 @@ final class JournalGuard
             $index++;
             if (Scalar::text($row, 'code') !== $line->accountCode()
                 || Scalar::text($row, 'debit_minor') !== $line->debit()->minorString()
-                || Scalar::text($row, 'credit_minor') !== $line->credit()->minorString()) {
+                || Scalar::text($row, 'credit_minor') !== $line->credit()->minorString()
+                || Scalar::nullableText($row, 'memo') !== $line->memo()
+                || Scalar::nullableText($row, 'subledger_type') !== $line->subledgerType()
+                || Scalar::nullableText($row, 'subledger_ref') !== $line->subledgerRef()) {
                 return false;
             }
         }

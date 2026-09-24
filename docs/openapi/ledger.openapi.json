@@ -125,6 +125,17 @@
         "type": "string",
         "enum": ["USD", "CAD", "EUR"]
       },
+      "JournalPostLine": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["accountCode", "debitMinor", "creditMinor"],
+        "properties": {
+          "accountCode": { "type": "string", "enum": ["1010", "3000"] },
+          "debitMinor": { "$ref": "#/components/schemas/MoneyMinor" },
+          "creditMinor": { "$ref": "#/components/schemas/MoneyMinor" },
+          "memo": { "type": "string" }
+        }
+      },
       "JournalLine": {
         "type": "object",
         "additionalProperties": false,
@@ -155,7 +166,7 @@
           "lines": {
             "type": "array",
             "minItems": 2,
-            "items": { "$ref": "#/components/schemas/JournalLine" }
+            "items": { "$ref": "#/components/schemas/JournalPostLine" }
           }
         }
       },

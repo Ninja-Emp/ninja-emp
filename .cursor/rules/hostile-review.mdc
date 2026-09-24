@@ -16,7 +16,7 @@ Do not ship a change that a hostile reviewer can use as a second writer or a ren
 - `6150` may share a journal with `2000` or `2100` only when the source type is `sale` or `sale_return`.
 - `LedgerPoster::post` posts owner capital only: source `owner_capital`, accounts `1010` and `3000`, with no subledger. A payout, rent receipt, rent charge, labeled sale, or cash-to-income journal does not post. Widen that only in the same change that inserts the sale, receipt, or payout row.
 - A reversal must swap the named owner-capital journal and that journal is not already reversed. The flag alone does not enter a soft-closed month.
-- The same posting key with a different body is refused. The bank `1010` never goes negative. Only an owner or a manager can post.
+- The same posting key with a different body, time, or memo is refused. The bank `1010` is locked before the balance is read and never goes negative. A posting date must be a real calendar day. Only an owner or a manager can post.
 - The journal insert and its audit row commit together. A cashier cannot post.
 
 ## Before done

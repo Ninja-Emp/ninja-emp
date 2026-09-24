@@ -113,12 +113,10 @@ final class LedgerPoster
         if ($posting->postingKey() === '' || strlen($posting->postingKey()) > 190) {
             throw new LedgerError('JOURNAL_INVALID', 'Posting key is required');
         }
-        if ($posting->description() === '') {
+        if (trim($posting->description()) === '') {
             throw new LedgerError('JOURNAL_INVALID', 'A journal needs a description');
         }
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $posting->postingDate())) {
-            throw new LedgerError('JOURNAL_INVALID', 'Posting date must be an ISO date');
-        }
+        $this->calendarDate($posting->postingDate());
         if (count($posting->lines()) < 2) {
             throw new LedgerError('JOURNAL_UNBALANCED', 'A journal needs at least two lines');
         }
@@ -195,6 +193,11 @@ final class LedgerPoster
         if (!$sawAccount) {
             return;
         }
+        $lock = $this->pdo->prepare("SELECT account_id FROM accounts WHERE code = '2000' FOR UPDATE");
+        $lock->execute();
+        if ($lock->fetch() === false) {
+            throw new LedgerError('ACCOUNT_MISSING', 'Account 2000 is not on the chart');
+        }
         foreach ($deltaByParty as $party => $delta) {
             $this->assertPayableBalance($delta, $party);
         }
@@ -254,12 +257,10 @@ final class LedgerPoster
 
     private function periodId(string $bookId, string $postingDate, bool $reversal): string
     {
+        $this->calendarDate($postingDate);
         $start = substr($postingDate, 0, 8) . '01';
-        $timestamp = strtotime($postingDate . ' UTC');
-        if ($timestamp === false) {
-            throw new LedgerError('JOURNAL_INVALID', 'Posting date must be an ISO date');
-        }
-        $end = substr($postingDate, 0, 8) . sprintf('%02d', (int) date('t', $timestamp));
+        $parsed = new \DateTimeImmutable($postingDate . ' UTC');
+        $end = $parsed->format('Y-m-t');
         $select = $this->pdo->prepare(
             'SELECT period_id::text AS period_id, status FROM accounting_periods WHERE book_id = ? AND starts_on = ? AND ends_on = ?',
         );
@@ -410,6 +411,17 @@ final class LedgerPoster
     private function guard(): JournalGuard
     {
         return new JournalGuard($this->pdo);
+    }
+
+    private function calendarDate(string $postingDate): void
+    {
+        $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $postingDate, new \DateTimeZone('UTC'));
+        $errors = \DateTimeImmutable::getLastErrors();
+        $warnings = is_array($errors) ? $errors['warning_count'] : 0;
+        $errorCount = is_array($errors) ? $errors['error_count'] : 0;
+        if ($parsed === false || $warnings > 0 || $errorCount > 0 || $parsed->format('Y-m-d') !== $postingDate) {
+            throw new LedgerError('JOURNAL_INVALID', 'Posting date must be an ISO date');
+        }
     }
 
     private function pgBool(mixed $value): bool
