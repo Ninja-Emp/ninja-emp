@@ -1,0 +1,206 @@
+{
+  "openapi": "3.1.0",
+  "info": { "title": "EMP POS register", "version": "0.1.0" },
+  "servers": [{ "url": "/api/v1" }],
+  "security": [{ "storeSession": [] }, { "csrf": [] }],
+  "paths": {
+    "/sales": {
+      "post": {
+        "operationId": "completeSale",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Sale" } } } },
+        "responses": {
+          "201": { "description": "Sale journal posted", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Posted" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/sales/void": {
+      "post": {
+        "operationId": "voidSale",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SaleId" } } } },
+        "responses": {
+          "201": { "description": "Reversal journal posted", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Posted" } } } },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/sales/returns": {
+      "post": {
+        "operationId": "returnSale",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Return" } } } },
+        "responses": {
+          "201": { "description": "Return journal posted. Unpaid holder remainder goes to 1310.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Posted" } } } },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/rent/charges": {
+      "post": {
+        "operationId": "chargeRent",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RentCharge" } } } },
+        "responses": {
+          "201": { "description": "Debit 1300, credit 4100", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Posted" } } } },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/rent/receipts": {
+      "post": {
+        "operationId": "receiveRent",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RentReceipt" } } } },
+        "responses": {
+          "201": { "description": "Debit cash, card, or undeposited checks. Never 2000.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Posted" } } } },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/rent/settlements": {
+      "post": {
+        "operationId": "applyPayableToRent",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Apply" } } } },
+        "responses": {
+          "201": { "description": "The only 2000 to 1300 journal", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Posted" } } } },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/payouts": {
+      "post": {
+        "operationId": "payHolder",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Payout" } } } },
+        "responses": {
+          "201": { "description": "Pays leftover payable. Does not include rent.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Posted" } } } },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/registers/sessions": {
+      "post": {
+        "operationId": "openTill",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OpenTill" } } } },
+        "responses": {
+          "201": { "description": "Opens a till. No journal.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TillSession" } } } },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/registers/sessions/close": {
+      "post": {
+        "operationId": "closeTill",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CloseTill" } } } },
+        "responses": {
+          "200": { "description": "Closes the till. A journal is posted only for over or short, and that journal uses 6150.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ClosedTill" } } } },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "storeSession": { "type": "apiKey", "in": "cookie", "name": "session" },
+      "csrf": { "type": "apiKey", "in": "header", "name": "X-CSRF-Token" }
+    },
+    "responses": {
+      "Error": { "description": "Register error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+    },
+    "schemas": {
+      "MoneyMinor": { "type": "string", "pattern": "^[0-9]+$" },
+      "Posted": {
+        "type": "object",
+        "required": ["journalId", "postingKey"],
+        "properties": {
+          "journalId": { "type": "string", "format": "uuid" },
+          "postingKey": { "type": "string" }
+        }
+      },
+      "Sale": {
+        "type": "object",
+        "required": ["lines", "tenders"],
+        "properties": {
+          "lines": { "type": "array", "minItems": 1 },
+          "tenders": { "type": "array", "minItems": 1 }
+        }
+      },
+      "SaleId": {
+        "type": "object",
+        "required": ["saleId"],
+        "properties": { "saleId": { "type": "string", "format": "uuid" } }
+      },
+      "Return": {
+        "type": "object",
+        "required": ["saleId", "lines"],
+        "properties": { "saleId": { "type": "string", "format": "uuid" }, "lines": { "type": "array", "minItems": 1 } }
+      },
+      "RentCharge": {
+        "type": "object",
+        "required": ["assignmentId", "amountMinor"],
+        "properties": { "assignmentId": { "type": "string", "format": "uuid" }, "amountMinor": { "$ref": "#/components/schemas/MoneyMinor" } }
+      },
+      "RentReceipt": {
+        "type": "object",
+        "required": ["partyId", "amountMinor", "method"],
+        "properties": {
+          "partyId": { "type": "string", "format": "uuid" },
+          "amountMinor": { "$ref": "#/components/schemas/MoneyMinor" },
+          "method": { "type": "string", "enum": ["cash", "card", "check"] }
+        }
+      },
+      "Apply": {
+        "type": "object",
+        "required": ["partyId", "amountMinor"],
+        "properties": { "partyId": { "type": "string", "format": "uuid" }, "amountMinor": { "$ref": "#/components/schemas/MoneyMinor" } }
+      },
+      "Payout": {
+        "type": "object",
+        "required": ["partyId", "amountMinor", "method"],
+        "properties": {
+          "partyId": { "type": "string", "format": "uuid" },
+          "amountMinor": { "$ref": "#/components/schemas/MoneyMinor" },
+          "method": { "type": "string", "enum": ["check", "cash"] }
+        }
+      },
+      "OpenTill": {
+        "type": "object",
+        "required": ["registerId", "openingCashMinor"],
+        "properties": { "registerId": { "type": "string", "format": "uuid" }, "openingCashMinor": { "$ref": "#/components/schemas/MoneyMinor" } }
+      },
+      "CloseTill": {
+        "type": "object",
+        "required": ["registerSessionId", "countedCashMinor"],
+        "properties": { "registerSessionId": { "type": "string", "format": "uuid" }, "countedCashMinor": { "$ref": "#/components/schemas/MoneyMinor" } }
+      },
+      "TillSession": {
+        "type": "object",
+        "required": ["registerSessionId"],
+        "properties": { "registerSessionId": { "type": "string", "format": "uuid" } }
+      },
+      "ClosedTill": {
+        "type": "object",
+        "required": ["registerSessionId", "journalId"],
+        "properties": {
+          "registerSessionId": { "type": "string", "format": "uuid" },
+          "journalId": { "type": ["string", "null"] }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["errorCode", "message"],
+        "properties": {
+          "errorCode": { "type": "string", "enum": ["UNAUTHORIZED", "CSRF_INVALID", "JOURNAL_UNBALANCED", "JOURNAL_LINE_INVALID"] },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  }
+}

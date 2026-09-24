@@ -25,13 +25,16 @@ This repository is the last register. Open chats on `emp-pos.code-workspace`, no
 
 ```text
 emp-pos/
-  public/index.php                 # health check only ("ok")
+  public/index.php                 # health, plus /api/v1 identity and ledger
   bin/migrate.php                  # shared, or tenant <schema>
   bin/seed-demo.php                # wipe and reseed the demo store only
   bin/prove-catalog.php            # catalog diff, then rolls the probe schema back
+  bin/prove-openapi.php            # identity, ledger, and register documents
+  bin/prove-http.php               # signup, journal, trial balance; drops only slug contract-proof
+  docs/openapi/                    # identity, ledger, register
   migrations/shared/001_public.sql
   migrations/tenant/001_store.sql  # includes the empty-mall reference rows
-  seed/demo.sql                    # Saturday journals, fixed ids
+  seed/demo.sql                    # demo journals, fixed ids
   composer.json                    # PHP ^8.5, no packages installed
   docs/HANDOFF.md
   src/Bootstrap/Kernel.php
@@ -52,7 +55,7 @@ New malls follow migration 066: `intake_show_category`, `intake_show_brand`, `in
 
 `php bin/seed-demo.php` builds Demo Mall and can wipe it again. Wipe runs only when slug `demo`, status `demo`, and schema `tenant_018f0000_0000_7000_8000_000000000001` all match. Logins: `owner@demo.test` and `cashier@demo.test`. Password: `practice`.
 
-The seed posts opening capital (debit `1010`, credit `3000`) so the check does not draw an empty bank. Rent stays on `1300`. The only `2000` to `1300` journal is the named apply. The bowl return puts the unpaid holder remainder on `1310`. The check pays leftover payable. Till close is exact, so there is no over/short journal. Journal hashes are scheme v2. `postJournal` is slice 2.
+The seed posts opening capital (debit `1010`, credit `3000`) so the check does not draw an empty bank. Rent stays on `1300`. The only `2000` to `1300` journal is the named apply. The bowl return puts the unpaid holder remainder on `1310`. The check pays leftover payable. Till close is exact, so there is no over/short journal. Journal hashes are scheme v2.
 
 ```text
 php bin/migrate.php
@@ -61,26 +64,36 @@ php bin/seed-demo.php
 php bin/prove-catalog.php
 php bin/prove-database.php
 php bin/prove-ledger.php
+php bin/prove-openapi.php
+php bin/prove-http.php
 ```
 
 `prove-database.php` runs against `emp_pos` only. Each case is a transaction that rolls back. The demo store stays at status `demo` with its ten journals. A live status refuses the wipe.
 
 The database rejects a second opening journal, a repeated posting key, unbalanced lines, a one-line journal, updates or deletes of ledger and audit rows, a repeated booth code, overlapping assignments and periods, a sale, return, rent receipt, or payout pointed at the wrong journal, and a repeated check number.
 
-ACH is listed as a payout method and the check constraint `holder_payouts_cash_register_chk` still rejects it. Payable going negative, and which accounts a rent receipt may touch, are not database constraints. Those stay application rules. Do not change the baseline for them unless the operator asks. `postJournal` is still slice 2.
+ACH is listed as a payout method and the check constraint `holder_payouts_cash_register_chk` still rejects it. Payable going negative, and which accounts a rent receipt may touch, are not database constraints. Those stay application rules. Do not change the baseline for them unless the operator asks.
 
 `EMP_POS_DATABASE_URL` defaults to `emp_pos` on `127.0.0.1:5433`. Prove also reads Nest `emp` and `emp_pos_nest_ref` read-only.
 
+## Contracts and handlers
+
+Done. `docs/openapi/identity.openapi.json`, `ledger.openapi.json`, and `register.openapi.json`. `php bin/prove-openapi.php` checks those documents. It does not listen and does not touch the database.
+
+HTTP handlers exist for identity (`/csrf`, `/signup`, `/login`, `/logout`, `/session`) and the ledger (`POST /journals`, `GET /journals/{journalId}`, `GET /books/trial-balance`). Signup creates the store schema, the primary book, an argon2id password, and a session whose `token_hash` is sha256 of the cookie `session`. Mutating routes require cookie `csrf` and header `X-CSRF-Token`. Ledger posts go through `LedgerPoster`. Register routes are documented only. There are no sale, void, return, rent, payout, or till handlers.
+
+`php bin/prove-http.php` signs up slug `contract-proof`, posts a journal, reads it, and reads the trial balance, then drops only that slug’s schema. Demo stays.
+
 ## Next slices
 
-One chat each:
-
 1. Base install. Done.
-2. Ledger. Done. `postJournal` posts in the caller’s transaction. The same `posting_key` returns the existing journal. A drifted trial balance throws. `php bin/prove-ledger.php` rolls back on `emp_pos`.
-3. Tenancy and identity. Signup creates a schema. Cookie session. CSRF on HTML POST.
-4. Saturday kernel. Sale, void, return with clawback, rent charge, rent receipt, apply-payable-to-rent, check payout, open and close till.
-5. Catalog, party, booth. Items, vendors, House, booth list. Map is Canvas 2D.
-6. Office books. Tax worksheet, income, balance sheet, party statement.
+2. Ledger poster. Done. `LedgerPoster::post` posts in the caller’s transaction. The same `posting_key` returns the existing journal. A drifted trial balance throws. `php bin/prove-ledger.php` rolls back on `emp_pos`.
+3. Identity and ledger contracts. Done.
+4. Register contract. Done as a document. Handlers are not written.
+5. Identity and ledger HTTP. Done.
+6. Register handlers: sale, void, return with clawback, rent charge, rent receipt, apply payable to rent, check payout, till open and close.
+7. Catalog, party, booth. Items, vendors, House, booth list.
+8. Office books. Tax worksheet, income, balance sheet, party statement.
 
 Portal, gifts, store credit, layaway, Square, print hardware, platform billing, and any production import wait until the operator names them.
 

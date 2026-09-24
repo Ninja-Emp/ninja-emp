@@ -95,6 +95,8 @@ if (!is_array($security) || $security === []) {
     fail('A store session is not required');
 }
 
+proveIdentity(load(dirname(__DIR__) . '/docs/openapi/identity.openapi.json'));
+proveRegister(load(dirname(__DIR__) . '/docs/openapi/register.openapi.json'));
 fwrite(STDOUT, "openapi holds\n");
 
 /**
@@ -154,4 +156,78 @@ function fail(string $message): never
 {
     fwrite(STDERR, $message . "\n");
     exit(1);
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function load(string $path): array
+{
+    $raw = file_get_contents($path);
+    if ($raw === false) {
+        fail('OpenAPI file is missing');
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        fail('OpenAPI file is not JSON');
+    }
+    /** @var array<string, mixed> $decoded */
+    return $decoded;
+}
+
+/**
+ * @param array<string, mixed> $doc
+ */
+function proveIdentity(array $doc): void
+{
+    requireString($doc, 'openapi', '3.1.0');
+    $paths = requireArray($doc, 'paths');
+    requireOperation($paths, '/csrf', 'get');
+    $signup = requireOperation($paths, '/signup', 'post');
+    requireOperation($paths, '/login', 'post');
+    requireOperation($paths, '/logout', 'post');
+    requireOperation($paths, '/session', 'get');
+    requireResponse($signup, '201');
+    requireResponse($signup, '403');
+    $schemas = requireArray(requireArray($doc, 'components'), 'schemas');
+    foreach (['email', 'password', 'storeName', 'slug'] as $field) {
+        $required = requireArray($schemas, 'Signup')['required'] ?? null;
+        if (!is_array($required) || !in_array($field, $required, true)) {
+            fail('Signup is missing ' . $field);
+        }
+    }
+    $enum = requireArray(requireArray(requireArray($schemas, 'Error'), 'properties'), 'errorCode')['enum'] ?? null;
+    foreach (['INVALID_EMAIL', 'INVALID_PASSWORD', 'SLUG_TAKEN', 'EMAIL_TAKEN', 'UNAUTHORIZED', 'CSRF_INVALID'] as $code) {
+        if (!is_array($enum) || !in_array($code, $enum, true)) {
+            fail('Identity error code ' . $code . ' is missing');
+        }
+    }
+}
+
+/**
+ * @param array<string, mixed> $doc
+ */
+function proveRegister(array $doc): void
+{
+    requireString($doc, 'openapi', '3.1.0');
+    $paths = requireArray($doc, 'paths');
+    foreach ([
+        '/sales' => 'post',
+        '/sales/void' => 'post',
+        '/sales/returns' => 'post',
+        '/rent/charges' => 'post',
+        '/rent/receipts' => 'post',
+        '/rent/settlements' => 'post',
+        '/payouts' => 'post',
+        '/registers/sessions' => 'post',
+        '/registers/sessions/close' => 'post',
+    ] as $path => $method) {
+        $operation = requireOperation($paths, $path, $method);
+        requireResponse($operation, '401');
+        requireResponse($operation, '403');
+    }
+    $security = $doc['security'] ?? null;
+    if (!is_array($security) || $security === []) {
+        fail('Register operations do not require a session');
+    }
 }

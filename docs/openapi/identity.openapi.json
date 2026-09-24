@@ -1,0 +1,130 @@
+{
+  "openapi": "3.1.0",
+  "info": { "title": "EMP POS identity", "version": "0.1.0" },
+  "servers": [{ "url": "/api/v1" }],
+  "paths": {
+    "/csrf": {
+      "get": {
+        "operationId": "csrf",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Sets the csrf cookie and returns the same token",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Csrf" } } }
+          }
+        }
+      }
+    },
+    "/signup": {
+      "post": {
+        "operationId": "signup",
+        "security": [{ "csrf": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Signup" } } }
+        },
+        "responses": {
+          "201": { "description": "Store created and session cookie set", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Session" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/login": {
+      "post": {
+        "operationId": "login",
+        "security": [{ "csrf": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Login" } } }
+        },
+        "responses": {
+          "200": { "description": "Session cookie set", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Session" } } } },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/logout": {
+      "post": {
+        "operationId": "logout",
+        "security": [{ "storeSession": [] }, { "csrf": [] }],
+        "responses": {
+          "204": { "description": "Session cookie cleared" },
+          "403": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/session": {
+      "get": {
+        "operationId": "session",
+        "security": [{ "storeSession": [] }],
+        "responses": {
+          "200": { "description": "Current session", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Session" } } } },
+          "401": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "storeSession": { "type": "apiKey", "in": "cookie", "name": "session" },
+      "csrf": { "type": "apiKey", "in": "header", "name": "X-CSRF-Token" }
+    },
+    "responses": {
+      "Error": {
+        "description": "Identity error",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    },
+    "schemas": {
+      "Csrf": {
+        "type": "object",
+        "required": ["csrfToken"],
+        "properties": { "csrfToken": { "type": "string" } }
+      },
+      "Signup": {
+        "type": "object",
+        "required": ["email", "password", "storeName", "slug"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string", "minLength": 8 },
+          "storeName": { "type": "string", "minLength": 1 },
+          "slug": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$", "maxLength": 63 },
+          "currency": { "type": "string", "enum": ["USD", "CAD", "EUR"] },
+          "timezone": { "type": "string" }
+        }
+      },
+      "Login": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string" },
+          "password": { "type": "string" }
+        }
+      },
+      "Session": {
+        "type": "object",
+        "required": ["identityId", "tenantId", "slug", "role"],
+        "properties": {
+          "identityId": { "type": "string", "format": "uuid" },
+          "tenantId": { "type": "string", "format": "uuid" },
+          "slug": { "type": "string" },
+          "role": { "type": "string", "enum": ["owner", "manager", "cashier"] }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["errorCode", "message"],
+        "properties": {
+          "errorCode": {
+            "type": "string",
+            "enum": ["INVALID_EMAIL", "INVALID_PASSWORD", "SLUG_TAKEN", "EMAIL_TAKEN", "UNAUTHORIZED", "CSRF_INVALID"]
+          },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  }
+}
