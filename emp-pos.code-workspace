@@ -1,0 +1,25 @@
+{
+  "folders": [
+    {
+      "name": "emp-pos",
+      "path": "."
+    },
+    {
+      "name": "reference-emp",
+      "path": "../emp"
+    },
+    {
+      "name": "reference-pc-web",
+      "path": "../curser-pos-web"
+    }
+  ],
+  "settings": {
+    "files.readonlyInclude": {
+      "**/emp/**": true,
+      "**/curser-pos-web/**": true
+    },
+    "files.readonlyExclude": {
+      "**/emp-pos/**": true
+    }
+  }
+}

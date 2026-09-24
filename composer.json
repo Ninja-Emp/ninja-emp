@@ -1,0 +1,15 @@
+{
+  "name": "emp/pos",
+  "description": "One PHP application on the EMP books.",
+  "type": "project",
+  "require": {
+    "php": "^8.5"
+  },
+  "autoload": {
+    "psr-4": {
+      "EmpPos\\": "src/"
+    }
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}
