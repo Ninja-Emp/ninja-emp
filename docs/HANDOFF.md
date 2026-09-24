@@ -80,9 +80,11 @@ ACH is listed as a payout method and the check constraint `holder_payouts_cash_r
 
 Done. `docs/openapi/identity.openapi.json`, `ledger.openapi.json`, and `register.openapi.json`. `php bin/prove-openapi.php` checks those documents. It does not listen and does not touch the database.
 
-HTTP handlers exist for identity (`/csrf`, `/signup`, `/login`, `/logout`, `/session`) and the ledger (`POST /journals`, `GET /journals/{journalId}`, `GET /books/trial-balance`). Signup creates the store schema, the primary book, an argon2id password, and a session whose `token_hash` is sha256 of the cookie `session`. Mutating routes require cookie `csrf` and header `X-CSRF-Token`. Ledger posts go through `LedgerPoster`. Register routes are documented only. There are no sale, void, return, rent, payout, or till handlers.
+HTTP handlers exist for identity (`/csrf`, `/signup`, `/login`, `/logout`, `/session`) and the ledger (`POST /journals`, `GET /journals/{journalId}`, `GET /books/trial-balance`). Signup creates the store schema, the primary book, an argon2id password, and a session whose `token_hash` is sha256 of the cookie `session`. Mutating routes require cookie `csrf` and header `X-CSRF-Token`. A cashier cannot post a journal. Ledger posts go through `LedgerPoster` only. That function refuses a rent receipt that touches `2000`, any `2000` to `1300` journal that is not `payable_rent_settlement`, a payable balance that would go negative, and a fee, rounding, or till-difference source that touches payable or tax. Money in JSON is a canonical digit string. The journal insert and an `audit_events` row commit together. Register routes are documented only. There are no sale, void, return, rent, payout, or till handlers.
 
-`php bin/prove-http.php` signs up slug `contract-proof`, posts a journal, reads it, and reads the trial balance, then drops only that slug’s schema. Demo stays.
+`php bin/prove-http.php` signs up slug `contract-proof`, posts a journal, reads it, reads the trial balance, and refuses the illegal shapes, then drops only that slug’s schema. Demo stays.
+
+PHPStan is level 10 with no baseline. PHPMD is `composer run check:phpmd` after a clean probe. PHPUnit line coverage of `src/` is above 80%. Infection 0.35 (0.32 cannot install next to PHPUnit 13) is 100% MSI on `Money`, `JournalHash`, `LedgerPoster`, and `TrialBalance`.
 
 ## Next slices
 

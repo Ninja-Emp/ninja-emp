@@ -12,6 +12,7 @@ use EmpPos\Shared\Ledger\Money;
 use EmpPos\Shared\Ledger\Posting;
 use EmpPos\Shared\Ledger\TrialBalance;
 use EmpPos\Shared\Persistence\Migrator;
+use EmpPos\Shared\Scalar;
 use PDO;
 
 final class App
@@ -53,7 +54,10 @@ final class App
         $this->pdo->exec('SET search_path TO "' . $this->schema($member['schema']) . '", public');
         try {
             if ($request->method() === 'POST' && $path === '/api/v1/journals') {
-                return $this->postJournal($request);
+                if ($member['role'] === 'cashier') {
+                    return Response::json(403, ['errorCode' => 'FORBIDDEN', 'message' => 'A cashier cannot post a journal']);
+                }
+                return $this->postJournal($request, $member);
             }
             if ($request->method() === 'GET' && str_starts_with($path, '/api/v1/journals/')) {
                 return $this->getJournal(substr($path, strlen('/api/v1/journals/')));
@@ -71,22 +75,29 @@ final class App
         return Response::json(404, ['errorCode' => 'NOT_FOUND', 'message' => 'Not found']);
     }
 
-    private function postJournal(Request $request): Response
+    /**
+     * @param array{identityId: string, tenantId: string, slug: string, role: string, schema: string, membershipId: string} $member
+     */
+    private function postJournal(Request $request, array $member): Response
     {
         $body = $request->json();
-        $currency = (string) ($body['currency'] ?? '');
+        $currency = Scalar::string($body['currency'] ?? '', 'currency');
+        $rawLines = $body['lines'] ?? [];
+        if (!is_array($rawLines)) {
+            $rawLines = [];
+        }
         $lines = [];
-        foreach ($body['lines'] ?? [] as $line) {
+        foreach ($rawLines as $line) {
             if (!is_array($line)) {
                 continue;
             }
             $lines[] = new JournalLine(
-                (string) ($line['accountCode'] ?? ''),
-                Money::of((int) ($line['debitMinor'] ?? 0), $currency),
-                Money::of((int) ($line['creditMinor'] ?? 0), $currency),
-                isset($line['subledgerType']) ? (string) $line['subledgerType'] : null,
-                isset($line['subledgerRef']) ? (string) $line['subledgerRef'] : null,
-                isset($line['memo']) ? (string) $line['memo'] : null,
+                Scalar::string($line['accountCode'] ?? '', 'accountCode'),
+                Money::fromMinorString($this->minor($line['debitMinor'] ?? null), $currency),
+                Money::fromMinorString($this->minor($line['creditMinor'] ?? null), $currency),
+                isset($line['subledgerType']) ? Scalar::string($line['subledgerType'], 'subledgerType') : null,
+                isset($line['subledgerRef']) ? Scalar::string($line['subledgerRef'], 'subledgerRef') : null,
+                isset($line['memo']) ? Scalar::string($line['memo'], 'memo') : null,
             );
         }
         $ownsTransaction = !$this->pdo->inTransaction();
@@ -95,16 +106,16 @@ final class App
         }
         try {
         $posted = (new LedgerPoster($this->pdo))->post(new Posting(
-            (string) ($body['postingKey'] ?? ''),
-            (string) ($body['postingDate'] ?? ''),
-            (string) ($body['occurredAt'] ?? ''),
+            Scalar::string($body['postingKey'] ?? '', 'postingKey'),
+            Scalar::string($body['postingDate'] ?? '', 'postingDate'),
+            Scalar::string($body['occurredAt'] ?? '', 'occurredAt'),
             $currency,
-            (string) ($body['sourceType'] ?? ''),
-            (string) ($body['description'] ?? ''),
+            Scalar::string($body['sourceType'] ?? '', 'sourceType'),
+            Scalar::string($body['description'] ?? '', 'description'),
             $lines,
-            isset($body['sourceReference']) ? (string) $body['sourceReference'] : null,
+            isset($body['sourceReference']) ? Scalar::string($body['sourceReference'], 'sourceReference') : null,
             ($body['reversal'] ?? false) === true,
-            isset($body['reversesJournalId']) ? (string) $body['reversesJournalId'] : null,
+            isset($body['reversesJournalId']) ? Scalar::string($body['reversesJournalId'], 'reversesJournalId') : null,
         ));
         } catch (LedgerError $error) {
             if ($ownsTransaction && $this->pdo->inTransaction()) {
@@ -112,6 +123,7 @@ final class App
             }
             throw $error;
         }
+        $this->audit($member, $posted->journalId(), $posted->reused());
         if ($ownsTransaction) {
             $this->pdo->commit();
         }
@@ -123,6 +135,32 @@ final class App
         ]);
     }
 
+    private function minor(mixed $value): string
+    {
+        if (is_int($value)) {
+            return (string) $value;
+        }
+        if (is_string($value)) {
+            return $value;
+        }
+        return '';
+    }
+
+    /**
+     * @param array{identityId: string, membershipId: string} $member
+     */
+    private function audit(array $member, string $journalId, bool $reused): void
+    {
+        if ($reused) {
+            return;
+        }
+        $insert = $this->pdo->prepare(
+            "INSERT INTO audit_events (identity_id, membership_id, action, message, resource_type, resource_id, payload)
+             VALUES (?, ?, 'journal.post', 'Journal posted', 'journal', ?, '{}'::jsonb)",
+        );
+        $insert->execute([$member['identityId'], $member['membershipId'], $journalId]);
+    }
+
     private function getJournal(string $journalId): Response
     {
         $select = $this->pdo->prepare(
@@ -132,34 +170,41 @@ final class App
              FROM journals WHERE journal_id = ?",
         );
         $select->execute([$journalId]);
-        $row = $select->fetch();
-        if ($row === false) {
+        $fetched = $select->fetch();
+        if ($fetched === false) {
             return Response::json(404, ['errorCode' => 'JOURNAL_MISSING', 'message' => 'Journal was not found']);
         }
+        $row = Scalar::row($fetched);
         $lines = $this->pdo->prepare(
             'SELECT a.code, l.debit_minor::text AS debit_minor, l.credit_minor::text AS credit_minor, l.subledger_type, l.subledger_ref::text AS subledger_ref
              FROM journal_lines l JOIN accounts a ON a.account_id = l.account_id WHERE l.journal_id = ? ORDER BY l.line_no',
         );
         $lines->execute([$journalId]);
+        $fetchedLines = $lines->fetchAll();
+        $out = [];
+        foreach ($fetchedLines as $line) {
+            $item = Scalar::row($line);
+            $out[] = [
+                'accountCode' => Scalar::text($item, 'code'),
+                'debitMinor' => Scalar::text($item, 'debit_minor'),
+                'creditMinor' => Scalar::text($item, 'credit_minor'),
+                'subledgerType' => Scalar::nullableText($item, 'subledger_type'),
+                'subledgerRef' => Scalar::nullableText($item, 'subledger_ref'),
+            ];
+        }
         return Response::json(200, [
-            'journalId' => (string) $row['journal_id'],
-            'journalNo' => (string) $row['journal_no'],
-            'postingKey' => (string) $row['posting_key'],
-            'postingDate' => (string) $row['posting_date'],
-            'occurredAt' => (string) $row['occurred_at'],
-            'currency' => rtrim((string) $row['currency']),
-            'sourceType' => (string) $row['source_type'],
-            'sourceReference' => $row['source_reference'],
-            'description' => (string) $row['description'],
+            'journalId' => Scalar::text($row, 'journal_id'),
+            'journalNo' => Scalar::text($row, 'journal_no'),
+            'postingKey' => Scalar::text($row, 'posting_key'),
+            'postingDate' => Scalar::text($row, 'posting_date'),
+            'occurredAt' => Scalar::text($row, 'occurred_at'),
+            'currency' => rtrim(Scalar::text($row, 'currency')),
+            'sourceType' => Scalar::text($row, 'source_type'),
+            'sourceReference' => Scalar::nullableText($row, 'source_reference'),
+            'description' => Scalar::text($row, 'description'),
             'reversal' => $row['is_reversal'] === true || $row['is_reversal'] === 't',
-            'reversesJournalId' => $row['reverses_journal_id'],
-            'lines' => array_map(static fn (array $line): array => [
-                'accountCode' => (string) $line['code'],
-                'debitMinor' => (string) $line['debit_minor'],
-                'creditMinor' => (string) $line['credit_minor'],
-                'subledgerType' => $line['subledger_type'],
-                'subledgerRef' => $line['subledger_ref'],
-            ], $lines->fetchAll()),
+            'reversesJournalId' => Scalar::nullableText($row, 'reverses_journal_id'),
+            'lines' => $out,
         ]);
     }
 

@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace EmpPos\Shared\Ledger;
 
-use RuntimeException;
-
 final class JournalHash
 {
     public const int SCHEME_V2 = 2;
@@ -27,7 +25,7 @@ final class JournalHash
         ?string $reversesJournalId,
         array $lines,
     ): string {
-        $encoded = json_encode(
+        return json_encode(
             [
                 'scheme' => self::SCHEME_V2,
                 'postingKey' => $postingKey,
@@ -43,12 +41,8 @@ final class JournalHash
                 'reversesJournalId' => $reversesJournalId,
                 'lines' => $lines,
             ],
-            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
         );
-        if ($encoded === false) {
-            throw new RuntimeException('Journal payload did not encode');
-        }
-        return $encoded;
     }
 
     public static function hash(?string $prevHash, string $payload): string

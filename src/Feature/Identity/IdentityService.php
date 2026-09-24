@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace EmpPos\Feature\Identity;
 
 use EmpPos\Shared\Persistence\Migrator;
+use EmpPos\Shared\Scalar;
 use PDO;
 use PDOException;
 
@@ -31,14 +32,14 @@ final class IdentityService
      */
     public function signup(array $body): array
     {
-        $email = strtolower(trim((string) ($body['email'] ?? '')));
-        $password = (string) ($body['password'] ?? '');
-        $storeName = trim((string) ($body['storeName'] ?? ''));
-        $slug = strtolower(trim((string) ($body['slug'] ?? '')));
-        $currency = (string) ($body['currency'] ?? 'USD');
-        $timezone = (string) ($body['timezone'] ?? 'America/Chicago');
+        $email = strtolower(trim(Scalar::string($body['email'] ?? '', 'email')));
+        $password = Scalar::string($body['password'] ?? '', 'password');
+        $storeName = trim(Scalar::string($body['storeName'] ?? '', 'storeName'));
+        $slug = strtolower(trim(Scalar::string($body['slug'] ?? '', 'slug')));
+        $currency = Scalar::string($body['currency'] ?? 'USD', 'currency');
+        $timezone = Scalar::string($body['timezone'] ?? 'America/Chicago', 'timezone');
         if (!in_array($currency, ['USD', 'CAD', 'EUR'], true)) {
-            return $this->error(400, 'INVALID_EMAIL', 'Currency is not supported');
+            return $this->error(400, 'INVALID_CURRENCY', 'Currency is not supported');
         }
         if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
             return $this->error(400, 'INVALID_EMAIL', 'Email is not valid');
@@ -47,7 +48,7 @@ final class IdentityService
             return $this->error(400, 'INVALID_PASSWORD', 'Password must be at least 8 characters');
         }
         if ($storeName === '' || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) !== 1) {
-            return $this->error(400, 'INVALID_EMAIL', 'Store name and slug are required');
+            return $this->error(400, 'INVALID_SLUG', 'Store name and slug are required');
         }
         $emailTaken = $this->pdo->prepare('SELECT 1 FROM public.identities WHERE email = ?');
         $emailTaken->execute([$email]);
@@ -68,19 +69,20 @@ final class IdentityService
             $hash = password_hash($password, PASSWORD_ARGON2ID, ['memory_cost' => 19456, 'time_cost' => 2, 'threads' => 1]);
             $identity = $this->pdo->prepare('INSERT INTO public.identities (email, password_hash) VALUES (?, ?) RETURNING identity_id::text AS identity_id');
             $identity->execute([$email, $hash]);
-            $identityId = (string) $identity->fetch()['identity_id'];
+            $identityRow = Scalar::row($identity->fetch());
+            $identityId = Scalar::text($identityRow, 'identity_id');
             $tenant = $this->pdo->prepare(
                 "INSERT INTO public.tenants (slug, store_name, status, use_case, functional_currency, timezone) VALUES (?, ?, 'live', 'vendor_mall', ?, ?) RETURNING tenant_id::text AS tenant_id, schema_name",
             );
             $tenant->execute([$slug, $storeName, $currency, $timezone]);
-            $tenantRow = $tenant->fetch();
-            $tenantId = (string) $tenantRow['tenant_id'];
-            $schema = (string) $tenantRow['schema_name'];
+            $tenantRow = Scalar::row($tenant->fetch());
+            $tenantId = Scalar::text($tenantRow, 'tenant_id');
+            $schema = Scalar::text($tenantRow, 'schema_name');
             $membership = $this->pdo->prepare(
                 "INSERT INTO public.tenant_memberships (tenant_id, identity_id, role) VALUES (?, ?, 'owner') RETURNING tenant_membership_id::text AS tenant_membership_id",
             );
             $membership->execute([$tenantId, $identityId]);
-            $membershipId = (string) $membership->fetch()['tenant_membership_id'];
+            $membershipId = Scalar::text(Scalar::row($membership->fetch()), 'tenant_membership_id');
             $this->pdo->prepare('INSERT INTO public.tenant_billing (tenant_id, plan_code, status) VALUES (?, ?, ?)')->execute([$tenantId, 'practice', 'trial']);
             $this->migrator->applyTenant($schema);
             $this->pdo->prepare(
@@ -99,6 +101,9 @@ final class IdentityService
             if ($owns && $this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
+            if ((string) $error->getCode() === '23505') {
+                return $this->taken($email, $slug);
+            }
             throw $error;
         }
     }
@@ -109,8 +114,8 @@ final class IdentityService
      */
     public function login(array $body): array
     {
-        $email = strtolower(trim((string) ($body['email'] ?? '')));
-        $password = (string) ($body['password'] ?? '');
+        $email = strtolower(trim(Scalar::string($body['email'] ?? '', 'email')));
+        $password = Scalar::string($body['password'] ?? '', 'password');
         $select = $this->pdo->prepare(
             "SELECT i.identity_id::text AS identity_id, i.password_hash, m.tenant_membership_id::text AS tenant_membership_id, m.role, t.tenant_id::text AS tenant_id, t.slug
              FROM public.identities i
@@ -121,18 +126,22 @@ final class IdentityService
              LIMIT 1",
         );
         $select->execute([$email]);
-        $row = $select->fetch();
-        if ($row === false || !password_verify($password, (string) $row['password_hash'])) {
+        $fetched = $select->fetch();
+        if ($fetched === false) {
             return $this->error(401, 'UNAUTHORIZED', 'Email or password is wrong');
         }
-        $token = $this->startSession((string) $row['tenant_membership_id']);
+        $row = Scalar::row($fetched);
+        if (!password_verify($password, Scalar::text($row, 'password_hash'))) {
+            return $this->error(401, 'UNAUTHORIZED', 'Email or password is wrong');
+        }
+        $token = $this->startSession(Scalar::text($row, 'tenant_membership_id'));
         return [
             'status' => 200,
             'body' => [
-                'identityId' => (string) $row['identity_id'],
-                'tenantId' => (string) $row['tenant_id'],
-                'slug' => (string) $row['slug'],
-                'role' => (string) $row['role'],
+                'identityId' => Scalar::text($row, 'identity_id'),
+                'tenantId' => Scalar::text($row, 'tenant_id'),
+                'slug' => Scalar::text($row, 'slug'),
+                'role' => Scalar::text($row, 'role'),
             ],
             'cookies' => [$this->cookie('session', $token, false)],
         ];
@@ -157,11 +166,20 @@ final class IdentityService
         if ($row === null) {
             return $this->error(401, 'UNAUTHORIZED', 'Sign in required');
         }
-        return ['status' => 200, 'body' => $row, 'cookies' => []];
+        return [
+            'status' => 200,
+            'body' => [
+                'identityId' => $row['identityId'],
+                'tenantId' => $row['tenantId'],
+                'slug' => $row['slug'],
+                'role' => $row['role'],
+            ],
+            'cookies' => [],
+        ];
     }
 
     /**
-     * @return array{identityId: string, tenantId: string, slug: string, role: string, schema: string}|null
+     * @return array{identityId: string, tenantId: string, slug: string, role: string, schema: string, membershipId: string}|null
      */
     public function membership(string $token): ?array
     {
@@ -169,24 +187,26 @@ final class IdentityService
             return null;
         }
         $select = $this->pdo->prepare(
-            "SELECT i.identity_id::text AS identity_id, t.tenant_id::text AS tenant_id, t.slug, t.schema_name, m.role
+            "SELECT i.identity_id::text AS identity_id, t.tenant_id::text AS tenant_id, t.slug, t.schema_name, m.role, m.tenant_membership_id::text AS tenant_membership_id
              FROM public.tenant_sessions s
-             JOIN public.tenant_memberships m ON m.tenant_membership_id = s.tenant_membership_id
-             JOIN public.identities i ON i.identity_id = m.identity_id
+             JOIN public.tenant_memberships m ON m.tenant_membership_id = s.tenant_membership_id AND m.disabled_at IS NULL
+             JOIN public.identities i ON i.identity_id = m.identity_id AND i.disabled_at IS NULL
              JOIN public.tenants t ON t.tenant_id = m.tenant_id
              WHERE s.token_hash = ? AND s.expires_at > now()",
         );
         $select->execute([hash('sha256', $token)]);
-        $row = $select->fetch();
-        if ($row === false) {
+        $fetched = $select->fetch();
+        if ($fetched === false) {
             return null;
         }
+        $row = Scalar::row($fetched);
         return [
-            'identityId' => (string) $row['identity_id'],
-            'tenantId' => (string) $row['tenant_id'],
-            'slug' => (string) $row['slug'],
-            'role' => (string) $row['role'],
-            'schema' => (string) $row['schema_name'],
+            'identityId' => Scalar::text($row, 'identity_id'),
+            'tenantId' => Scalar::text($row, 'tenant_id'),
+            'slug' => Scalar::text($row, 'slug'),
+            'role' => Scalar::text($row, 'role'),
+            'schema' => Scalar::text($row, 'schema_name'),
+            'membershipId' => Scalar::text($row, 'tenant_membership_id'),
         ];
     }
 
@@ -206,6 +226,24 @@ final class IdentityService
     private function cookie(string $name, string $value, bool $clear): array
     {
         return ['name' => $name, 'value' => $value, 'clear' => $clear];
+    }
+
+    /**
+     * @return array{status: int, body: array<string, mixed>, cookies: list<array{name: string, value: string, clear: bool}>}
+     */
+    private function taken(string $email, string $slug): array
+    {
+        $emailTaken = $this->pdo->prepare('SELECT 1 FROM public.identities WHERE email = ?');
+        $emailTaken->execute([$email]);
+        if ($emailTaken->fetch() !== false) {
+            return $this->error(409, 'EMAIL_TAKEN', 'That email is already registered');
+        }
+        $slugTaken = $this->pdo->prepare('SELECT 1 FROM public.tenants WHERE slug = ?');
+        $slugTaken->execute([$slug]);
+        if ($slugTaken->fetch() !== false) {
+            return $this->error(409, 'SLUG_TAKEN', 'That store address is taken');
+        }
+        return $this->error(409, 'SLUG_TAKEN', 'That store address is taken');
     }
 
     /**

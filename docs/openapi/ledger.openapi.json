@@ -41,6 +41,7 @@
           },
           "400": { "$ref": "#/components/responses/Error" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Error" },
           "409": { "$ref": "#/components/responses/Error" },
           "500": { "$ref": "#/components/responses/Error" }
         }
@@ -238,6 +239,8 @@
               "JOURNAL_FAILED",
               "JOURNAL_MISSING",
               "TRIAL_BALANCE_DRIFT",
+              "PAYABLE_NEGATIVE",
+              "FORBIDDEN",
               "UNAUTHORIZED"
             ]
           },

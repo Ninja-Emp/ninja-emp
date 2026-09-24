@@ -25,6 +25,18 @@ final class Money
         return new self($minor, $currency);
     }
 
+    public static function fromMinorString(string $minor, string $currency): self
+    {
+        if ($minor !== '0' && preg_match('/^[1-9][0-9]*$/', $minor) !== 1) {
+            throw new LedgerError('INVALID_MONEY', 'Money must be a canonical minor-unit string');
+        }
+        $limit = (string) PHP_INT_MAX;
+        if (strlen($minor) > strlen($limit) || (strlen($minor) === strlen($limit) && strcmp($minor, $limit) > 0)) {
+            throw new LedgerError('INVALID_MONEY', 'Money is too large');
+        }
+        return self::of((int) $minor, $currency);
+    }
+
     public static function zero(string $currency): self
     {
         return self::of(0, $currency);

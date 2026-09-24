@@ -1,0 +1,22 @@
+{
+    "source": {
+        "directories": ["src/Shared/Ledger"],
+        "excludes": [
+            "JournalRules.php",
+            "JournalLine.php",
+            "Posting.php",
+            "PostedJournal.php",
+            "LedgerError.php"
+        ]
+    },
+    "logs": {
+        "text": "php://stdout"
+    },
+    "minMsi": 100,
+    "minCoveredMsi": 100,
+    "testFrameworkOptions": "--filter MoneyTest|BarTest::testLedgerProof",
+    "mutators": {
+        "@default": true
+    },
+    "testFramework": "phpunit"
+}

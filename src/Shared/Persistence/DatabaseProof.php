@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace EmpPos\Shared\Persistence;
 
+use EmpPos\Shared\Scalar;
 use PDO;
 use PDOException;
 use RuntimeException;
@@ -39,7 +40,7 @@ final class DatabaseProof
      */
     public function prove(): array
     {
-        $database = $this->pdo->query('SELECT current_database()')->fetchColumn();
+        $database = Sql::column($this->pdo, 'SELECT current_database()');
         if ($database !== 'emp_pos') {
             throw new RuntimeException('Database proof refuses to write outside emp_pos');
         }
@@ -151,8 +152,8 @@ final class DatabaseProof
         if ($status->fetchColumn() !== 'demo') {
             throw new RuntimeException('Demo store is not in demo status');
         }
-        $journals = $this->pdo->query('SELECT COUNT(*) FROM journals')->fetchColumn();
-        if ((string) $journals !== '10') {
+        $journals = Sql::column($this->pdo, 'SELECT COUNT(*) FROM journals');
+        if (Scalar::string($journals, 'journals') !== '10') {
             throw new RuntimeException('Demo store does not have its ten journals');
         }
     }
@@ -205,7 +206,7 @@ final class DatabaseProof
 
     private function tipHash(): string
     {
-        $hash = $this->pdo->query('SELECT entry_hash FROM journals WHERE journal_no = 10')->fetchColumn();
+        $hash = Sql::column($this->pdo, 'SELECT entry_hash FROM journals WHERE journal_no = 10');
         if (!is_string($hash) || strlen(rtrim($hash)) !== 64) {
             throw new RuntimeException('Demo chain has no tip hash');
         }

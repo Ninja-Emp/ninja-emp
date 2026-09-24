@@ -68,7 +68,7 @@ final class Migrator
 
     private function checksum(string $key): ?string
     {
-        $ready = $this->pdo->query("SELECT to_regclass('public.schema_migrations')")->fetchColumn();
+        $ready = Sql::column($this->pdo, "SELECT to_regclass('public.schema_migrations')");
         if ($ready === false || $ready === null) {
             return null;
         }

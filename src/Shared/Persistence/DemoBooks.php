@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace EmpPos\Shared\Persistence;
 
 use EmpPos\Shared\Ledger\JournalHash;
+use EmpPos\Shared\Scalar;
 use PDO;
 use RuntimeException;
 
@@ -22,53 +23,61 @@ final class DemoBooks
 
     private function assertBalanced(PDO $pdo): void
     {
-        $row = $pdo->query(
+        $statement = Sql::statement(
+            $pdo,
             'SELECT COALESCE(SUM(debit_minor), 0) AS debit, COALESCE(SUM(credit_minor), 0) AS credit FROM journal_lines',
-        )->fetch();
-        if ($row === false || (string) $row['debit'] !== (string) $row['credit']) {
+        );
+        $fetched = $statement->fetch();
+        if ($fetched === false) {
+            throw new RuntimeException('Demo journals are not balanced');
+        }
+        $row = Scalar::row($fetched);
+        if (Scalar::text($row, 'debit') !== Scalar::text($row, 'credit')) {
             throw new RuntimeException('Demo journals are not balanced');
         }
     }
 
     private function assertHashes(PDO $pdo): void
     {
-        $journals = $pdo->query(
+        $journals = Sql::rows(
+            $pdo,
             "SELECT journal_id::text AS journal_id, journal_no::text AS journal_no, posting_key, posting_date::text AS posting_date,
                     to_char(occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS occurred_at,
                     period_id::text AS period_id, currency, source_type, source_reference, description,
                     is_reversal, reverses_journal_id::text AS reverses_journal_id, prev_hash, entry_hash, hash_scheme
              FROM journals
              ORDER BY journals.journal_no",
-        )->fetchAll();
+        );
         if ($journals === []) {
             throw new RuntimeException('Demo store has no journals');
         }
         $prev = null;
         foreach ($journals as $journal) {
-            if ((int) $journal['hash_scheme'] !== JournalHash::SCHEME_V2) {
-                throw new RuntimeException('Demo journal ' . $journal['journal_no'] . ' is not hash scheme v2');
+            if (Scalar::int($journal, 'hash_scheme') !== JournalHash::SCHEME_V2) {
+                throw new RuntimeException('Demo journal ' . Scalar::text($journal, 'journal_no') . ' is not hash scheme v2');
             }
-            $lines = $this->lines($pdo, (string) $journal['journal_id']);
+            $lines = $this->lines($pdo, Scalar::text($journal, 'journal_id'));
             $payload = JournalHash::payloadV2(
-                (string) $journal['posting_key'],
-                (string) $journal['posting_date'],
-                (string) $journal['occurred_at'],
-                (string) $journal['period_id'],
-                (string) $journal['journal_no'],
-                (string) $journal['currency'],
-                (string) $journal['source_type'],
-                $journal['source_reference'] !== null ? (string) $journal['source_reference'] : null,
-                (string) $journal['description'],
+                Scalar::text($journal, 'posting_key'),
+                Scalar::text($journal, 'posting_date'),
+                Scalar::text($journal, 'occurred_at'),
+                Scalar::text($journal, 'period_id'),
+                Scalar::text($journal, 'journal_no'),
+                rtrim(Scalar::text($journal, 'currency')),
+                Scalar::text($journal, 'source_type'),
+                Scalar::nullableText($journal, 'source_reference'),
+                Scalar::text($journal, 'description'),
                 $this->pgBool($journal['is_reversal']),
-                $journal['reverses_journal_id'] !== null ? (string) $journal['reverses_journal_id'] : null,
+                Scalar::nullableText($journal, 'reverses_journal_id'),
                 $lines,
             );
             $hash = JournalHash::hash($prev, $payload);
-            if (!hash_equals($hash, (string) $journal['entry_hash'])) {
-                throw new RuntimeException('Demo journal ' . $journal['journal_no'] . ' hash does not match its lines');
+            if (!hash_equals($hash, rtrim(Scalar::text($journal, 'entry_hash')))) {
+                throw new RuntimeException('Demo journal ' . Scalar::text($journal, 'journal_no') . ' hash does not match its lines');
             }
-            if ($prev !== null && (string) $journal['prev_hash'] !== $prev) {
-                throw new RuntimeException('Demo journal ' . $journal['journal_no'] . ' broke the hash chain');
+            $prevHash = Scalar::nullableText($journal, 'prev_hash');
+            if ($prev !== null && $prevHash !== $prev) {
+                throw new RuntimeException('Demo journal ' . Scalar::text($journal, 'journal_no') . ' broke the hash chain');
             }
             $prev = $hash;
         }
@@ -90,12 +99,13 @@ final class DemoBooks
         $select->execute([$journalId]);
         $lines = [];
         foreach ($select->fetchAll() as $line) {
+            $row = Scalar::row($line);
             $lines[] = [
-                'accountCode' => (string) $line['account_code'],
-                'debitMinor' => (string) $line['debit_minor'],
-                'creditMinor' => (string) $line['credit_minor'],
-                'subledgerType' => $line['subledger_type'] !== null ? (string) $line['subledger_type'] : null,
-                'subledgerRef' => $line['subledger_ref'] !== null ? (string) $line['subledger_ref'] : null,
+                'accountCode' => Scalar::text($row, 'account_code'),
+                'debitMinor' => Scalar::text($row, 'debit_minor'),
+                'creditMinor' => Scalar::text($row, 'credit_minor'),
+                'subledgerType' => Scalar::nullableText($row, 'subledger_type'),
+                'subledgerRef' => Scalar::nullableText($row, 'subledger_ref'),
             ];
         }
         return $lines;
@@ -121,28 +131,36 @@ final class DemoBooks
             '4000' => '-4000',
             '4100' => '-8000',
         ];
-        $rows = $pdo->query(
+        $rows = Sql::rows(
+            $pdo,
             'SELECT a.code, COALESCE(SUM(l.debit_minor - l.credit_minor), 0)::text AS net
              FROM accounts a
              LEFT JOIN journal_lines l ON l.account_id = a.account_id
              WHERE a.code IN (\'1000\', \'1010\', \'1300\', \'1310\', \'2000\', \'3000\', \'4000\', \'4100\')
              GROUP BY a.code
              ORDER BY a.code',
-        )->fetchAll();
+        );
         $found = [];
         foreach ($rows as $row) {
-            $found[(string) $row['code']] = (string) $row['net'];
+            $found[Scalar::text($row, 'code')] = Scalar::text($row, 'net');
         }
+        $matched = 0;
         foreach ($expected as $code => $net) {
-            if (($found[$code] ?? null) !== $net) {
-                throw new RuntimeException('Demo account ' . $code . ' net is not ' . $net);
+            foreach ($found as $actualCode => $actualNet) {
+                if ((string) $actualCode === (string) $code && $actualNet === $net) {
+                    $matched++;
+                }
             }
+        }
+        if ($matched !== count($expected)) {
+            throw new RuntimeException('Demo account nets do not match');
         }
     }
 
     private function assertPayableNeverNegative(PDO $pdo): void
     {
-        $rows = $pdo->query(
+        $rows = Sql::rows(
+            $pdo,
             "SELECT j.journal_no, COALESCE(SUM(l.credit_minor - l.debit_minor), 0)::text AS delta
              FROM journals j
              JOIN journal_lines l ON l.journal_id = j.journal_id
@@ -150,32 +168,34 @@ final class DemoBooks
              WHERE a.code = '2000'
              GROUP BY j.journal_no
              ORDER BY j.journal_no",
-        )->fetchAll();
+        );
         $balance = 0;
         foreach ($rows as $row) {
-            $balance += (int) $row['delta'];
+            $balance += Scalar::int($row, 'delta');
             if ($balance < 0) {
-                throw new RuntimeException('Demo payable went negative at journal ' . $row['journal_no']);
+                throw new RuntimeException('Demo payable went negative at journal ' . Scalar::text($row, 'journal_no'));
             }
         }
     }
 
     private function assertRentDoesNotTouchPayable(PDO $pdo): void
     {
-        $count = $pdo->query(
+        $count = Sql::column(
+            $pdo,
             "SELECT COUNT(*) FROM journal_lines l
              JOIN journals j ON j.journal_id = l.journal_id
              JOIN accounts a ON a.account_id = l.account_id
              WHERE j.source_type = 'rent_receipt' AND a.code = '2000'",
-        )->fetchColumn();
-        if ((string) $count !== '0') {
+        );
+        if (Scalar::string($count, 'count') !== '0') {
             throw new RuntimeException('A rent receipt debited payable');
         }
     }
 
     private function assertOnlyNamedApply(PDO $pdo): void
     {
-        $rows = $pdo->query(
+        $rows = Sql::rows(
+            $pdo,
             "SELECT j.source_type
              FROM journals j
              WHERE EXISTS (
@@ -189,8 +209,8 @@ final class DemoBooks
                  WHERE l.journal_id = j.journal_id AND a.code = '1300'
              )
              ORDER BY j.journal_no",
-        )->fetchAll();
-        if (count($rows) !== 1 || (string) $rows[0]['source_type'] !== 'payable_rent_settlement') {
+        );
+        if (count($rows) !== 1 || Scalar::text($rows[0], 'source_type') !== 'payable_rent_settlement') {
             throw new RuntimeException('Payable moved to rent outside the named apply');
         }
     }

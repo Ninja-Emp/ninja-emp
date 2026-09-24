@@ -197,7 +197,7 @@ function proveIdentity(array $doc): void
         }
     }
     $enum = requireArray(requireArray(requireArray($schemas, 'Error'), 'properties'), 'errorCode')['enum'] ?? null;
-    foreach (['INVALID_EMAIL', 'INVALID_PASSWORD', 'SLUG_TAKEN', 'EMAIL_TAKEN', 'UNAUTHORIZED', 'CSRF_INVALID'] as $code) {
+        foreach (['INVALID_EMAIL', 'INVALID_PASSWORD', 'INVALID_SLUG', 'INVALID_CURRENCY', 'SLUG_TAKEN', 'EMAIL_TAKEN', 'UNAUTHORIZED', 'CSRF_INVALID'] as $code) {
         if (!is_array($enum) || !in_array($code, $enum, true)) {
             fail('Identity error code ' . $code . ' is missing');
         }

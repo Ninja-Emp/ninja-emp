@@ -3,13 +3,36 @@
   "description": "One PHP application on the EMP books.",
   "type": "project",
   "require": {
-    "php": "^8.5"
+    "php": "^8.5",
+    "ext-pdo": "*"
   },
   "autoload": {
     "psr-4": {
       "EmpPos\\": "src/"
     }
   },
+  "autoload-dev": {
+    "psr-4": {
+      "EmpPos\\Tests\\": "tests/"
+    }
+  },
+  "require-dev": {
+    "infection/infection": "^0.35",
+    "phpmd/phpmd": "2.15.0",
+    "phpstan/phpstan": "^2.1",
+    "phpunit/phpunit": "13.0.0"
+  },
+  "config": {
+    "allow-plugins": {
+      "infection/extension-installer": true
+    }
+  },
   "minimum-stability": "stable",
-  "prefer-stable": true
+  "prefer-stable": true,
+  "scripts": {
+    "phpstan": "phpstan analyse --memory-limit=512M",
+    "probe:phpmd": "php -d error_reporting=\"E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED\" bin/phpmd-probe-rule.php",
+    "check:phpmd": "php -d error_reporting=\"E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED\" vendor/bin/phpmd src text phpmd.xml",
+    "test": "phpunit"
+  }
 }

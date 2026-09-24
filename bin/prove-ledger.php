@@ -13,16 +13,31 @@ use EmpPos\Shared\Ledger\TrialBalance;
 use EmpPos\Shared\Persistence\Database;
 use EmpPos\Shared\Persistence\DemoSeeder;
 
+function proveLedger(): void
+{
 $pdo = Database::connectFromEnv();
 $database = $pdo->query('SELECT current_database()')->fetchColumn();
 if ($database !== 'emp_pos') {
-    fwrite(STDERR, "Ledger proof refuses to write outside emp_pos\n");
-    exit(1);
+    throw new RuntimeException('Ledger proof refuses to write outside emp_pos');
 }
 $pdo->exec('SET search_path TO "' . DemoSeeder::SCHEMA . '", public');
+$journalsBefore = $pdo->query('SELECT COUNT(*) FROM journals')->fetchColumn();
 $poster = new LedgerPoster($pdo);
 $trial = new TrialBalance($pdo);
 $party = '018f0000-0000-7000-8000-000000000020';
+
+expectCode($poster, 'JOURNAL_FAILED', static fn (): mixed => $poster->post(new Posting(
+    'je:proof:outside',
+    '2026-09-12',
+    '2026-09-12T18:00:00.000Z',
+    'USD',
+    'owner_capital',
+    'Outside',
+    [
+        new JournalLine('1010', Money::of(100, 'USD'), Money::zero('USD')),
+        new JournalLine('3000', Money::zero('USD'), Money::of(100, 'USD')),
+    ],
+)));
 
 $pdo->beginTransaction();
 try {
@@ -57,6 +72,81 @@ try {
     if (!$again->reused() || $again->journalId() !== $first->journalId()) {
         throw new RuntimeException('The same posting key appended a second journal');
     }
+    expectCode($poster, 'JOURNAL_INVALID', static fn (): mixed => $poster->post(new Posting(
+        '',
+        '2026-09-12',
+        '2026-09-12T18:00:00.000Z',
+        'USD',
+        'owner_capital',
+        'Missing key',
+        [
+            new JournalLine('1010', Money::of(100, 'USD'), Money::zero('USD')),
+            new JournalLine('3000', Money::zero('USD'), Money::of(100, 'USD')),
+        ],
+    )));
+    expectCode($poster, 'JOURNAL_INVALID', static fn (): mixed => $poster->post(new Posting(
+        'je:proof:blank',
+        '2026-09-12',
+        '2026-09-12T18:00:00.000Z',
+        'USD',
+        'owner_capital',
+        '',
+        [
+            new JournalLine('1010', Money::of(100, 'USD'), Money::zero('USD')),
+            new JournalLine('3000', Money::zero('USD'), Money::of(100, 'USD')),
+        ],
+    )));
+    expectCode($poster, 'JOURNAL_INVALID', static fn (): mixed => $poster->post(new Posting(
+        'je:proof:date',
+        '09-12-2026',
+        '2026-09-12T18:00:00.000Z',
+        'USD',
+        'owner_capital',
+        'Bad date',
+        [
+            new JournalLine('1010', Money::of(100, 'USD'), Money::zero('USD')),
+            new JournalLine('3000', Money::zero('USD'), Money::of(100, 'USD')),
+        ],
+    )));
+    expectCode($poster, 'JOURNAL_INVALID', static fn (): mixed => $poster->post(new Posting(
+        'je:proof:time',
+        '2026-09-12',
+        '2026-09-12 18:00:00',
+        'USD',
+        'owner_capital',
+        'Bad time',
+        [
+            new JournalLine('1010', Money::of(100, 'USD'), Money::zero('USD')),
+            new JournalLine('3000', Money::zero('USD'), Money::of(100, 'USD')),
+        ],
+    )));
+    expectCode($poster, 'JOURNAL_INVALID', static fn (): mixed => $poster->post(new Posting(
+        'je:proof:reversal',
+        '2026-09-12',
+        '2026-09-12T18:00:00.000Z',
+        'USD',
+        'owner_capital',
+        'Reversal',
+        [
+            new JournalLine('1010', Money::of(100, 'USD'), Money::zero('USD')),
+            new JournalLine('3000', Money::zero('USD'), Money::of(100, 'USD')),
+        ],
+        null,
+        true,
+        '',
+    )));
+    expectCode($poster, 'JOURNAL_LINE_INVALID', static fn (): mixed => $poster->post(new Posting(
+        'je:proof:both',
+        '2026-09-12',
+        '2026-09-12T18:00:00.000Z',
+        'USD',
+        'owner_capital',
+        'Both sides',
+        [
+            new JournalLine('1010', Money::of(100, 'USD'), Money::of(100, 'USD')),
+            new JournalLine('3000', Money::zero('USD'), Money::of(100, 'USD')),
+        ],
+    )));
     expectCode($poster, 'JOURNAL_UNBALANCED', static fn (): mixed => $poster->post(new Posting(
         'je:proof:one-line',
         '2026-09-12',
@@ -103,6 +193,18 @@ try {
         ],
     )));
     expectCode($poster, 'CURRENCY_MISMATCH', static fn (): mixed => $poster->post(new Posting(
+        'je:proof:line-cad',
+        '2026-09-12',
+        '2026-09-12T18:00:00.000Z',
+        'USD',
+        'owner_capital',
+        'Line currency',
+        [
+            new JournalLine('1010', Money::of(100, 'CAD'), Money::zero('CAD')),
+            new JournalLine('3000', Money::zero('USD'), Money::of(100, 'USD')),
+        ],
+    )));
+    expectCode($poster, 'CURRENCY_MISMATCH', static fn (): mixed => $poster->post(new Posting(
         'je:proof:cad',
         '2026-09-12',
         '2026-09-12T18:00:00.000Z',
@@ -114,10 +216,22 @@ try {
             new JournalLine('3000', Money::zero('CAD'), Money::of(100, 'CAD')),
         ],
     )));
+    $poster->post(new Posting(
+        'je:proof:payable-credit',
+        '2026-09-12',
+        '2026-09-12T18:01:00.000Z',
+        'USD',
+        'owner_capital',
+        'Payable credit',
+        [
+            new JournalLine('1010', Money::of(100, 'USD'), Money::zero('USD')),
+            new JournalLine('2000', Money::zero('USD'), Money::of(100, 'USD'), 'party', $party),
+        ],
+    ));
     $posted = $poster->post(new Posting(
         'je:proof:party',
         '2026-09-12',
-        '2026-09-12T18:01:00.000Z',
+        '2026-09-12T18:02:00.000Z',
         'USD',
         'payable_rent_settlement',
         'Named apply',
@@ -126,9 +240,21 @@ try {
             new JournalLine('1300', Money::zero('USD'), Money::of(100, 'USD'), 'party', $party),
         ],
     ));
-    if ($posted->reused() || $posted->journalNo() !== '12') {
+    if ($posted->reused() || (int) $posted->journalNo() <= (int) $first->journalNo()) {
         throw new RuntimeException('Party lines did not post');
     }
+    expectCode($poster, 'PAYABLE_NEGATIVE', static fn (): mixed => $poster->post(new Posting(
+        'je:proof:negative',
+        '2026-09-12',
+        '2026-09-12T18:03:00.000Z',
+        'USD',
+        'holder_payout',
+        'Overpay',
+        [
+            new JournalLine('2000', Money::of(1, 'USD'), Money::zero('USD'), 'party', $party),
+            new JournalLine('1010', Money::zero('USD'), Money::of(1, 'USD')),
+        ],
+    )));
     $trial->assertBalanced();
     $pdo->rollBack();
 } catch (Throwable $error) {
@@ -149,6 +275,30 @@ try {
         'USD',
         'owner_capital',
         'Closed month',
+        [
+            new JournalLine('1010', Money::of(100, 'USD'), Money::zero('USD')),
+            new JournalLine('3000', Money::zero('USD'), Money::of(100, 'USD')),
+        ],
+    )));
+    $pdo->rollBack();
+} catch (Throwable $error) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    throw $error;
+}
+
+$pdo->beginTransaction();
+try {
+    $update = $pdo->prepare("UPDATE accounting_periods SET status = 'soft_closed' WHERE starts_on = '2026-09-01'");
+    $update->execute();
+    expectCode($poster, 'PERIOD_REVIEW', static fn (): mixed => $poster->post(new Posting(
+        'je:proof:review',
+        '2026-09-12',
+        '2026-09-12T18:00:00.000Z',
+        'USD',
+        'owner_capital',
+        'Month in review',
         [
             new JournalLine('1010', Money::of(100, 'USD'), Money::zero('USD')),
             new JournalLine('3000', Money::zero('USD'), Money::of(100, 'USD')),
@@ -195,11 +345,11 @@ try {
 }
 
 $count = $pdo->query('SELECT COUNT(*) FROM journals')->fetchColumn();
-if ((string) $count !== '10') {
-    fwrite(STDERR, "Demo journals changed\n");
-    exit(1);
+if ((string) $count !== (string) $journalsBefore) {
+    throw new RuntimeException('Demo journals changed');
 }
 fwrite(STDOUT, "ledger holds\n");
+}
 
 function expectCode(LedgerPoster $poster, string $code, callable $action): void
 {
@@ -212,4 +362,13 @@ function expectCode(LedgerPoster $poster, string $code, callable $action): void
         throw $error;
     }
     throw new RuntimeException($code . ' was allowed');
+}
+
+if (PHP_SAPI === 'cli' && realpath((string) ($_SERVER['SCRIPT_FILENAME'] ?? '')) === __FILE__) {
+    try {
+        proveLedger();
+    } catch (Throwable $error) {
+        fwrite(STDERR, $error->getMessage() . "\n");
+        exit(1);
+    }
 }

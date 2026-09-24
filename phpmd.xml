@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="emp-pos"
+    xmlns="http://pmd.sf.net/ruleset/1.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://pmd.sf.net/ruleset/1.0.0 http://pmd.sf.net/ruleset_xml_schema.xsd"
+    xsi:noNamespaceSchemaLocation="http://pmd.sf.net/ruleset_xml_schema.xsd">
+    <description>Append a rule only after composer run probe:phpmd exits with zero violations under src/.</description>
+    <exclude-pattern>*/vendor/*</exclude-pattern>
+    <exclude-pattern>*/tests/*</exclude-pattern>
+    <rule ref="rulesets/codesize.xml/ExcessiveClassLength">
+        <properties>
+            <property name="minimum" value="500"/>
+        </properties>
+    </rule>
+</ruleset>

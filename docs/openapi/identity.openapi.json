@@ -120,7 +120,7 @@
         "properties": {
           "errorCode": {
             "type": "string",
-            "enum": ["INVALID_EMAIL", "INVALID_PASSWORD", "SLUG_TAKEN", "EMAIL_TAKEN", "UNAUTHORIZED", "CSRF_INVALID"]
+            "enum": ["INVALID_EMAIL", "INVALID_PASSWORD", "INVALID_SLUG", "INVALID_CURRENCY", "SLUG_TAKEN", "EMAIL_TAKEN", "UNAUTHORIZED", "CSRF_INVALID"]
           },
           "message": { "type": "string" }
         }

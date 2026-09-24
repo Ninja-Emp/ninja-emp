@@ -1,0 +1,9 @@
+parameters:
+    level: 10
+    phpVersion:
+        min: 80500
+        max: 80599
+    treatPhpDocTypesAsCertain: false
+    paths:
+        - src
+    reportUnmatchedIgnoredErrors: true

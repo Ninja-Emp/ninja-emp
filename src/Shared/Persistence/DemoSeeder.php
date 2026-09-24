@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace EmpPos\Shared\Persistence;
 
+use EmpPos\Shared\Scalar;
 use PDO;
 
 final class DemoSeeder
@@ -56,8 +57,9 @@ final class DemoSeeder
         if ($row === false) {
             return;
         }
-        $status = (string) $row['status'];
-        $schema = (string) $row['schema_name'];
+        $row = Scalar::row($row);
+        $status = Scalar::text($row, 'status');
+        $schema = Scalar::text($row, 'schema_name');
         if ($status !== 'demo') {
             throw new WipeRefused('Wipe refused: store is live');
         }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace EmpPos\Shared\Persistence;
 
+use EmpPos\Shared\Scalar;
 use PDO;
 use RuntimeException;
 
@@ -83,13 +84,14 @@ final class CatalogProof
 
     private function nestTenant(PDO $nest): string
     {
-        $schema = $nest->query(
+        $schema = Sql::column(
+            $nest,
             "SELECT substring(migration_key FROM '^tenant:(tenant_[a-z0-9_]+):066_intake_defaults_off\\.sql$')
              FROM public.schema_migrations
              WHERE migration_key LIKE '%:066_intake_defaults_off.sql'
              ORDER BY 1
              LIMIT 1",
-        )->fetchColumn();
+        );
         if (!is_string($schema) || $schema === '') {
             throw new RuntimeException('No Nest tenant is at migration 066');
         }
@@ -108,7 +110,10 @@ final class CatalogProof
             $select = $pdo->prepare($sql);
             $select->execute([$schema]);
             foreach ($select->fetchAll(PDO::FETCH_NUM) as $row) {
-                foreach (explode("\n", (string) $row[0]) as $line) {
+                if (!is_array($row) || !array_key_exists(0, $row)) {
+                    throw new RuntimeException('Catalog row is not an array');
+                }
+                foreach (explode("\n", Scalar::string($row[0], 'snapshot')) as $line) {
                     $lines[] = $this->normalize($line, $schema);
                 }
             }
@@ -204,10 +209,13 @@ final class CatalogProof
     {
         $query = str_replace('__SCHEMA__', $this->ident($schema), $sql);
         $lines = [];
-        foreach ($pdo->query($query)->fetchAll(PDO::FETCH_NUM) as $row) {
+        foreach (Sql::statement($pdo, $query)->fetchAll(PDO::FETCH_NUM) as $row) {
+            if (!is_array($row)) {
+                throw new RuntimeException('Catalog row is not an array');
+            }
             $parts = [];
             foreach ($row as $value) {
-                $parts[] = $value === null ? '' : (string) $value;
+                $parts[] = $value === null ? '' : Scalar::string($value, 'catalog');
             }
             $lines[] = implode('|', $parts);
         }
@@ -228,7 +236,7 @@ final class CatalogProof
         $select->execute([$schema, 'store_settings']);
         $columns = [];
         foreach ($select->fetchAll() as $row) {
-            $name = (string) $row['column_name'];
+            $name = Scalar::text(Scalar::row($row), 'column_name');
             if (preg_match('/^[a-z_][a-z0-9_]*$/', $name) !== 1) {
                 throw new RuntimeException('Unexpected settings column');
             }
@@ -238,14 +246,14 @@ final class CatalogProof
             throw new RuntimeException('store_settings is missing');
         }
         $list = implode(', ', array_map(static fn (string $name): string => '"' . $name . '"::text', $columns));
-        $row = $pdo->query('SELECT ' . $list . ' FROM ' . $this->ident($schema) . '.store_settings')->fetch();
-        if ($row === false) {
+        $fetched = Sql::statement($pdo, 'SELECT ' . $list . ' FROM ' . $this->ident($schema) . '.store_settings')->fetch();
+        if ($fetched === false) {
             throw new RuntimeException('store_settings has no row');
         }
+        $row = Scalar::row($fetched);
         $out = [];
         foreach ($columns as $name) {
-            $value = $row[$name];
-            $out[$name] = $value === null ? '' : (string) $value;
+            $out[$name] = Scalar::nullableText($row, $name) ?? '';
         }
         return $out;
     }

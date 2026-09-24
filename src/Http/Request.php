@@ -48,6 +48,15 @@ final class Request
             return [];
         }
         $decoded = json_decode($this->body, true);
-        return is_array($decoded) ? $decoded : [];
+        if (!is_array($decoded)) {
+            return [];
+        }
+        $body = [];
+        foreach ($decoded as $key => $value) {
+            if (is_string($key)) {
+                $body[$key] = $value;
+            }
+        }
+        return $body;
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace EmpPos\Shared\Ledger;
 
+use EmpPos\Shared\Scalar;
 use PDO;
 use PDOException;
 
@@ -25,10 +26,10 @@ final class LedgerPoster
             return $existing;
         }
         $prepared = $this->prepare($posting);
+        $occurredAt = $this->occurredAt($posting->occurredAt());
         $periodId = $this->periodId($book['book_id'], $posting->postingDate(), $posting->reversal());
         $journalNo = $this->nextJournalNo($book['book_id']);
         $prevHash = $this->lockPrevHash($book['book_id']);
-        $occurredAt = $this->occurredAt($posting->occurredAt());
         $payload = JournalHash::payloadV2(
             $posting->postingKey(),
             $posting->postingDate(),
@@ -73,15 +74,20 @@ final class LedgerPoster
      */
     private function primaryBook(string $currency): array
     {
-        $row = $this->pdo->query("SELECT book_id::text AS book_id, currency FROM ledger_books WHERE code = 'PRIMARY'")->fetch();
-        if ($row === false) {
+        $statement = $this->pdo->query("SELECT book_id::text AS book_id, currency FROM ledger_books WHERE code = 'PRIMARY'");
+        if ($statement === false) {
+            throw new LedgerError('JOURNAL_FAILED', 'Primary book query failed');
+        }
+        $fetched = $statement->fetch();
+        if ($fetched === false) {
             throw new LedgerError('BOOK_MISSING', 'Primary book is not seeded');
         }
-        $bookCurrency = rtrim((string) $row['currency']);
+        $row = Scalar::row($fetched);
+        $bookCurrency = rtrim(Scalar::text($row, 'currency'));
         if ($bookCurrency !== $currency) {
             throw new LedgerError('CURRENCY_MISMATCH', 'Journal currency must match the store money');
         }
-        return ['book_id' => (string) $row['book_id'], 'currency' => $bookCurrency];
+        return ['book_id' => Scalar::text($row, 'book_id'), 'currency' => $bookCurrency];
     }
 
     private function findByPostingKey(string $bookId, string $postingKey): ?PostedJournal
@@ -90,11 +96,12 @@ final class LedgerPoster
             'SELECT journal_id::text AS journal_id, journal_no::text AS journal_no, posting_key FROM journals WHERE book_id = ? AND posting_key = ?',
         );
         $select->execute([$bookId, $postingKey]);
-        $row = $select->fetch();
-        if ($row === false) {
+        $fetched = $select->fetch();
+        if ($fetched === false) {
             return null;
         }
-        return new PostedJournal((string) $row['journal_id'], (string) $row['journal_no'], (string) $row['posting_key'], true);
+        $row = Scalar::row($fetched);
+        return new PostedJournal(Scalar::text($row, 'journal_id'), Scalar::text($row, 'journal_no'), Scalar::text($row, 'posting_key'), true);
     }
 
     /**
@@ -114,6 +121,7 @@ final class LedgerPoster
         if (count($posting->lines()) < 2) {
             throw new LedgerError('JOURNAL_UNBALANCED', 'A journal needs at least two lines');
         }
+        JournalRules::assert($posting);
         if ($posting->reversal() && ($posting->reversesJournalId() === null || $posting->reversesJournalId() === '')) {
             throw new LedgerError('JOURNAL_INVALID', 'A reversal must name the journal it reverses');
         }
@@ -157,7 +165,63 @@ final class LedgerPoster
         if ($debit !== $credit) {
             throw new LedgerError('JOURNAL_UNBALANCED', 'Debits must equal credits');
         }
+        $this->assertPayable($posting);
         return ['debit' => $debit, 'credit' => $credit, 'hashLines' => $hashLines, 'rows' => $rows];
+    }
+
+    private function assertPayable(Posting $posting): void
+    {
+        /** @var array<string, int> $deltaByParty */
+        $deltaByParty = [];
+        $accountDelta = 0;
+        $sawAccount = false;
+        foreach ($posting->lines() as $line) {
+            if ($line->accountCode() !== '2000') {
+                continue;
+            }
+            $delta = $line->credit()->minor() - $line->debit()->minor();
+            $accountDelta += $delta;
+            $sawAccount = true;
+            $party = $line->subledgerRef();
+            if ($party === null || $party === '') {
+                continue;
+            }
+            $deltaByParty[$party] = ($deltaByParty[$party] ?? 0) + $delta;
+        }
+        if (!$sawAccount) {
+            return;
+        }
+        foreach ($deltaByParty as $party => $delta) {
+            $this->assertPayableBalance($delta, $party);
+        }
+        if ($deltaByParty === []) {
+            $this->assertPayableBalance($accountDelta, null);
+        }
+    }
+
+    private function assertPayableBalance(int $delta, ?string $party): void
+    {
+        if ($party === null) {
+            $select = $this->pdo->prepare(
+                "SELECT (COALESCE(SUM(l.credit_minor - l.debit_minor), 0) + ?::bigint)::text AS owed
+                 FROM journal_lines l
+                 JOIN accounts a ON a.account_id = l.account_id
+                 WHERE a.code = '2000'",
+            );
+            $select->execute([$delta]);
+        } else {
+            $select = $this->pdo->prepare(
+                "SELECT (COALESCE(SUM(l.credit_minor - l.debit_minor), 0) + ?::bigint)::text AS owed
+                 FROM journal_lines l
+                 JOIN accounts a ON a.account_id = l.account_id
+                 WHERE a.code = '2000' AND l.subledger_ref = ?",
+            );
+            $select->execute([$delta, $party]);
+        }
+        $owed = $select->fetchColumn();
+        if ($owed === false || str_starts_with((string) $owed, '-')) {
+            throw new LedgerError('PAYABLE_NEGATIVE', 'Payable cannot go negative');
+        }
     }
 
     /**
@@ -169,30 +233,35 @@ final class LedgerPoster
             'SELECT account_id::text AS account_id, is_postable, is_control, subledger_type FROM accounts WHERE code = ?',
         );
         $select->execute([$code]);
-        $row = $select->fetch();
-        if ($row === false) {
+        $fetched = $select->fetch();
+        if ($fetched === false) {
             throw new LedgerError('ACCOUNT_MISSING', 'Account ' . $code . ' is not on the chart');
         }
+        $row = Scalar::row($fetched);
         if (!$this->pgBool($row['is_postable'])) {
             throw new LedgerError('ACCOUNT_NOT_POSTABLE', 'Account ' . $code . ' cannot be posted');
         }
         return [
-            'id' => (string) $row['account_id'],
+            'id' => Scalar::text($row, 'account_id'),
             'control' => $this->pgBool($row['is_control']),
-            'subledger' => (string) ($row['subledger_type'] ?? ''),
+            'subledger' => Scalar::nullableText($row, 'subledger_type') ?? '',
         ];
     }
 
     private function periodId(string $bookId, string $postingDate, bool $reversal): string
     {
         $start = substr($postingDate, 0, 8) . '01';
-        $end = substr($postingDate, 0, 8) . sprintf('%02d', (int) date('t', strtotime($postingDate . ' UTC')));
+        $timestamp = strtotime($postingDate . ' UTC');
+        if ($timestamp === false) {
+            throw new LedgerError('JOURNAL_INVALID', 'Posting date must be an ISO date');
+        }
+        $end = substr($postingDate, 0, 8) . sprintf('%02d', (int) date('t', $timestamp));
         $select = $this->pdo->prepare(
             'SELECT period_id::text AS period_id, status FROM accounting_periods WHERE book_id = ? AND starts_on = ? AND ends_on = ?',
         );
         $select->execute([$bookId, $start, $end]);
-        $row = $select->fetch();
-        if ($row === false) {
+        $fetched = $select->fetch();
+        if ($fetched === false) {
             $insert = $this->pdo->prepare(
                 "INSERT INTO accounting_periods (book_id, starts_on, ends_on, status) VALUES (?, ?, ?, 'open') RETURNING period_id::text AS period_id",
             );
@@ -201,16 +270,17 @@ final class LedgerPoster
             if ($created === false) {
                 throw new LedgerError('PERIOD_FAILED', 'Could not open the month');
             }
-            return (string) $created['period_id'];
+            return Scalar::text(Scalar::row($created), 'period_id');
         }
-        $status = (string) $row['status'];
+        $row = Scalar::row($fetched);
+        $status = Scalar::text($row, 'status');
         if ($status === 'hard_closed') {
             throw new LedgerError('PERIOD_CLOSED', 'That month is closed');
         }
         if ($status === 'soft_closed' && !$reversal) {
             throw new LedgerError('PERIOD_REVIEW', 'That month is being reviewed');
         }
-        return (string) $row['period_id'];
+        return Scalar::text($row, 'period_id');
     }
 
     private function nextJournalNo(string $bookId): string
@@ -223,11 +293,15 @@ final class LedgerPoster
             "UPDATE accounting_sequences SET next_value = next_value + 1 WHERE book_id = ? AND scope = 'journal' RETURNING (next_value - 1)::text AS consumed",
         );
         $update->execute([$bookId]);
-        $row = $update->fetch();
-        if ($row === false || preg_match('/^[1-9][0-9]*$/', (string) $row['consumed']) !== 1) {
+        $fetched = $update->fetch();
+        if ($fetched === false) {
             throw new LedgerError('JOURNAL_FAILED', 'Journal sequence did not advance');
         }
-        return (string) $row['consumed'];
+        $consumed = Scalar::text(Scalar::row($fetched), 'consumed');
+        if (preg_match('/^[1-9][0-9]*$/', $consumed) !== 1) {
+            throw new LedgerError('JOURNAL_FAILED', 'Journal sequence did not advance');
+        }
+        return $consumed;
     }
 
     private function lockPrevHash(string $bookId): ?string
@@ -285,11 +359,11 @@ final class LedgerPoster
             $entryHash,
             JournalHash::SCHEME_V2,
         ]);
-        $row = $insert->fetch();
-        if ($row === false) {
+        $fetched = $insert->fetch();
+        if ($fetched === false) {
             throw new LedgerError('JOURNAL_FAILED', 'Journal insert returned no row');
         }
-        return (string) $row['journal_id'];
+        return Scalar::text(Scalar::row($fetched), 'journal_id');
     }
 
     /**

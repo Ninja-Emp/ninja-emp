@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace EmpPos\Shared\Ledger;
 
+use EmpPos\Shared\Scalar;
 use PDO;
 
 final class TrialBalance
@@ -19,39 +20,55 @@ final class TrialBalance
     }
 
     /**
-     * @return array{currency: string, rows: list<array{code: string, debitMinor: string, creditMinor: string}>, totalDebitMinor: string, totalCreditMinor: string}
+     * @return array{currency: string, rows: list<array{code: string, name: string, debitMinor: string, creditMinor: string}>, totalDebitMinor: string, totalCreditMinor: string}
      */
     public function report(): array
     {
-        $rows = $this->pdo->query(
+        $lines = $this->statement(
             "SELECT a.code, a.name, COALESCE(SUM(l.debit_minor), 0)::text AS debit, COALESCE(SUM(l.credit_minor), 0)::text AS credit
              FROM accounts a
              LEFT JOIN journal_lines l ON l.account_id = a.account_id
              GROUP BY a.code, a.name
              ORDER BY a.code",
-        )->fetchAll();
-        $book = $this->pdo->query("SELECT currency FROM ledger_books WHERE code = 'PRIMARY'")->fetch();
-        $debit = 0;
-        $credit = 0;
-        $out = [];
-        foreach ($rows as $row) {
-            $debit += (int) $row['debit'];
-            $credit += (int) $row['credit'];
-            $out[] = [
-                'code' => (string) $row['code'],
-                'name' => (string) $row['name'],
-                'debitMinor' => (string) $row['debit'],
-                'creditMinor' => (string) $row['credit'],
-            ];
+        );
+        $totals = $this->statement(
+            'SELECT COALESCE(SUM(debit_minor), 0)::text AS debit, COALESCE(SUM(credit_minor), 0)::text AS credit FROM journal_lines',
+        )->fetch();
+        $book = $this->statement("SELECT currency FROM ledger_books WHERE code = 'PRIMARY'")->fetch();
+        if ($totals === false || $book === false) {
+            throw new LedgerError('TRIAL_BALANCE_DRIFT', 'The books are out of balance');
         }
+        $totalRow = Scalar::row($totals);
+        $bookRow = Scalar::row($book);
+        $debit = Scalar::text($totalRow, 'debit');
+        $credit = Scalar::text($totalRow, 'credit');
         if ($debit !== $credit) {
             throw new LedgerError('TRIAL_BALANCE_DRIFT', 'The books are out of balance');
         }
+        $out = [];
+        foreach ($lines->fetchAll() as $row) {
+            $item = Scalar::row($row);
+            $out[] = [
+                'code' => Scalar::text($item, 'code'),
+                'name' => Scalar::text($item, 'name'),
+                'debitMinor' => Scalar::text($item, 'debit'),
+                'creditMinor' => Scalar::text($item, 'credit'),
+            ];
+        }
         return [
-            'currency' => rtrim((string) ($book['currency'] ?? '')),
+            'currency' => rtrim(Scalar::text($bookRow, 'currency')),
             'rows' => $out,
-            'totalDebitMinor' => (string) $debit,
-            'totalCreditMinor' => (string) $credit,
+            'totalDebitMinor' => $debit,
+            'totalCreditMinor' => $credit,
         ];
+    }
+
+    private function statement(string $sql): \PDOStatement
+    {
+        $statement = $this->pdo->query($sql);
+        if ($statement === false) {
+            throw new LedgerError('TRIAL_BALANCE_DRIFT', 'The books are out of balance');
+        }
+        return $statement;
     }
 }

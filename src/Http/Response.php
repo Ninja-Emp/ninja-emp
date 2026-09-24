@@ -40,12 +40,16 @@ final class Response
 
     /**
      * @param array<string, mixed> $body
+     * @param list<array{name: string, value: string, clear: bool}> $cookies
      */
     public static function json(int $status, array $body, array $cookies = []): self
     {
         return new self($status, $body, $cookies);
     }
 
+    /**
+     * @param list<array{name: string, value: string, clear: bool}> $cookies
+     */
     public static function empty(int $status, array $cookies = []): self
     {
         return new self($status, null, $cookies);
