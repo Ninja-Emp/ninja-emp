@@ -39,6 +39,27 @@ COMMENT ON DOMAIN kernel.fx_rate IS 'Exchange rate. 10 dp to avoid compounding r
 CREATE DOMAIN kernel.percent_rate AS numeric(9,6);
 COMMENT ON DOMAIN kernel.percent_rate IS 'A rate expressed as a fraction (0.075000 = 7.5%).';
 
+-- IANA timezone (ported from the sibling kernel). A bare `text` timezone column
+-- accepts 'Mars/Olympus' as happily as 'America/New_York', and the mistake only
+-- surfaces months later when a report is an hour off or a business-day boundary
+-- lands on the wrong date. pg_timezone_names is the authoritative IANA list, but
+-- a CHECK constraint cannot contain a subquery, so the membership test is
+-- reached through a function (same shape as kernel.money_scale_ok). STABLE, not
+-- IMMUTABLE: it reads a catalog view, and claiming immutability for a catalog
+-- read is a lie that bites at dump/restore.
+CREATE OR REPLACE FUNCTION kernel.is_iana_timezone(p_name text)
+RETURNS boolean
+LANGUAGE sql STABLE AS $$
+  SELECT p_name IS NOT NULL
+     AND EXISTS (SELECT 1 FROM pg_timezone_names tz WHERE tz.name = p_name)
+$$;
+COMMENT ON FUNCTION kernel.is_iana_timezone IS
+  'True when p_name is a valid IANA timezone name (pg_timezone_names).';
+
+CREATE DOMAIN kernel.iana_timezone AS text
+  CHECK (kernel.is_iana_timezone(VALUE));
+COMMENT ON DOMAIN kernel.iana_timezone IS 'IANA timezone name (e.g. America/New_York). Validated against pg_timezone_names.';
+
 -- ----------------------------------------------------------------------------
 -- Session-context helpers. The DBAL sets these per transaction via SET LOCAL.
 -- current_tenant() drives RLS defense-in-depth; NULL means "no tenant" -> no rows.

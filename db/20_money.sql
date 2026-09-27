@@ -17,7 +17,7 @@ CREATE TABLE tenant_config (
                            REFERENCES kernel.currency(code),
   fiscal_year_start_month smallint NOT NULL DEFAULT 1
                            CHECK (fiscal_year_start_month BETWEEN 1 AND 12),
-  timezone               text NOT NULL DEFAULT 'UTC',
+  timezone               kernel.iana_timezone NOT NULL DEFAULT 'UTC',
   created_at             timestamptz NOT NULL DEFAULT now(),
   created_by             uuid DEFAULT kernel.current_actor(),
   updated_at             timestamptz NOT NULL DEFAULT now(),
@@ -25,6 +25,15 @@ CREATE TABLE tenant_config (
   version                integer NOT NULL DEFAULT 1
 );
 COMMENT ON TABLE tenant_config IS 'One row per tenant. functional_currency is the ledger base currency.';
+
+-- SINGLETON TABLE (ported from the sibling kernel). The comment above has always
+-- claimed "exactly one row per tenant schema", but nothing enforced it: the
+-- primary key is tenant_id, so a second row with a different tenant_id (or a
+-- NULL-context insert) was accepted, and two competing configs then made
+-- functional_currency -- the base for every base_debit/base_credit -- ambiguous.
+-- A unique index on the constant expression `true` allows at most one row, so
+-- the invariant is now the database's, not the reader's.
+CREATE UNIQUE INDEX ux_tenant_config_singleton ON tenant_config ((true));
 
 CREATE TRIGGER trg_tenant_config_audit
   BEFORE UPDATE ON tenant_config

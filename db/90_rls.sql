@@ -80,4 +80,9 @@ ALTER TABLE journal_line  DISABLE ROW LEVEL SECURITY;
 COMMENT ON TABLE journal_entry IS 'Append-only journal header. RLS intentionally OFF (ADR-0007, measured 3x cost); relies on schema isolation.';
 COMMENT ON TABLE journal_line  IS 'Append-only journal lines. RLS intentionally OFF (ADR-0007, measured 3x cost); relies on schema isolation.';
 
+-- journal_counter is on the same hot path (locked FOR UPDATE on every posting)
+-- and is deliberately left without RLS for the same reason; isolation is by
+-- schema. It is not in the tenant-RLS list above, and that omission is
+-- intentional and auditable, not an oversight.
+
 DROP FUNCTION _apply_tenant_rls(text);

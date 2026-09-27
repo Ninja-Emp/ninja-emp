@@ -15,6 +15,7 @@
 set -uo pipefail
 
 DB="${NINJA_DB:-ninja_emp}"
+TENANT="${NINJA_TENANT:-tenant_demo}"
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 TESTDIR="$HERE/db/tests"
 OUT="$(mktemp -d)"
@@ -58,7 +59,24 @@ done
 printf '%-14s %6s %6s %6s\n' -------------- ------ ------ ------
 printf '%-14s %6s %6s %6s\n' TOTAL "$TOTAL" "$FAILED" "$ERRORED"
 
-if [[ $FAILED -gt 0 || $ERRORED -gt 0 ]]; then
+# --- Concurrency (race) proof harness ---------------------------------------
+# Two concurrent sessions per scenario, so it is slower than the SQL suites and
+# runs last. It is a hard gate: a missing lock (session B returns without
+# waiting) fails the run.
+RACE_RC=0
+if [[ "${NINJA_SKIP_RACE:-0}" != "1" ]]; then
+  printf '\n%-14s %s\n' race 'concurrency proof harness (counter/period/account/key)'
+  if PSQL="${PSQL:-sudo -u postgres psql}" bash "$TESTDIR/run-race.sh" "$TENANT" >"$OUT/race.log" 2>&1; then
+    grep '^RACE_OK' "$OUT/race.log" | sed 's/^/   /'
+  else
+    RACE_RC=1
+    echo "   ---- race output (last 40 lines) ----"
+    tail -40 "$OUT/race.log" | sed 's/^/   /'
+    echo "   ------------------------------------"
+  fi
+fi
+
+if [[ $FAILED -gt 0 || $ERRORED -gt 0 || $RACE_RC -gt 0 ]]; then
   echo "RESULT: RED"
   exit 1
 fi

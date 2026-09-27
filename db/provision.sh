@@ -54,6 +54,12 @@ $PSQL -d "$TENANT_DB" -c "SET search_path = $TENANT, kernel; \
   INSERT INTO tenant_config (legal_name, functional_currency) \
     VALUES ('Demo Mall LLC','USD') ON CONFLICT (tenant_id) DO NOTHING;"
 
+echo ">> journal posting counter (posting serialization point)"
+$PSQL -d "$TENANT_DB" -c "SET search_path = $TENANT, kernel; \
+  SET app.tenant_id = '$DEMO_TENANT_ID'; \
+  INSERT INTO journal_counter (tenant_id, last_entry_no) \
+    VALUES ('$DEMO_TENANT_ID', 0) ON CONFLICT (tenant_id) DO NOTHING;"
+
 # Seeds (CoA + posting_map, consignment CoA, fiscal calendar generator).
 for f in 35_coa_seed.sql 37_coa_consignment.sql 38_coa_pos.sql 39_coa_close.sql 39_coa_tax.sql 36_tenant_seed.sql; do
   echo "   - $f"

@@ -110,6 +110,36 @@ CREATE TRIGGER trg_fiscal_period_audit
   FOR EACH ROW EXECUTE FUNCTION kernel.touch_audit();
 
 -- ----------------------------------------------------------------------------
+-- Journal counter — the tenant's posting serialization point.
+--
+-- Ported from the sibling kernel's book_journal_counters. The kernel already
+-- assigns entry_no from an identity sequence, which is atomic; what the sequence
+-- does NOT do is serialize the whole posting. Two problems follow from that:
+--
+--   1. The hash chain (JI-3) reads the latest entry_hash and links to it. Two
+--      concurrent posters both read the same predecessor, both compute a
+--      successor of it, and the second loses to ux_journal_entry_prev_hash. The
+--      posting fails with a unique violation that looks like a bug in the caller
+--      but is really a missing lock. Serializing on this row makes the chain
+--      race-free.
+--   2. Lock order. A posting touches the counter, then the fiscal period, then
+--      each line's account. If two posters could take those locks in different
+--      orders they could deadlock. Taking the counter FIRST -- before any period
+--      or account lock -- makes the order total and identical for every poster,
+--      so a deadlock is impossible by construction.
+--
+-- One row per tenant schema (seeded at provisioning). last_entry_no mirrors the
+-- last assigned entry_no so the counter is observable and testable.
+-- ----------------------------------------------------------------------------
+CREATE TABLE journal_counter (
+  tenant_id     uuid PRIMARY KEY DEFAULT kernel.current_tenant(),
+  last_entry_no bigint NOT NULL DEFAULT 0 CHECK (last_entry_no >= 0),
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+COMMENT ON TABLE journal_counter IS
+  'One row per tenant. Locked FOR UPDATE at the start of every posting to serialize the hash chain and fix lock order (counter -> period -> account).';
+
+-- ----------------------------------------------------------------------------
 -- Journal Entry — append-only header. Corrections are reversals, never edits.
 -- ----------------------------------------------------------------------------
 CREATE TABLE journal_entry (
@@ -129,6 +159,13 @@ CREATE TABLE journal_entry (
   entry_hash      text,
   created_by      uuid,
   created_at      timestamptz NOT NULL DEFAULT now(),
+  -- POSTING SEAL (ported from the sibling kernel). The transaction that creates
+  -- the header is the ONLY transaction allowed to add lines to it. Without this,
+  -- a later transaction could append a balanced pair of lines to an already
+  -- committed entry: the deferred balance trigger would still pass, the chain
+  -- would be untouched, and the entry would silently grow after the fact. The
+  -- xid is captured here and checked on every line insert.
+  posting_xid     xid8 NOT NULL DEFAULT pg_current_xact_id(),
   UNIQUE (tenant_id, entry_no),
   UNIQUE (tenant_id, idempotency_key)
 );
@@ -216,8 +253,26 @@ COMMENT ON FUNCTION journal_entry_digest IS
 
 CREATE OR REPLACE FUNCTION journal_entry_hash_chain() RETURNS trigger
 LANGUAGE plpgsql AS $$
-DECLARE v_prev text;
+DECLARE
+  v_prev text;
+  v_last bigint;
 BEGIN
+  -- Serialize postings for this tenant: lock the counter row FIRST, before any
+  -- period or account lock. This makes the hash chain race-free (two posters can
+  -- no longer read the same predecessor) and fixes the lock order
+  -- (counter -> period -> account) for every poster, so a deadlock is impossible.
+  SELECT last_entry_no INTO v_last
+    FROM journal_counter
+   WHERE tenant_id = NEW.tenant_id
+   FOR UPDATE;
+  IF v_last IS NULL THEN
+    RAISE EXCEPTION 'tenant % has no journal counter; provisioning is incomplete', NEW.tenant_id
+      USING ERRCODE = '23503';
+  END IF;
+  UPDATE journal_counter
+     SET last_entry_no = NEW.entry_no, updated_at = now()
+   WHERE tenant_id = NEW.tenant_id;
+
   SELECT entry_hash INTO v_prev
     FROM journal_entry
    WHERE tenant_id = NEW.tenant_id
@@ -229,7 +284,7 @@ BEGIN
   RETURN NEW;
 END; $$;
 COMMENT ON FUNCTION journal_entry_hash_chain IS
-  'BEFORE INSERT: chains each entry to its predecessor (JI-3).';
+  'BEFORE INSERT: locks the tenant journal counter (serialization + lock order), then chains each entry to its predecessor (JI-3).';
 
 CREATE TRIGGER trg_journal_entry_hash_chain
   BEFORE INSERT ON journal_entry
@@ -307,9 +362,14 @@ CREATE OR REPLACE FUNCTION assert_period_open() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE v_status text;
 BEGIN
+  -- FOR UPDATE: lock the period row as the second step of the posting lock order
+  -- (counter -> period -> account). A concurrent period close then cannot slip
+  -- between this check and the commit of the posting.
   SELECT status INTO v_status FROM fiscal_period
     WHERE start_date <= NEW.entry_date AND end_date >= NEW.entry_date
-    LIMIT 1;
+    ORDER BY start_date
+    LIMIT 1
+    FOR UPDATE;
   IF v_status IS NULL THEN
     RAISE EXCEPTION 'No fiscal period covers entry_date %', NEW.entry_date USING ERRCODE='23514';
   END IF;
@@ -397,6 +457,57 @@ COMMENT ON FUNCTION assert_control_account_tagged IS
 CREATE TRIGGER trg_journal_line_control_tagged
   BEFORE INSERT ON journal_line
   FOR EACH ROW EXECUTE FUNCTION assert_control_account_tagged();
+
+-- (6) ACCOUNT LOCK: lock the line's account as the third and final step of the
+-- posting lock order (counter -> period -> account). The trigger name sorts first
+-- among the journal_line BEFORE INSERT triggers so the lock is taken before the
+-- subledger checks read the account. Because the counter is already held, two
+-- posters can never take account locks in opposite orders, so a deadlock is
+-- impossible; the lock exists to serialise a posting against a concurrent change
+-- to the account it posts to.
+CREATE OR REPLACE FUNCTION assert_line_account_lock() RETURNS trigger
+LANGUAGE plpgsql AS $$
+DECLARE v_id uuid;
+BEGIN
+  SELECT id INTO v_id FROM account WHERE id = NEW.account_id FOR UPDATE;
+  IF v_id IS NULL THEN
+    RAISE EXCEPTION 'Journal line account % does not exist', NEW.account_id USING ERRCODE='23503';
+  END IF;
+  RETURN NEW;
+END; $$;
+COMMENT ON FUNCTION assert_line_account_lock IS
+  'BEFORE INSERT on journal_line: locks the line account FOR UPDATE (posting lock order step 3).';
+
+CREATE TRIGGER trg_journal_line_0_lock_account
+  BEFORE INSERT ON journal_line
+  FOR EACH ROW EXECUTE FUNCTION assert_line_account_lock();
+
+-- (7) POSTING SEAL (ported from the sibling kernel). The transaction that created
+-- a journal entry is the only one permitted to add lines to it. A later
+-- transaction that tries to append a balanced pair of lines is refused: without
+-- this, an entry could grow after it was posted, and the deferred balance check
+-- would happily accept the new pair because it only ever looks at the totals.
+CREATE OR REPLACE FUNCTION assert_line_same_xact() RETURNS trigger
+LANGUAGE plpgsql AS $$
+DECLARE v_xid xid8;
+BEGIN
+  SELECT posting_xid INTO v_xid FROM journal_entry WHERE id = NEW.journal_entry_id;
+  IF v_xid IS NULL THEN
+    RAISE EXCEPTION 'Journal line journal % does not exist', NEW.journal_entry_id USING ERRCODE='23503';
+  END IF;
+  IF v_xid IS DISTINCT FROM pg_current_xact_id() THEN
+    RAISE EXCEPTION
+      'A journal line cannot be added to entry % after it was posted; the entry is sealed to its posting transaction',
+      NEW.journal_entry_id USING ERRCODE='23514';
+  END IF;
+  RETURN NEW;
+END; $$;
+COMMENT ON FUNCTION assert_line_same_xact IS
+  'BEFORE INSERT on journal_line: refuses a line whose transaction differs from the journal entry''s posting_xid (posting seal).';
+
+CREATE TRIGGER trg_journal_line_seal
+  BEFORE INSERT ON journal_line
+  FOR EACH ROW EXECUTE FUNCTION assert_line_same_xact();
 
 -- ============================================================================
 -- POSTING API (idempotent) + REVERSAL + TRIAL BALANCE

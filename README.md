@@ -105,8 +105,8 @@ apps/                    the deployable applications — one directory per web-f
   tenant-ui/             the Tenant UI application (NinjaEmp\TenantUi\*) — server-rendered templates
     public/              front controller + dev-server router (the document root)
 db/                      PostgreSQL schema (DB-first). Numbered, idempotent, re-runnable.
-  migrations/            versioned, resumable, checksum-verified migrations (0001…0007)
-  tests/                 SQL assertion suites (11 suites, 241 assertions)
+  migrations/            versioned, resumable, checksum-verified migrations (0001…0008)
+  tests/                 SQL assertion suites (12 suites, 251 assertions) + concurrency race harness
 bootstrap/               zero-dependency autoloader + PSR interface stubs (used when vendor/ is absent)
 bin/ninja                the developer task runner (pure PHP — no make, no bash)
 scripts/                 backup / restore / sync / migrate helpers
@@ -172,7 +172,7 @@ php bin/ninja test-e2e   # end-to-end only (boots the real front controllers ove
 The **database** suites are separate (they need a live PostgreSQL):
 
 ```bash
-bash scripts/run_tests.sh          # all 11 suites
+bash scripts/run_tests.sh          # all 12 suites + the concurrency race harness
 bash scripts/run_tests.sh close    # just one suite
 ```
 
@@ -189,7 +189,15 @@ bash scripts/run_tests.sh close    # just one suite
 | `lease.sql` | 20 | **PASS** |
 | `retail.sql` | 37 | **PASS** |
 | `settlement.sql` | 19 | **PASS** |
-| **Total** | **241** | **GREEN** |
+| `append_only_guard.sql` | 10 | **PASS** |
+| **Total** | **251** | **GREEN** |
+
+The **race harness** (`db/tests/run-race.sh`) runs two concurrent sessions per
+scenario — counter, period, account, idempotency key — and fails if the second
+session does not block on the first session's lock. It proves the posting lock
+order (counter → period → account) and that postings serialize on the tenant
+`journal_counter`, so the hash chain can never race two posters to the same
+predecessor.
 
 ---
 

@@ -7,6 +7,7 @@ PostgreSQL **18** (verified on 18.6). **Two databases** (ADR-0008): `ninja_contr
 |------|-------|---------|
 | `00_bootstrap.sql` | once/db (`ninja_control`) | Control plane: tenant registry (`control` schema) |
 | `00_kernel.sql` | once/db (`ninja_emp`) | Extensions (into `kernel`), domains, helper fns, global reference data |
+| `01_guard.sql` | once/db (`ninja_emp`) | Append-only guard functions + event triggers (TRUNCATE, `DISABLE`/`DROP`, replica mode) |
 | `99_roles.sql` | cluster | `ninja_app` (NOBYPASSRLS) + `ninja_migrator` (BYPASSRLS) |
 | `05_audit.sql` | per-tenant | Append-only `audit_log` + row-history triggers (ADR-0017) |
 | `10_party.sql` | per-tenant | Party Model + PII encryption/masking (ADR-0018) |
@@ -26,32 +27,51 @@ PostgreSQL **18** (verified on 18.6). **Two databases** (ADR-0008): `ninja_contr
 | `75_pos_posting.sql` | per-tenant | `post_sale` / `post_refund` / `post_shift_close` / `post_merchant_settlement` (idempotent) |
 | `80_vendor_portal.sql` | per-tenant | **Realtime vendor portal** views + `vendor_portal_check()` tie-out |
 | `90_rls.sql` | per-tenant | RLS defense-in-depth (journal tables excluded — ADR-0007) |
+| `98_append_only_guard.sql` | per-tenant | Arms the append-only guards: `ENABLE ALWAYS` triggers, TRUNCATE guards, `DISABLE`/`DROP` event triggers |
 | `tests/invariants.sql` | per-tenant | Proves the accounting + enterprise-data invariants on real PG |
 | `tests/vendormall.sql` | per-tenant | Vendor Mall domain + ledger integration |
 | `tests/partition.sql` | per-tenant | Proves the journal design is partition-ready (ADR-0019) |
 | `tests/consignment.sql` | per-tenant | Consignment domain + ledger integration |
 | `tests/pos.sql` | per-tenant | POS, tenders, tax, refunds, drawer, merchant fees, realtime portal |
 | `tests/rls_benchmark.sql` | per-tenant | Measures RLS cost on the hot journal path |
+| `tests/append_only_guard.sql` | per-tenant | Proves the append-only guards survive replica mode, TRUNCATE, and `DISABLE`/`DROP` |
+| `tests/run-race.sh` + `tests/race/*.sql` | per-tenant | **Concurrency (race) proof harness** — two sessions per scenario (counter/period/account/key) |
+| `migrations/0008_posting_serialization.sql` | per-tenant | Posting serialization, lock order, posting seal, singleton config, IANA timezone |
 
 ## Run
 ```bash
-bash db/provision.sh tenant_demo
-sudo -u postgres psql -d ninja_emp -v ON_ERROR_STOP=1 -f db/tests/invariants.sql
-sudo -u postgres psql -d ninja_emp -v ON_ERROR_STOP=1 -f db/tests/vendormall.sql
-sudo -u postgres psql -d ninja_emp -v ON_ERROR_STOP=1 -f db/tests/partition.sql
-sudo -u postgres psql -d ninja_emp -v ON_ERROR_STOP=1 -f db/tests/consignment.sql
-sudo -u postgres psql -d ninja_emp -v ON_ERROR_STOP=1 -f db/tests/pos.sql
+bash db/provision.sh tenant_demo          # build from scratch (destructive)
+bash scripts/run_tests.sh                 # every SQL suite + the race harness
+bash scripts/run_tests.sh close pos       # only named SQL suites
+bash db/tests/run-race.sh tenant_demo     # the concurrency proof harness alone
 ```
-All five suites are **idempotent** (safe to re-run against a live tenant).
+All SQL suites are **idempotent** (safe to re-run against a live tenant). The race
+harness runs two concurrent `psql` sessions per scenario and is a hard gate: if
+session B returns without waiting on session A's lock, the run is red.
 
 ## Test results (all green, re-runnable)
 | Suite | Assertions | Result |
 |-------|-----------|--------|
-| `invariants.sql` | 19 | **19/19 PASS** |
-| `vendormall.sql` | 20 | **20/20 PASS** |
-| `partition.sql` | 5 | **5/5 PASS** |
+| `invariants.sql` | 28 | **28/28 PASS** |
 | `consignment.sql` | 12 | **12/12 PASS** |
+| `vendormall.sql` | 20 | **20/20 PASS** |
 | `pos.sql` | 27 | **27/27 PASS** |
+| `partition.sql` | 6 | **6/6 PASS** |
+| `close.sql` | 23 | **23/23 PASS** |
+| `inventory.sql` | 30 | **30/30 PASS** |
+| `tax1099.sql` | 19 | **19/19 PASS** |
+| `lease.sql` | 20 | **20/20 PASS** |
+| `retail.sql` | 37 | **37/37 PASS** |
+| `settlement.sql` | 19 | **19/19 PASS** |
+| `append_only_guard.sql` | 10 | **10/10 PASS** |
+| `run-race.sh` (counter/period/account/key) | 4 | **4/4 RACE_OK** |
+
+**Concurrency proven (ported from the sibling kernel):** postings serialize on the tenant
+`journal_counter` — the hash chain can no longer race two posters to the same predecessor ·
+the posting lock order is total and identical for every poster (counter → period → account), so a
+deadlock is impossible by construction · a `journal_entry` is sealed to its posting transaction
+(`posting_xid`), so a line cannot be appended after it is posted · `tenant_config` is a true
+singleton · `timezone` columns are validated IANA names.
 
 **Invariants proven:** trial balance = 0 · unbalanced entry rejected · append-only enforced ·
 reversal nets to zero · idempotent posting · period lock · subledger↔control account ·

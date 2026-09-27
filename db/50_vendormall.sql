@@ -18,7 +18,7 @@ CREATE TABLE location (
   tenant_id    uuid NOT NULL DEFAULT kernel.current_tenant(),
   code         text NOT NULL,
   name         text NOT NULL,
-  timezone     text NOT NULL DEFAULT 'UTC',
+  timezone     kernel.iana_timezone NOT NULL DEFAULT 'UTC',
   address_line1 text,
   address_line2 text,
   city         text,
