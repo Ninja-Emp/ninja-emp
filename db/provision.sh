@@ -31,6 +31,9 @@ $PSQL -c "DROP DATABASE IF EXISTS $TENANT_DB;" >/dev/null
 $PSQL -c "CREATE DATABASE $TENANT_DB;" >/dev/null
 $PSQL -d "$TENANT_DB" -f "$HERE/00_kernel.sql"
 
+echo ">> append-only guard functions + event triggers (once/db)"
+$PSQL -d "$TENANT_DB" -f "$HERE/01_guard.sql"
+
 echo ">> kernel grants (per-database)"
 $PSQL -d "$TENANT_DB" -c "GRANT USAGE ON SCHEMA kernel TO ninja_app, ninja_migrator; \
   GRANT SELECT ON ALL TABLES IN SCHEMA kernel TO ninja_app, ninja_migrator; \
@@ -64,7 +67,7 @@ for f in 40_subledger.sql 45_openitem.sql 50_vendormall.sql 55_vendormall_postin
          70_pos.sql 72_inventory.sql 75_pos_posting.sql 77_pos_inventory.sql \
          78_stored_value.sql 79_vendor_draw.sql 80_vendor_portal.sql \
          82_tax_1099.sql 83_lease_trueup.sql 84_markdown_layaway.sql 86_commission_trueup.sql \
-         85_close.sql 90_rls.sql; do
+         85_close.sql 90_rls.sql 98_append_only_guard.sql; do
   echo "   - $f"
   # tenant_id is needed because some domain files seed tenant reference data
   # (e.g. 70_pos.sql seeds tender_type).

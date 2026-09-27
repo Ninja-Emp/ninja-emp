@@ -179,7 +179,7 @@ BEGIN
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RAISE NOTICE '  journal line memos truncated: %', v_count;
 
-  PERFORM set_config('session_replication_role', 'origin', true);
+  PERFORM kernel.append_only_guards_set(true);
 
   -- --- card metadata --------------------------------------------------------
   IF to_regclass(v_schema || '.payment_tender') IS NOT NULL THEN
@@ -207,7 +207,7 @@ BEGIN
   -- TRAIL (who/what/when, row counts, cardinality), not the old values.
   --
   -- This runs LAST so it also captures the scrub's own writes.
-  PERFORM set_config('session_replication_role', 'replica', true);
+  PERFORM kernel.append_only_guards_set(false);
 
   UPDATE audit_log
      SET before_data = CASE WHEN before_data IS NULL THEN NULL
